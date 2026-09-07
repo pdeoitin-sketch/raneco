@@ -2,13 +2,18 @@
   "name": "tempo-time-dashboard",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "A polished browser-based dashboard for world clocks, timers, stopwatch, and time calculations.",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test tests/*.test.mjs",
+    "build:tz-data": "node scripts/build-tz-data.mjs",
+    "fetch:tz-data": "node scripts/build-tz-data.mjs --fetch"
   },
   "devDependencies": {
+    "jsdom": "^30.0.1",
     "vite": "^7.1.7"
   }
 }
