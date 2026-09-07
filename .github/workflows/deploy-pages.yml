@@ -1,0 +1,71 @@
+# Build the Vite project and deploy the `dist/` folder to GitHub Pages.
+#
+# Triggered on every push to `main` (and manually from the Actions tab).
+# Requires the repository's Pages source to be set to "GitHub Actions"
+# (Settings → Pages → Build and deployment → Source).
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least-privilege token: read the repo, write the Pages deployment, and mint
+# the OIDC token that actions/deploy-pages uses to verify the deployment.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment at a time. Don't cancel an in-flight deployment;
+# let it finish and then deploy the newest queued commit.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Resolves the site's public URL and, importantly, its base path
+      # ("/raneco" for a project site, "" for a user/org site or custom domain).
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v6
+
+      # Vite must know the base path so `dist/index.html` references
+      # `/raneco/assets/...` instead of `/assets/...`, which 404s on Pages.
+      - name: Build with Vite
+        run: npm run build
+        env:
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
