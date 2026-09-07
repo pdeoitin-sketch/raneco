@@ -124,9 +124,6 @@ body.dark .little-card { background: #302c45; color: #d8d4e8; }
 .little-card-icon { color: var(--violet); font-size: 17px; line-height: 1; margin-bottom: 10px; }
 .little-card .eyebrow { color: #76748c; margin-bottom: 6px; font-size: 9px; }
 .little-card p:last-child { margin: 0; font-size: 11px; line-height: 1.5; }
-.quiet-button { border: 0; background: transparent; color: var(--ink-3); display: flex; align-items: center; gap: 9px; padding: 7px 12px; font-size: 12px; text-align: left; }
-.quiet-button:hover { color: var(--violet); }
-.quiet-button svg { width: 17px; height: 17px; }
 
 main { margin-left: 246px; padding: 42px clamp(28px, 5vw, 76px) 28px; max-width: 1600px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 auto 36px; max-width: 1200px; }
@@ -186,7 +183,7 @@ h3 { margin: 0; letter-spacing: -.75px; line-height: 1.15; font-size: 19px; }
 
 .footer { max-width: 1200px; display: flex; justify-content: space-between; align-items: center; margin: 58px auto 0; padding: 18px 1px 1px; color: var(--ink-3); border-top: 1px solid var(--line); font-size: 10px; }.footer p { margin: 0; }.footer-mark { color: var(--ink); font-weight: 700; letter-spacing: -.5px; }
 
-.zone-dialog { width: min(430px, calc(100% - 32px)); border: 0; padding: 0; color: var(--ink); background: transparent; border-radius: 20px; box-shadow: 0 20px 70px rgba(18,16,40,.28); }.zone-dialog::backdrop { background: rgba(28,26,48,.48); backdrop-filter: blur(3px); }.dialog-card { position: relative; padding: 30px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }.dialog-card .eyebrow { color: var(--violet); }.dialog-card h2 { font-size: 24px; }.dialog-copy { max-width: 310px; margin: 11px 0 23px; color: var(--ink-2); font-size: 12px; line-height: 1.5; }.dialog-select-label { display: block; margin-bottom: 7px; color: var(--ink-3); font-size: 9px; font-weight: 700; letter-spacing: 1px; }.dialog-card select { width: 100%; height: 42px; outline: none; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--ink); background: var(--surface); padding: 0 10px; font-size: 12px; }.dialog-submit { width: 100%; margin-top: 18px; }.dialog-close { position: absolute; top: 15px; right: 16px; border: 0; color: var(--ink-3); background: none; font-size: 26px; font-weight: 300; line-height: 1; }.dialog-close:hover { color: var(--ink); }.toast { position: fixed; z-index: 20; left: 50%; bottom: 28px; display: flex; align-items: center; gap: 9px; padding: 11px 15px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); box-shadow: 0 14px 34px rgba(25,23,48,.17); font-size: 11px; font-weight: 600; transform: translate(-50%, 22px); opacity: 0; visibility: hidden; transition: .25s ease; }.toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }.toast-icon { display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; color: white; background: var(--mint); font-size: 10px; }.mobile-nav, .mobile-nav-backdrop { display: none; }
+.zone-dialog { width: min(430px, calc(100% - 32px)); border: 0; padding: 0; color: var(--ink); background: transparent; border-radius: 20px; box-shadow: 0 20px 70px rgba(18,16,40,.28); }.zone-dialog::backdrop { background: rgba(28,26,48,.48); backdrop-filter: blur(3px); }.dialog-card { position: relative; padding: 30px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }.dialog-card .eyebrow { color: var(--violet); }.dialog-card h2 { font-size: 24px; }.dialog-copy { max-width: 310px; margin: 11px 0 23px; color: var(--ink-2); font-size: 12px; line-height: 1.5; }.dialog-select-label { display: block; margin-bottom: 7px; color: var(--ink-3); font-size: 9px; font-weight: 700; letter-spacing: 1px; } /* superseded by .picker-search */.dialog-submit { width: 100%; margin-top: 18px; }.dialog-close { position: absolute; top: 15px; right: 16px; border: 0; color: var(--ink-3); background: none; font-size: 26px; font-weight: 300; line-height: 1; }.dialog-close:hover { color: var(--ink); }.toast { position: fixed; z-index: 20; left: 50%; bottom: 28px; display: flex; align-items: center; gap: 9px; padding: 11px 15px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); box-shadow: 0 14px 34px rgba(25,23,48,.17); font-size: 11px; font-weight: 600; transform: translate(-50%, 22px); opacity: 0; visibility: hidden; transition: .25s ease; }.toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }.toast-icon { display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; color: white; background: var(--mint); font-size: 10px; }.mobile-nav, .mobile-nav-backdrop { display: none; }
 
 @media (max-width: 1180px) {
   main { padding-left: 42px; padding-right: 42px; }
@@ -214,3 +211,656 @@ h3 { margin: 0; letter-spacing: -.75px; line-height: 1.15; font-size: 19px; }
 @media (max-width: 480px) {
   main { padding-left: 14px; padding-right: 14px; }.topbar { align-items: flex-start; }.topbar-actions { padding-top: 2px; }.status-pill { width: 36px; min-width: 36px; height: 36px; padding: 0; justify-content: center; }.status-pill > span:last-child { display: none; }.status-dot { width: 8px; height: 8px; }.now-card-top { gap: 10px; }.soft-button { padding: 0 9px; font-size: 10px; }.soft-button svg { display: none; }.digital-time { font-size: 15.2vw; }.quick-card { padding-left: 14px; padding-right: 14px; }.mini-progress { left: 14px; right: 14px; }.card-topline { font-size: 8px; }.quick-countdown { font-size: 19px; letter-spacing: -1.2px; }.quick-card p { font-size: 10px; }.world-grid { grid-template-columns: 1fr 1fr; }.city-label strong { max-width: 70px; }.world-time { font-size: 21px; }.world-card-bottom { gap: 3px; }.world-card-bottom span:last-child { font-size: 8px; }.timer-layout { gap: 13px; }.timer-ring { width: 128px; height: 128px; }.timer-ring-inner span { font-size: 21px; }.timer-controls { min-width: 0; }.time-inputs { gap: 5px; }.time-inputs input { padding: 0 6px; }.input-colon { padding-bottom: 10px; }.preset-row { gap: 3px; }.preset-button { font-size: 8px; }.primary-actions { gap: 5px; }.timer-start { font-size: 10px; }.reset-button { flex-basis: 37px; width: 37px; height: 37px; }.calculator-card-heading h3 { font-size: 17px; }.converter-form { gap: 7px; }.converter-form input, .converter-form select { padding: 0 7px; }.conversion-hint { font-size: 9px; }.answer-totals { grid-template-columns: repeat(2, 1fr); row-gap: 11px; }.answer-totals > div:nth-child(2) { border-right: 0; }.answer-totals > div:nth-child(3), .answer-totals > div:nth-child(4) { border-top: 1px solid var(--line-strong); padding-top: 8px; }.footer { font-size: 9px; }.footer p:last-child { display: none; }
 }
+
+/* ====================================================================
+   Places, live weather and the Auto theme
+   --------------------------------------------------------------------
+   Everything below is additive: the blocks above stay as they were and
+   only the pieces this feature needs are re-tinted. Palettes are chosen
+   by `data-appearance` on <body> (see src/theme.js); each palette is a
+   set of colour tokens, and every token is registered with @property so
+   a sunrise->day->storm change animates instead of snapping.
+   ==================================================================== */
+
+/* Registered tokens: required for the browser to interpolate them. */
+@property --canvas { syntax: "<color>"; inherits: true; initial-value: #f7f7fb; }
+@property --canvas-soft { syntax: "<color>"; inherits: true; initial-value: #f1f1f7; }
+@property --surface { syntax: "<color>"; inherits: true; initial-value: #ffffff; }
+@property --surface-raised { syntax: "<color>"; inherits: true; initial-value: #fdfdff; }
+@property --ink { syntax: "<color>"; inherits: true; initial-value: #20212d; }
+@property --ink-2 { syntax: "<color>"; inherits: true; initial-value: #505263; }
+@property --ink-3 { syntax: "<color>"; inherits: true; initial-value: #8f91a0; }
+@property --line { syntax: "<color>"; inherits: true; initial-value: #e7e7ef; }
+@property --line-strong { syntax: "<color>"; inherits: true; initial-value: #d8d8e4; }
+@property --violet { syntax: "<color>"; inherits: true; initial-value: #6f55f6; }
+@property --violet-dark { syntax: "<color>"; inherits: true; initial-value: #5138d8; }
+@property --violet-soft { syntax: "<color>"; inherits: true; initial-value: #eeeaff; }
+@property --coral { syntax: "<color>"; inherits: true; initial-value: #fc806f; }
+@property --coral-soft { syntax: "<color>"; inherits: true; initial-value: #fff0ec; }
+@property --mint { syntax: "<color>"; inherits: true; initial-value: #66c9ac; }
+@property --mint-soft { syntax: "<color>"; inherits: true; initial-value: #e9f8f2; }
+@property --hero-1 { syntax: "<color>"; inherits: true; initial-value: #26223f; }
+@property --hero-2 { syntax: "<color>"; inherits: true; initial-value: #443283; }
+@property --hero-3 { syntax: "<color>"; inherits: true; initial-value: #725de5; }
+@property --tint-a { syntax: "<color>"; inherits: true; initial-value: #f3f0ff; }
+@property --tint-b { syntax: "<color>"; inherits: true; initial-value: #f9f8ff; }
+@property --card-tint { syntax: "<color>"; inherits: true; initial-value: #fbfaff; }
+@property --weather-a { syntax: "<color>"; inherits: true; initial-value: #f2f5ff; }
+@property --weather-b { syntax: "<color>"; inherits: true; initial-value: #f7fbf9; }
+@property --sky-glow { syntax: "<color>"; inherits: true; initial-value: #ffffff; }
+@property --on-violet { syntax: "<color>"; inherits: true; initial-value: #ffffff; }
+@property --star { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --rain { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --snow { syntax: "<number>"; inherits: true; initial-value: 0; }
+
+:root {
+  --tint-a: #f3f0ff;
+  --tint-b: #f9f8ff;
+  --card-tint: #fbfaff;
+  --weather-a: #f2f5ff;
+  --weather-b: #f7fbf9;
+  --hero-1: #26223f;
+  --hero-2: #443283;
+  --hero-3: #725de5;
+  --sky-glow: #ffffff;
+  --on-violet: #ffffff;
+  --star: 0;
+  --rain: 0;
+  --snow: 0;
+}
+
+/* ---------------------------------------------------------------- transitions */
+
+body {
+  transition:
+    background-color .7s ease, color .7s ease,
+    --canvas .7s ease, --canvas-soft .7s ease, --surface .7s ease, --surface-raised .7s ease,
+    --ink .7s ease, --ink-2 .7s ease, --ink-3 .7s ease, --line .7s ease, --line-strong .7s ease,
+    --violet .7s ease, --violet-dark .7s ease, --violet-soft .7s ease, --on-violet .7s ease,
+    --coral .7s ease, --coral-soft .7s ease, --mint .7s ease, --mint-soft .7s ease,
+    --hero-1 .9s ease, --hero-2 .9s ease, --hero-3 .9s ease,
+    --tint-a .9s ease, --tint-b .9s ease, --card-tint .9s ease,
+    --weather-a .9s ease, --weather-b .9s ease, --sky-glow 1.2s ease,
+    --star 1.2s ease, --rain 1.2s ease, --snow 1.2s ease;
+}
+.now-card, .quick-card, .tool-card, .calculator-card, .world-card, .sidebar, .dialog-card, .status-pill, .saved-section, .theme-switch {
+  transition: background-color .7s ease, border-color .7s ease, color .7s ease, box-shadow .7s ease, background .9s ease;
+}
+
+/* Anything that hard-codes a light-mode colour follows the palette instead. */
+body[data-appearance] .primary-button { color: var(--on-violet); border-color: var(--violet); }
+body[data-appearance] .primary-button:hover { background: var(--violet-dark); border-color: var(--violet-dark); }
+body[data-appearance] .little-card .eyebrow { color: var(--ink-3); }
+body[data-appearance] .world-card:before { opacity: .5; }
+body[data-ui="dark"] .world-card.color-0:before { background: rgba(136, 119, 241, .14); }
+body[data-ui="dark"] .world-card.color-1:before { background: rgba(242, 138, 115, .13); }
+body[data-ui="dark"] .world-card.color-2:before { background: rgba(92, 197, 166, .12); }
+body[data-ui="dark"] .world-card.color-3:before { background: rgba(108, 164, 236, .13); }
+body[data-ui="dark"] .world-card.color-4:before { background: rgba(199, 138, 218, .13); }
+body[data-ui="dark"] .world-card.color-5:before { background: rgba(217, 174, 77, .13); }
+body[data-ui="dark"] .formula-icon.soft { color: #86dcc1; }
+body[data-ui="dark"] .text-button { color: var(--mint); }
+body[data-ui="dark"] .icon-button:hover, body[data-ui="dark"] .outline-button:hover,
+body[data-ui="dark"] .secondary-button:hover:not(:disabled), body[data-ui="dark"] .preset-button:hover,
+body[data-ui="dark"] .preset-button.active { border-color: var(--violet); }
+body[data-appearance] .now-card { background: linear-gradient(128deg, var(--hero-1) 0%, var(--hero-2) 56%, var(--hero-3) 100%); }
+body[data-appearance] .timer-card, body[data-appearance] .duration-card { background: linear-gradient(135deg, var(--surface) 0%, var(--card-tint) 100%); }
+body[data-appearance] .little-card { background: linear-gradient(148deg, var(--tint-a), var(--tint-b)); color: var(--ink-2); }
+body[data-appearance] .quick-city { color: var(--ink) !important; }
+body[data-appearance] .coral-card, body[data-appearance] .mint-card { color: var(--ink-2); }
+body[data-appearance] .nav-link.active { color: var(--violet-dark); }
+body[data-appearance] .status-dot { background: var(--mint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mint) 18%, transparent); }
+
+/* Dark-ish palettes need the light-on-dark tweaks that used to be tied to the
+   old body.dark switch only. */
+body[data-ui="dark"] .icon-coral { color: #ffb0a0; background: rgba(252, 128, 111, .16); }
+body[data-ui="dark"] .icon-mint { color: #86dcc1; background: rgba(102, 201, 172, .14); }
+body[data-ui="dark"] .icon-sky { color: #a6c9ff; background: rgba(120, 165, 240, .16); }
+body[data-ui="dark"] .mini-progress { background: rgba(255, 255, 255, .12); }
+body[data-ui="dark"] .mint-card .mini-progress { background: rgba(255, 255, 255, .1); }
+body[data-ui="dark"] .tool-status { color: #f0a294; }
+body[data-ui="dark"] .tool-status.running { color: #7fdcb8; }
+body[data-ui="dark"] .tool-status.neutral { color: var(--ink-3); }
+body[data-ui="dark"] .same-day { color: #62d4a8 !important; }
+body[data-ui="dark"] .day-ahead { color: #8fabf0 !important; }
+body[data-ui="dark"] .day-behind { color: #f0a090 !important; }
+body[data-ui="dark"] .save-calculation { border-color: var(--line-strong); color: var(--ink-2); }
+body[data-ui="dark"] .weather-mini { background: rgba(255, 255, 255, .06); border-color: var(--line); color: var(--ink-2); }
+
+/* ---------------------------------------------------------------- palettes */
+
+/* Sunrise: warm peaches and apricots. */
+body[data-appearance="dawn"] {
+  --canvas: #fdf1e6;
+  --canvas-soft: #fbe8d8;
+  --surface: #fffaf4;
+  --surface-raised: #fff7ef;
+  --ink: #3d2822;
+  --ink-2: #6f4f43;
+  --ink-3: #a4806f;
+  --line: #f5ddc7;
+  --line-strong: #ecc9ab;
+  --violet: #b95518;
+  --violet-dark: #97450f;
+  --violet-soft: #fbe4ce;
+  --coral: #f4886b;
+  --coral-soft: #ffe3d6;
+  --mint: #4fa787;
+  --mint-soft: #e3f2e9;
+  --hero-1: #7a3a3e;
+  --hero-2: #d0703f;
+  --hero-3: #ffb265;
+  --tint-a: #fce9d6;
+  --tint-b: #fdf4e9;
+  --card-tint: #fff6ec;
+  --weather-a: #ffe6cf;
+  --weather-b: #fff3e4;
+  --sky-glow: #ffd7a8;
+}
+
+/* Bright sunny day: very clean white, crisp ink, blue sky hero. */
+body[data-appearance="clear"] {
+  --canvas: #ffffff;
+  --canvas-soft: #f3f6fa;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --ink: #0e1119;
+  --ink-2: #454c5c;
+  --ink-3: #858da0;
+  --line: #e6eaf0;
+  --line-strong: #d3dae5;
+  --violet: #4a3fd6;
+  --violet-dark: #37299c;
+  --violet-soft: #ecebfb;
+  --coral: #f4694f;
+  --coral-soft: #ffefeb;
+  --mint: #2fae8b;
+  --mint-soft: #e4f7f0;
+  --hero-1: #1b56c9;
+  --hero-2: #2f7fe0;
+  --hero-3: #5aa3ef;
+  --tint-a: #eef4ff;
+  --tint-b: #f8fbff;
+  --card-tint: #fafcff;
+  --weather-a: #e7f2ff;
+  --weather-b: #f6fbff;
+  --sky-glow: #dbeeff;
+  --star: 0;
+}
+
+/* Cloudy: soft grey, low glare. */
+body[data-appearance="cloud"] {
+  --canvas: #eceef2;
+  --canvas-soft: #e4e7ee;
+  --surface: #f9fafc;
+  --surface-raised: #fdfdfe;
+  --ink: #23262e;
+  --ink-2: #545a68;
+  --ink-3: #8d93a2;
+  --line: #dfe3ea;
+  --line-strong: #c9cfdb;
+  --violet: #5f6394;
+  --violet-dark: #464a75;
+  --violet-soft: #e6e7f3;
+  --coral: #d5776a;
+  --coral-soft: #f8e7e3;
+  --mint: #5d9c8a;
+  --mint-soft: #e3efe9;
+  --hero-1: #4b5364;
+  --hero-2: #6d7789;
+  --hero-3: #9aa5b7;
+  --tint-a: #e9ebf1;
+  --tint-b: #f3f4f8;
+  --card-tint: #f5f6f9;
+  --weather-a: #e6e9ef;
+  --weather-b: #f1f3f7;
+  --sky-glow: #cfd6e2;
+}
+
+/* Fog: pale, muted, a touch of blue. */
+body[data-appearance="fog"] {
+  --canvas: #eaedf1;
+  --canvas-soft: #e2e6ec;
+  --surface: #f7f9fb;
+  --surface-raised: #fcfdfe;
+  --ink: #262c35;
+  --ink-2: #57606d;
+  --ink-3: #8f98a6;
+  --line: #dde2e9;
+  --line-strong: #c8d0da;
+  --violet: #5d7088;
+  --violet-dark: #465a72;
+  --violet-soft: #e6ebf1;
+  --coral: #d18377;
+  --coral-soft: #f7e9e5;
+  --mint: #64a08e;
+  --mint-soft: #e4efe9;
+  --hero-1: #4a5563;
+  --hero-2: #74839a;
+  --hero-3: #a9b6c6;
+  --tint-a: #e7ebf0;
+  --tint-b: #f2f5f8;
+  --card-tint: #f4f6f9;
+  --weather-a: #e6ebf1;
+  --weather-b: #f1f4f8;
+  --sky-glow: #d5dde7;
+}
+
+/* Rain: slate blues, cooler ink. */
+body[data-appearance="rain"] {
+  --canvas: #e6edf4;
+  --canvas-soft: #dbe5ef;
+  --surface: #f6f9fc;
+  --surface-raised: #fbfdff;
+  --ink: #1c2733;
+  --ink-2: #4c5a6b;
+  --ink-3: #8393a5;
+  --line: #d7e1ec;
+  --line-strong: #bfcde0;
+  --violet: #3f6d99;
+  --violet-dark: #2c527a;
+  --violet-soft: #e1eaf4;
+  --coral: #d97a68;
+  --coral-soft: #f7e6e1;
+  --mint: #4c9f92;
+  --mint-soft: #dfefeb;
+  --hero-1: #1e3350;
+  --hero-2: #33587e;
+  --hero-3: #5f8fb8;
+  --tint-a: #e0e9f2;
+  --tint-b: #eef4f9;
+  --card-tint: #f1f6fa;
+  --weather-a: #dde8f3;
+  --weather-b: #eaf2f9;
+  --sky-glow: #b9cfe6;
+  --rain: .5;
+}
+
+/* Snow: cool whites with a bluish cast. */
+body[data-appearance="snow"] {
+  --canvas: #eef4f9;
+  --canvas-soft: #e3ecf5;
+  --surface: #fbfdff;
+  --surface-raised: #ffffff;
+  --ink: #1d2733;
+  --ink-2: #4d5a6a;
+  --ink-3: #8796a7;
+  --line: #dce6f0;
+  --line-strong: #c3d3e2;
+  --violet: #3f6c92;
+  --violet-dark: #2c5375;
+  --violet-soft: #e3edf6;
+  --coral: #e08a7a;
+  --coral-soft: #fbe9e5;
+  --mint: #5aa693;
+  --mint-soft: #e2f1ec;
+  --hero-1: #38566f;
+  --hero-2: #5f87a6;
+  --hero-3: #a9c8de;
+  --tint-a: #e6eef6;
+  --tint-b: #f2f7fc;
+  --card-tint: #f3f8fc;
+  --weather-a: #e6f0f8;
+  --weather-b: #f3f9fd;
+  --sky-glow: #cfe1f1;
+  --snow: .55;
+}
+
+/* Golden hour / dusk: warm plum dark. */
+body[data-appearance="dusk"] {
+  --canvas: #241a24;
+  --canvas-soft: #2b1f2b;
+  --surface: #30242f;
+  --surface-raised: #382a36;
+  --ink: #f8ece6;
+  --ink-2: #d6bcb6;
+  --ink-3: #a98c88;
+  --line: #46333f;
+  --line-strong: #5a4250;
+  --violet: #b05a28;
+  --violet-dark: #d17a41;
+  --on-violet: #fff6ef;
+  --violet-soft: #46302f;
+  --coral: #ff8f79;
+  --coral-soft: #502e2e;
+  --mint: #7ccbb2;
+  --mint-soft: #27403c;
+  --hero-1: #2b1226;
+  --hero-2: #7a2f3f;
+  --hero-3: #e38a4c;
+  --tint-a: #38283a;
+  --tint-b: #2f2331;
+  --card-tint: #362837;
+  --weather-a: #3a2833;
+  --weather-b: #31222e;
+  --sky-glow: #ff9e63;
+}
+
+/* Thunderstorm: dark and electric. */
+body[data-appearance="storm"] {
+  --canvas: #14161f;
+  --canvas-soft: #1a1d28;
+  --surface: #20242f;
+  --surface-raised: #262b38;
+  --ink: #eef1fb;
+  --ink-2: #b8c1d6;
+  --ink-3: #8791a8;
+  --line: #323848;
+  --line-strong: #414a60;
+  --violet: #9c8bff;
+  --violet-dark: #bfb2ff;
+  --on-violet: #17142a;
+  --violet-soft: #2b2a4c;
+  --coral: #ff9b85;
+  --coral-soft: #3d2a30;
+  --mint: #74d8bb;
+  --mint-soft: #223d39;
+  --hero-1: #0c0d16;
+  --hero-2: #2d2a5c;
+  --hero-3: #6a5cc4;
+  --tint-a: #262a3c;
+  --tint-b: #1f2231;
+  --card-tint: #242938;
+  --weather-a: #242a3c;
+  --weather-b: #1e2231;
+  --sky-glow: #6a5cc4;
+  --rain: .8;
+}
+
+/* Night: deep blue-black and a starfield. */
+body[data-appearance="night"] {
+  --canvas: #0d1020;
+  --canvas-soft: #12162a;
+  --surface: #171c33;
+  --surface-raised: #1c2239;
+  --ink: #eef0ff;
+  --ink-2: #bcc3e2;
+  --ink-3: #8b93b8;
+  --line: #262c48;
+  --line-strong: #333b5c;
+  --violet: #a99bff;
+  --violet-dark: #cabfff;
+  --on-violet: #12142c;
+  --violet-soft: #262a4e;
+  --coral: #ff9d86;
+  --coral-soft: #3a2733;
+  --mint: #6fd9b8;
+  --mint-soft: #1e3a37;
+  --hero-1: #06081a;
+  --hero-2: #171a44;
+  --hero-3: #3b3a86;
+  --tint-a: #1c2140;
+  --tint-b: #161b36;
+  --card-tint: #1a2039;
+  --weather-a: #1a2140;
+  --weather-b: #161b36;
+  --sky-glow: #2a2f66;
+  --star: 1;
+}
+
+/* Manual light / dark simply reuse the two original palettes. */
+body[data-appearance="light"] {
+  --on-violet: #ffffff;
+  --tint-a: #f3f0ff;
+  --tint-b: #f9f8ff;
+  --card-tint: #fbfaff;
+  --weather-a: #f2f5ff;
+  --weather-b: #f7fbf9;
+  --hero-1: #26223f;
+  --hero-2: #443283;
+  --hero-3: #725de5;
+  --sky-glow: #ffffff;
+  --on-violet: #ffffff;
+  --star: 0;
+  --rain: 0;
+  --snow: 0;
+}
+body[data-appearance="dark"] {
+  --tint-a: #302c45;
+  --tint-b: #2a2740;
+  --card-tint: #282838;
+  --weather-a: #262a3c;
+  --weather-b: #232838;
+  --hero-1: #1c1930;
+  --hero-2: #372d6e;
+  --hero-3: #6154c9;
+  --sky-glow: #3b3a72;
+  /* the fixed dark theme keeps the site's original look: no starfield,
+     that belongs to Auto's night. */
+  --star: 0;
+  --rain: 0;
+  --snow: 0;
+}
+
+/* Pre-paint background so a reload never flashes white. */
+html[data-appearance="dawn"] { background: #fdf1e6; }
+html[data-appearance="clear"] { background: #ffffff; }
+html[data-appearance="cloud"] { background: #eceef2; }
+html[data-appearance="fog"] { background: #eaedf1; }
+html[data-appearance="rain"] { background: #e6edf4; }
+html[data-appearance="snow"] { background: #eef4f9; }
+html[data-appearance="dusk"] { background: #241a24; }
+html[data-appearance="storm"] { background: #14161f; }
+html[data-appearance="night"] { background: #0d1020; }
+html[data-appearance="dark"] { background: #191923; }
+
+/* ---------------------------------------------------------------- sky layer */
+
+.sky { position: fixed; z-index: 0; inset: 0; overflow: hidden; pointer-events: none; }
+.app-shell { position: relative; z-index: 1; }
+.sky span, .card-stars { position: absolute; display: block; }
+.sky-glow { inset: 0; background: radial-gradient(60% 42% at 82% -6%, color-mix(in srgb, var(--sky-glow) 42%, transparent), transparent 72%); opacity: .8; }
+.sky-stars, .sky-stars-far, .sky-rain, .sky-snow { inset: -14% -8%; }
+.sky-stars, .card-stars {
+  background-repeat: repeat;
+  background-size: 340px 340px;
+  background-image:
+    radial-gradient(1.4px 1.4px at 18% 22%, rgba(255, 255, 255, .95), transparent 55%),
+    radial-gradient(1.1px 1.1px at 62% 12%, rgba(255, 255, 255, .8), transparent 55%),
+    radial-gradient(1.6px 1.6px at 84% 46%, rgba(214, 226, 255, .9), transparent 55%),
+    radial-gradient(1px 1px at 33% 58%, rgba(255, 255, 255, .7), transparent 55%),
+    radial-gradient(1.2px 1.2px at 8% 78%, rgba(255, 255, 255, .62), transparent 55%),
+    radial-gradient(1px 1px at 48% 88%, rgba(255, 255, 255, .55), transparent 55%),
+    radial-gradient(1.5px 1.5px at 72% 72%, rgba(255, 255, 255, .74), transparent 55%),
+    radial-gradient(1px 1px at 92% 8%, rgba(255, 255, 255, .5), transparent 55%);
+  opacity: var(--star);
+  transition: opacity 1.4s ease;
+}
+.sky-stars { animation: twinkle 7s ease-in-out infinite; }
+.sky-stars-far { background-size: 210px 210px; background-position: 60px 40px; animation-duration: 11s; animation-direction: reverse; opacity: calc(var(--star) * .62); }
+.card-stars { inset: 0; background-size: 260px 260px; background-repeat: repeat; opacity: calc(var(--star) * .9); z-index: 0; transition: opacity 1.4s ease; }
+.sky-moon {
+  inset: 6% 7% auto auto; width: 74px; height: 74px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 32%, rgba(255, 255, 255, .92), rgba(226, 232, 255, .5) 58%, rgba(226, 232, 255, 0) 70%);
+  box-shadow: 0 0 60px 24px rgba(226, 232, 255, .1);
+  opacity: calc(var(--star) * .55);
+  transition: opacity 1.4s ease;
+}
+.sky-rain {
+  background-image: repeating-linear-gradient(101deg, rgba(150, 185, 225, .34) 0 1px, rgba(150, 185, 225, 0) 1px 10px);
+  opacity: var(--rain);
+  animation: rainfall 1s linear infinite;
+  transition: opacity 1.2s ease;
+}
+.sky-snow {
+  background-image:
+    radial-gradient(2.2px 2.2px at 22% 30%, rgba(255, 255, 255, .92), transparent 60%),
+    radial-gradient(1.6px 1.6px at 58% 12%, rgba(255, 255, 255, .8), transparent 60%),
+    radial-gradient(2px 2px at 82% 62%, rgba(255, 255, 255, .78), transparent 60%),
+    radial-gradient(1.4px 1.4px at 40% 78%, rgba(255, 255, 255, .7), transparent 60%);
+  background-size: 240px 240px;
+  background-repeat: repeat;
+  opacity: var(--snow);
+  animation: snowfall 9s linear infinite;
+  transition: opacity 1.2s ease;
+}
+@keyframes twinkle { 50% { opacity: calc(var(--star) * .45); } }
+@keyframes rainfall { to { transform: translate3d(-46px, 130px, 0); } }
+@keyframes snowfall { to { transform: translate3d(26px, 150px, 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  body, .now-card, .quick-card, .tool-card, .calculator-card, .world-card, .sidebar, .dialog-card { transition: background-color .01s, color .01s; }
+  .sky-stars, .sky-stars-far, .sky-rain, .sky-snow { animation: none !important; }
+}
+
+/* ------------------------------------------------------------- theme switch */
+
+.theme-block { display: grid; gap: 7px; }
+.theme-block .eyebrow { color: var(--ink-3); margin: 0; }
+.theme-switch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 12px; background: var(--canvas-soft); }
+.theme-option { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 31px; padding: 0 4px; border: 0; border-radius: 9px; color: var(--ink-3); background: transparent; font-size: 10px; font-weight: 700; letter-spacing: -.1px; transition: color .18s ease, background .18s ease, box-shadow .18s ease; }
+.theme-option:hover { color: var(--violet); }
+.theme-option.active { color: var(--ink); background: var(--surface); box-shadow: 0 2px 9px rgba(24, 20, 60, .1); }
+.theme-option-icon { font-size: 11px; line-height: 1; }
+.theme-caption { display: grid; gap: 2px; margin: 0; color: var(--ink-3); font-size: 9.5px; line-height: 1.45; }
+.theme-caption b { color: var(--ink-2); font-size: 10.5px; font-weight: 700; }
+.theme-caption small { font-family: var(--font-mono); font-size: 8.5px; opacity: .85; }
+
+/* ------------------------------------------------------------ weather card */
+
+.hero-section { grid-template-rows: auto auto; }
+.now-card { grid-column: 1; grid-row: 1; }
+.quick-stack { grid-column: 2; grid-row: 1; }
+.weather-card {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 9px;
+  min-height: 0;
+  padding: 17px 22px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(118deg, var(--weather-a), var(--weather-b));
+  color: var(--ink);
+  box-shadow: var(--shadow-small);
+}
+.weather-body { display: flex; flex-wrap: wrap; align-items: center; gap: 12px clamp(16px, 2.6vw, 38px); position: relative; z-index: 1; }
+.weather-main { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.weather-temp { display: flex; align-items: flex-start; gap: 1px; margin: 0; font-family: var(--font-mono); font-size: clamp(29px, 3.2vw, 38px); font-weight: 500; letter-spacing: -2.2px; line-height: 1; font-variant-numeric: tabular-nums; }
+.weather-temp small { margin-left: 3px; color: var(--ink-2); font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0; }
+.weather-summary { min-width: 0; }
+.weather-place { margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.weather-condition { margin: 2px 0 0; color: var(--ink-2); font-size: 11px; }
+.weather-sun { display: flex; gap: clamp(12px, 2vw, 24px); margin: 0; }
+.weather-sun div { display: grid; gap: 2px; }
+.weather-sun dt { color: var(--ink-3); font-size: 8.5px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; }
+.weather-sun dd { margin: 0; font-family: var(--font-mono); font-size: 14px; letter-spacing: -.6px; color: var(--ink); }
+.weather-extra { margin-left: auto; display: grid; gap: 2px; justify-items: end; text-align: right; }
+.weather-details { margin: 0; color: var(--ink-2); font-size: 10.5px; }
+.weather-foot { display: flex; gap: 8px; margin: 0; color: var(--ink-3); font-family: var(--font-mono); font-size: 8.5px; }
+.weather-source { margin: 0; max-width: 320px; color: var(--ink-3); font-size: 9px; }
+.weather-location { margin: 0; justify-self: start; }
+.weather-actions { margin-left: auto; display: flex; gap: 5px; }
+.weather-mini { display: grid; place-items: center; min-width: 25px; height: 25px; padding: 0 7px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink-2); background: var(--surface); font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; transition: color .15s ease, border-color .15s ease, transform .15s ease; }
+.weather-mini:hover { color: var(--violet); border-color: var(--violet); transform: translateY(-1px); }
+.weather-mini:disabled { opacity: .5; cursor: progress; }
+.weather-card:after { content: ""; position: absolute; right: -46px; top: -70px; width: 190px; height: 190px; border-radius: 50%; background: radial-gradient(circle at 40% 40%, color-mix(in srgb, var(--sky-glow) 45%, transparent), transparent 68%); opacity: .55; pointer-events: none; }
+.weather-card[data-state="loading"] .weather-temp, .weather-card[data-state="loading"] .weather-sun { opacity: .55; }
+.weather-card[data-state="error"] .weather-condition { color: var(--coral); }
+#weather-symbol { transition: transform .3s ease; }
+.weather-card[data-state="ready"]:hover #weather-symbol { transform: scale(1.12) rotate(-6deg); }
+.icon-sky { color: var(--violet-dark); background: var(--violet-soft); }
+
+/* ------------------------------------------------------------------- places */
+
+.quick-country { margin: 16px 0 0 !important; color: var(--ink-3) !important; font-size: 9px !important; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
+.section-count { margin-left: 7px; color: var(--ink-3); font-family: var(--font-mono); font-size: 10px; }
+.city-label { align-items: flex-start; }
+.city-place { min-width: 0; display: inline; font-size: 13px; letter-spacing: -.2px; line-height: 1.25; white-space: normal; }
+.city-country { color: var(--ink-3); font-weight: 600; }
+.city-name { color: var(--ink); font-weight: 700; }
+.world-card.is-home { border-color: color-mix(in srgb, var(--violet) 42%, var(--line)); }
+.world-home-flag { position: absolute; z-index: 1; top: 15px; right: 38px; padding: 2px 5px; border-radius: 5px; color: var(--violet-dark); background: var(--violet-soft); font-family: var(--font-mono); font-size: 7.5px; letter-spacing: .8px; }
+body[data-ui="dark"] .world-home-flag { color: var(--violet-soft); background: var(--violet); }
+.world-card[data-legacy="true"] .city-name:after { content: " ↩"; color: var(--ink-3); font-size: 10px; }
+
+/* ------------------------------------------------------------- place picker */
+
+body:has(.picker-dialog[open]) { overflow: hidden; }
+.picker-dialog { width: min(580px, calc(100% - 24px)); }
+.picker-card { display: flex; flex-direction: column; gap: 11px; padding: 26px 26px 20px; max-height: min(82vh, 700px); }
+.picker-card .dialog-copy { margin: 0; max-width: 46ch; }
+.picker-search { display: flex; align-items: center; gap: 9px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 11px; background: var(--surface-raised); transition: border-color .16s ease, box-shadow .16s ease; }
+.picker-search:focus-within { border-color: var(--violet); box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 16%, transparent); }
+.picker-search-icon { flex: 0 0 auto; width: 15px; height: 15px; color: var(--ink-3); }
+.picker-search input { flex: 1; min-width: 0; height: 41px; border: 0; outline: none; background: transparent; color: var(--ink); font-size: 13px; }
+.picker-search input::placeholder { color: var(--ink-3); opacity: .8; }
+.picker-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.picker-keys { flex: 0 0 auto; color: var(--ink-3); font-family: var(--font-mono); font-size: 8.5px; }
+.picker-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.picker-chips { display: flex; gap: 6px; }
+.picker-chip { padding: 4px 10px; border: 1px solid var(--line); border-radius: 100px; color: var(--ink-3); background: var(--canvas-soft); font-size: 9.5px; font-weight: 700; transition: .16s ease; }
+.picker-chip:hover { color: var(--violet); }
+.picker-chip.active { color: var(--violet-dark); border-color: transparent; background: var(--violet-soft); }
+.picker-count { color: var(--ink-3); font-family: var(--font-mono); font-size: 9px; }
+.picker-list { flex: 1; min-height: 200px; max-height: 46vh; margin: 0 -8px; padding: 0 8px; overflow: auto; overscroll-behavior: contain; border-top: 1px solid var(--line); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.picker-list::-webkit-scrollbar { width: 9px; }
+.picker-list::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 10px; background: var(--line-strong) padding-box; }
+.picker-group { position: sticky; top: 0; z-index: 2; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 10px 6px 5px; background: linear-gradient(var(--surface) 66%, color-mix(in srgb, var(--surface) 55%, transparent)); color: var(--ink-3); font-size: 9px; font-weight: 700; letter-spacing: 1.15px; text-transform: uppercase; }
+.picker-group em { color: var(--ink-3); font-family: var(--font-mono); font-size: 8px; font-style: normal; letter-spacing: .3px; opacity: .8; text-transform: none; }
+.picker-option { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 10px; cursor: pointer; transition: background .14s ease; }
+.picker-option + .picker-option { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--line) 60%, transparent); }
+.picker-option:hover, .picker-option.active { background: var(--violet-soft); }
+.picker-option.active + .picker-option, .picker-option:hover + .picker-option { box-shadow: none; }
+.picker-option[aria-selected="true"] { background: var(--violet-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--violet) 55%, transparent); }
+.picker-option[data-disabled="true"] { opacity: .5; }
+.picker-city { flex: 0 1 auto; min-width: 0; color: var(--ink); font-size: 12.5px; font-weight: 600; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker-meta { flex: 1 1 auto; min-width: 0; color: var(--ink-3); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker-offset { flex: 0 0 auto; color: var(--ink-2); font-family: var(--font-mono); font-size: 9.5px; }
+.picker-tags { flex: 0 0 auto; display: flex; gap: 4px; }
+.picker-tag { padding: 2px 5px; border-radius: 5px; color: var(--ink-3); background: var(--canvas-soft); font-size: 7.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; white-space: nowrap; }
+.picker-tag.popular { color: #a3742c; background: #fdf3d9; }
+.picker-tag.home { color: white; background: var(--violet); }
+.picker-tag.added { color: var(--ink-2); background: var(--line); }
+body[data-ui="dark"] .picker-tag.popular { color: #f0cc7c; background: #3d3421; }
+.picker-empty { margin: 26px 6px; color: var(--ink-3); font-size: 12px; text-align: center; }
+.picker-summary { margin: 0; padding: 8px 10px; border: 1px dashed var(--line-strong); border-radius: 9px; color: var(--ink-2); background: var(--canvas-soft); font-family: var(--font-mono); font-size: 9.5px; letter-spacing: -.1px; }
+.picker-summary[data-legacy="true"] { border-color: color-mix(in srgb, var(--mint) 55%, var(--line-strong)); color: var(--ink); }
+.picker-summary[data-legacy="true"]:before { content: "✓ legacy id resolved · "; color: var(--mint); }
+.picker-card .dialog-submit { margin-top: 0; }
+
+/* ------------------------------------------------------------------ responses */
+
+@media (max-width: 1180px) {
+  .weather-body { gap: 12px 18px; }
+  .weather-extra { justify-items: start; text-align: left; margin-left: 0; }
+}
+@media (max-width: 1020px) {
+  .hero-section { grid-template-columns: minmax(0, 1fr) 250px; }
+  .now-card { grid-column: 1; grid-row: 1; }
+  .quick-stack { grid-column: 2; grid-row: 1; grid-template-rows: 1fr 1fr; }
+  .weather-card { grid-column: 1 / -1; grid-row: 2; }
+  .weather-sun dd { font-size: 12.5px; }
+}
+@media (max-width: 760px) {
+  .hero-section { grid-template-columns: 1fr; grid-template-rows: auto; gap: 13px; }
+  .now-card { order: 1; grid-column: 1; grid-row: auto; }
+  .quick-stack { order: 3; grid-column: 1; grid-row: auto; grid-template-rows: auto; }
+  .weather-card { order: 2; grid-column: 1; grid-row: auto; padding: 15px 16px 14px; }
+  .weather-body { gap: 10px 14px; }
+  .weather-temp { font-size: 30px; }
+  .weather-extra { width: 100%; margin-left: 0; text-align: left; }
+  .weather-source { max-width: none; }
+  .picker-card { padding: 20px 16px 16px; gap: 9px; }
+  .picker-list { max-height: 42vh; min-height: 170px; }
+  .picker-offset { display: none; }
+  .zone-dialog { width: calc(100% - 18px); }
+  .picker-dialog { width: calc(100% - 18px); }
+  .theme-caption small { display: none; }
+}
+@media (max-width: 480px) {
+  .weather-card { padding: 14px 13px 13px; border-radius: 18px; }
+  .weather-main { width: 100%; }
+  .weather-sun { width: 100%; justify-content: space-between; }
+  .picker-tags { display: none; }
+  .quick-country { margin-top: 13px !important; }
+  .city-country { display: block; }
+  .city-place { display: block; }
+}
+
+/* The weather card's own link sits on a tinted background, so it follows the mood. */
+body[data-ui="dark"] .weather-location { color: var(--mint); }
+body[data-ui="dark"] .weather-card .text-button:hover { color: var(--violet-dark); }

@@ -5,9 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="A calm, capable dashboard for your local time, world clocks, timers, stopwatch, and time calculations."
+      content="A calm, capable dashboard for your local time, world clocks, live weather, timers, stopwatch, and time calculations."
     />
     <title>Tempo — Time, made useful</title>
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f7f7fb" />
+    <script>
+      // Runs before the first paint so a remembered Auto palette (or a manual
+      // dark choice) never flashes white. app.js re-reads the same key and
+      // stores "<appearance>|<canvas colour>" in localStorage.
+      (function () {
+        try {
+          var last = localStorage.getItem("tempo-theme-last");
+          if (last) {
+            var parts = last.split("|");
+            document.documentElement.setAttribute("data-appearance", parts[0]);
+            if (parts[1]) document.documentElement.style.background = parts[1];
+            return;
+          }
+          if (localStorage.getItem("tempo-theme-mode") === "dark" || localStorage.getItem("tempo-theme") === "dark") {
+            document.documentElement.setAttribute("data-appearance", "dark");
+            document.documentElement.style.background = "#191923";
+          }
+        } catch (error) {
+          /* private mode: the default light palette is fine */
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -17,6 +41,15 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div class="sky" aria-hidden="true">
+      <span class="sky-glow"></span>
+      <span class="sky-stars"></span>
+      <span class="sky-stars sky-stars-far"></span>
+      <span class="sky-rain"></span>
+      <span class="sky-snow"></span>
+      <span class="sky-moon"></span>
+    </div>
+
     <div class="app-shell">
       <aside class="sidebar" aria-label="Main navigation">
         <a class="brand" href="#now" aria-label="Tempo home">
@@ -51,10 +84,22 @@
             <p class="eyebrow">A little reminder</p>
             <p>Time you enjoy wasting is not wasted time.</p>
           </div>
-          <button class="quiet-button" id="theme-button" type="button" aria-label="Toggle color theme">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.25 14.4A7.85 7.85 0 0 1 9.6 3.75a8.25 8.25 0 1 0 10.65 10.65Z"></path></svg>
-            <span>Dim lights</span>
-          </button>
+
+          <div class="theme-block">
+            <p class="eyebrow">LOOK</p>
+            <div class="theme-switch" id="theme-switch" role="radiogroup" aria-label="Colour theme">
+              <button class="theme-option active" type="button" role="radio" aria-checked="true" data-theme-mode="auto">
+                <span class="theme-option-icon" aria-hidden="true">☼</span> Auto
+              </button>
+              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-mode="light">
+                <span class="theme-option-icon" aria-hidden="true">☀</span> Light
+              </button>
+              <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-mode="dark">
+                <span class="theme-option-icon" aria-hidden="true">☾</span> Dark
+              </button>
+            </div>
+            <p class="theme-caption" id="theme-caption">Auto · follows your local time and weather</p>
+          </div>
         </div>
       </aside>
 
@@ -105,7 +150,7 @@
             </div>
 
             <div class="now-card-bottom">
-              <div class="sun-state"><span class="sun-icon">☀</span><span id="day-progress-label">Today is in motion</span></div>
+              <div class="sun-state"><span class="sun-icon" id="sun-icon">☀</span><span id="day-progress-label">Today is in motion</span></div>
               <div class="day-track" aria-hidden="true"><span id="day-progress"></span></div>
               <span class="sunset-copy" id="sunset-copy">Day progress</span>
             </div>
@@ -120,11 +165,43 @@
             </article>
             <article class="quick-card mint-card">
               <div class="card-topline"><span class="small-icon icon-mint">⌁</span><span>TIMEZONE</span></div>
+              <p class="quick-country" id="home-country-label">Your country</p>
               <p class="quick-city" id="home-city-label">Your local place</p>
               <p class="quick-subtitle" id="utc-offset">UTC offset loading</p>
               <button class="text-button" id="quick-zone-button" type="button">Change home zone <span>→</span></button>
             </article>
           </div>
+
+          <article class="quick-card weather-card" id="weather-card" data-state="idle" aria-labelledby="weather-title">
+            <span class="card-stars" aria-hidden="true"></span>
+            <div class="card-topline">
+              <span class="small-icon icon-sky" id="weather-symbol" aria-hidden="true">☂</span>
+              <span id="weather-title">RIGHT NOW, OUTSIDE</span>
+              <span class="weather-actions">
+                <button class="weather-mini" type="button" id="weather-units" title="Switch temperature units">°F</button>
+                <button class="weather-mini" type="button" id="weather-retry" title="Check the weather again" aria-label="Check the weather again">↻</button>
+              </span>
+            </div>
+            <div class="weather-body">
+              <div class="weather-main">
+                <p class="weather-temp"><span id="weather-temp">--</span><small id="weather-unit">°</small></p>
+                <div class="weather-summary">
+                  <p class="weather-place" id="weather-place">Your part of the world</p>
+                  <p class="weather-condition" id="weather-condition" aria-live="polite">Weather not loaded</p>
+                </div>
+              </div>
+              <dl class="weather-sun">
+                <div><dt>Sunrise</dt><dd id="weather-sunrise">--:--</dd></div>
+                <div><dt>Sunset</dt><dd id="weather-sunset">--:--</dd></div>
+              </dl>
+              <div class="weather-extra">
+                <p class="weather-details" id="weather-details"></p>
+                <p class="weather-foot"><span id="weather-daylight"></span><span id="weather-updated">one moment…</span></p>
+                <p class="weather-source" id="weather-source">Live weather from Open-Meteo — no account, no key.</p>
+              </div>
+              <button class="text-button weather-location" type="button" id="weather-use-location">Use my location</button>
+            </div>
+          </article>
         </section>
 
         <section class="section world-section section-anchor" id="world" aria-labelledby="world-title">
@@ -132,7 +209,10 @@
             <div>
               <p class="eyebrow">STAY IN SYNC</p>
               <h2 id="world-title">Around the world</h2>
-              <p class="section-intro">A quick glance at the people and places that matter.</p>
+              <p class="section-intro">
+                Every clock shows its real country and city, spelled the way the place spells itself today.
+                <span class="section-count" id="world-count"></span>
+              </p>
             </div>
             <button class="outline-button" id="add-city-button" type="button">
               <span class="button-plus">+</span> Add a city
@@ -281,15 +361,42 @@
       <a href="#calculator" data-nav="calculator">Time calculator</a>
     </nav>
 
-    <dialog class="zone-dialog" id="zone-dialog" aria-labelledby="zone-dialog-title">
-      <form method="dialog" class="dialog-card" id="zone-form">
-        <button class="dialog-close" id="dialog-close" type="button" aria-label="Close dialog">×</button>
-        <p class="eyebrow" id="dialog-eyebrow">MAKE IT YOURS</p>
-        <h2 id="zone-dialog-title">Set your home time zone</h2>
-        <p class="dialog-copy" id="dialog-copy">Choose the time zone you want Tempo to use as your home base.</p>
-        <label class="dialog-select-label" for="zone-select">CITY OR REGION</label>
-        <select id="zone-select"></select>
-        <button class="primary-button dialog-submit" id="zone-submit" type="submit">Save home zone</button>
+    <dialog class="zone-dialog picker-dialog" id="zone-dialog" aria-labelledby="zone-dialog-title">
+      <form method="dialog" class="dialog-card picker-card" id="zone-form">
+        <button class="dialog-close" id="dialog-close" type="button" aria-label="Close">×</button>
+        <p class="eyebrow" id="dialog-eyebrow">EVERY ZONE ON EARTH</p>
+        <h2 id="zone-dialog-title">Choose a place</h2>
+        <p class="dialog-copy" id="dialog-copy">Search any city or country — legacy spellings still find the modern one.</p>
+
+        <div class="picker-search">
+          <svg class="picker-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
+          <input
+            id="zone-search"
+            type="search"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Kathmandu, Kyiv, Kolkata, Nepal, Asia/Saigon…"
+            aria-label="Search cities and countries"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="picker-list"
+            aria-autocomplete="list"
+          />
+          <span class="picker-keys" aria-hidden="true">↑↓ ⏎</span>
+        </div>
+
+        <div class="picker-toolbar">
+          <div class="picker-chips" id="picker-chips" role="group" aria-label="Filter the list">
+            <button type="button" class="picker-chip active" data-filter="all" aria-pressed="true">All places</button>
+            <button type="button" class="picker-chip" data-filter="suggested" aria-pressed="false">★ Popular</button>
+          </div>
+          <span class="picker-count" id="picker-count">loading…</span>
+        </div>
+
+        <div class="picker-list" id="picker-list" role="listbox" aria-label="Countries and cities" tabindex="-1"></div>
+
+        <p class="picker-summary" id="picker-summary">Start typing, or pick from the list below.</p>
+        <button class="primary-button dialog-submit" id="zone-submit" type="submit">Use this place</button>
       </form>
     </dialog>
 

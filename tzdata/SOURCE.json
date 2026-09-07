@@ -1,0 +1,12 @@
+{
+  "repo": "eggert/tz (IANA time zone database)",
+  "ref": "main",
+  "commit": "b60ca52b173f5860f737f94ebe2d03470ad5f3e4",
+  "committedDate": "2026-09-05T17:26:25Z",
+  "fetched": "2026-09-07",
+  "files": [
+    "zone1970.tab",
+    "zone.tab",
+    "backward"
+  ]
+}

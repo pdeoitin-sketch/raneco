@@ -40,6 +40,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The dashboard is a static bundle, so the tests are the only gate: the
+      # jsdom suite boots app.js and would notice a broken picker, clock label,
+      # weather card or timer before Pages ever sees it.
+      - name: Test
+        run: npm test
+
       # Resolves the site's public URL and, importantly, its base path
       # ("/raneco" for a project site, "" for a user/org site or custom domain).
       - name: Configure GitHub Pages

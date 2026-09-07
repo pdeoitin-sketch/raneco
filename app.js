@@ -1,36 +1,34 @@
+/**
+ * Tempo — the dashboard shell.
+ *
+ * Place names come from src/tz-places.js (IANA zone1970.tab + Intl.DisplayNames),
+ * the searchable picker from src/city-picker.js, live weather from
+ * src/weather.js and the Auto theme from src/theme.js. The timer, stopwatch and
+ * calculator are plain local-time maths and deliberately know nothing about any
+ * of that.
+ */
+
+import { canonicalZone, isValidZone, placeLabel, recordFor, SUGGESTED_ZONES } from "./src/tz-places.js";
+import { createCityPicker } from "./src/city-picker.js";
+import { createWeatherCard } from "./src/weather-card.js";
+import { APPEARANCES, applyAppearance, readMode, resolveAppearance, themeCaption, writeMode } from "./src/theme.js";
+
 (() => {
   "use strict";
-
-  const knownCities = [
-    { city: "New York", zone: "America/New_York", region: "United States" },
-    { city: "Los Angeles", zone: "America/Los_Angeles", region: "United States" },
-    { city: "Mexico City", zone: "America/Mexico_City", region: "Mexico" },
-    { city: "São Paulo", zone: "America/Sao_Paulo", region: "Brazil" },
-    { city: "Honolulu", zone: "Pacific/Honolulu", region: "United States" },
-    { city: "London", zone: "Europe/London", region: "United Kingdom" },
-    { city: "Paris", zone: "Europe/Paris", region: "France" },
-    { city: "Cairo", zone: "Africa/Cairo", region: "Egypt" },
-    { city: "Dubai", zone: "Asia/Dubai", region: "United Arab Emirates" },
-    { city: "Mumbai", zone: "Asia/Kolkata", region: "India" },
-    { city: "Singapore", zone: "Asia/Singapore", region: "Singapore" },
-    { city: "Tokyo", zone: "Asia/Tokyo", region: "Japan" },
-    { city: "Seoul", zone: "Asia/Seoul", region: "South Korea" },
-    { city: "Sydney", zone: "Australia/Sydney", region: "Australia" },
-    { city: "Auckland", zone: "Pacific/Auckland", region: "New Zealand" },
-  ];
 
   const defaultWorldZones = [
     "America/New_York",
     "Europe/London",
-    "Asia/Tokyo",
+    "Asia/Kathmandu",
     "Australia/Sydney",
   ];
+
+  const MAX_WORLD_CLOCKS = 8;
 
   const keys = {
     homeZone: "tempo-home-zone",
     worldZones: "tempo-world-zones",
     saved: "tempo-saved-calculations",
-    theme: "tempo-theme",
   };
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -44,29 +42,14 @@
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
 
-  const systemTimeZone = (() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    } catch (_) {
-      return "UTC";
-    }
-  })();
-
-  const allTimeZones = (() => {
-    try {
-      if (typeof Intl.supportedValuesOf === "function") {
-        return Intl.supportedValuesOf("timeZone");
-      }
-    } catch (_) {
-      // Fall through to the curated list below.
-    }
-    return knownCities.map((city) => city.zone);
-  })();
-
-  function isValidTimeZone(zone) {
-    // UTC is a valid IANA option even though some engines omit it from
-    // Intl.supportedValuesOf("timeZone").
-    return typeof zone === "string" && (zone === "UTC" || zone === "Etc/UTC" || allTimeZones.includes(zone));
+  /**
+   * The id to actually hand to Intl: the modern canonical zone when this engine
+   * understands it, otherwise whatever the browser reported (older ICU builds
+   * still resolve their own legacy ids, e.g. Asia/Katmandu).
+   */
+  function usableZone(zone) {
+    const canonical = canonicalZone(zone);
+    return isValidZone(canonical) ? canonical : zone;
   }
 
   function getStoredJSON(key, fallback) {
@@ -78,28 +61,50 @@
     }
   }
 
-  function getStoredZone() {
+  function storedZone(key, fallback) {
     try {
-      const stored = localStorage.getItem(keys.homeZone);
-      return isValidTimeZone(stored) ? stored : systemTimeZone;
+      const raw = localStorage.getItem(key);
+      if (typeof raw !== "string" || !raw) return fallback;
+      const canonical = canonicalZone(raw);
+      if (isValidZone(canonical)) return canonical;
+      return isValidZone(raw) ? raw : fallback;
     } catch (_) {
-      return systemTimeZone;
+      return fallback;
+    }
+  }
+
+  function systemTimeZone() {
+    try {
+      return usableZone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+    } catch (_) {
+      return "UTC";
     }
   }
 
   function getStoredWorldZones() {
     const saved = getStoredJSON(keys.worldZones, null);
     if (!Array.isArray(saved)) return [...defaultWorldZones];
-    const valid = saved.filter(isValidTimeZone).slice(0, 8);
+    const seen = new Set();
+    const valid = [];
+    for (const item of saved) {
+      if (typeof item !== "string") continue;
+      const zone = usableZone(canonicalZone(item));
+      if (!isValidZone(zone) || seen.has(zone)) continue;
+      seen.add(zone);
+      valid.push(zone);
+      if (valid.length >= MAX_WORLD_CLOCKS) break;
+    }
     return valid.length ? valid : [...defaultWorldZones];
   }
 
   const state = {
-    homeZone: getStoredZone(),
+    homeZone: storedZone(keys.homeZone, systemTimeZone()),
     worldZones: getStoredWorldZones(),
     savedCalculations: getStoredJSON(keys.saved, []),
     lastCalculation: null,
-    dialogMode: "home",
+    themeMode: readMode(),
+    appearance: "light",
+    weather: null,
     timer: {
       original: 5 * 60 * 1000,
       remaining: 5 * 60 * 1000,
@@ -126,6 +131,7 @@
     localSeconds: $("#local-seconds"),
     localDate: $("#local-date"),
     localZoneName: $("#local-zone-name"),
+    sunIcon: $("#sun-icon"),
     hourHand: $("#hour-hand"),
     minuteHand: $("#minute-hand"),
     secondHand: $("#second-hand"),
@@ -135,23 +141,18 @@
     midnightCountdown: $("#midnight-countdown"),
     midnightProgress: $("#midnight-progress"),
     homeCityLabel: $("#home-city-label"),
+    homeCountryLabel: $("#home-country-label"),
     utcOffset: $("#utc-offset"),
     worldGrid: $("#world-grid"),
+    worldCount: $("#world-count"),
     changeZoneButton: $("#change-zone-button"),
     quickZoneButton: $("#quick-zone-button"),
     addCityButton: $("#add-city-button"),
-    zoneDialog: $("#zone-dialog"),
-    zoneForm: $("#zone-form"),
-    zoneSelect: $("#zone-select"),
-    zoneSubmit: $("#zone-submit"),
-    dialogEyebrow: $("#dialog-eyebrow"),
-    zoneDialogTitle: $("#zone-dialog-title"),
-    dialogCopy: $("#dialog-copy"),
-    dialogClose: $("#dialog-close"),
-    themeButton: $("#theme-button"),
-    mobileMenuButton: $("#mobile-menu-button"),
-    mobileNav: $("#mobile-nav"),
-    mobileNavBackdrop: $("#mobile-nav-backdrop"),
+    themeSwitch: $("#theme-switch"),
+    themeCaption: $("#theme-caption"),
+    toast: $("#toast"),
+    toastMessage: $("#toast-message"),
+    footerYear: $("#footer-year"),
     timerMinutes: $("#timer-minutes"),
     timerSeconds: $("#timer-seconds"),
     timerDisplay: $("#timer-display"),
@@ -183,12 +184,12 @@
     conversionHint: $(".conversion-hint"),
     savedList: $("#saved-list"),
     clearSaved: $("#clear-saved"),
-    toast: $("#toast"),
-    toastMessage: $("#toast-message"),
-    footerYear: $("#footer-year"),
+    mobileMenuButton: $("#mobile-menu-button"),
+    mobileNav: $("#mobile-nav"),
+    mobileNavBackdrop: $("#mobile-nav-backdrop"),
   };
 
-  // Date and timezone helpers --------------------------------------------
+  // Date and timezone helpers ---------------------------------------------
   const formatters = new Map();
   function getFormatter(locale, options) {
     const cacheKey = `${locale}|${JSON.stringify(options)}`;
@@ -242,16 +243,22 @@
     }
   }
 
-  function recordForZone(zone) {
-    const exact = knownCities.find((city) => city.zone === zone);
-    if (exact) return exact;
-    const pieces = zone.split("/");
-    const rawName = pieces[pieces.length - 1] || zone;
-    return {
-      city: rawName.replace(/_/g, " "),
-      zone,
-      region: pieces[0] || "Custom zone",
-    };
+  /** Offset used by the picker, which only knows a zone id (no date). */
+  const offsetCache = { at: 0, values: new Map() };
+  function offsetForZone(zone) {
+    const now = Date.now();
+    if (now - offsetCache.at > 10 * 60 * 1000) {
+      offsetCache.values.clear();
+      offsetCache.at = now;
+    }
+    if (!offsetCache.values.has(zone)) {
+      offsetCache.values.set(zone, formatOffset(new Date(now), zone));
+    }
+    return offsetCache.values.get(zone);
+  }
+
+  function placeFor(zone) {
+    return recordFor(zone);
   }
 
   function formatLongDate(date, zone) {
@@ -261,15 +268,6 @@
       month: "long",
       day: "numeric",
       year: "numeric",
-    }).format(date);
-  }
-
-  function formatShortDate(date, zone) {
-    return getFormatter("en-US", {
-      timeZone: zone,
-      weekday: "short",
-      month: "short",
-      day: "numeric",
     }).format(date);
   }
 
@@ -287,11 +285,6 @@
   function formatDateTimeLocal(date, zone) {
     const parts = partsFor(date, zone);
     return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
-  }
-
-  function friendlyZoneName(zone) {
-    const record = recordForZone(zone);
-    return record.city === "UTC" ? "UTC" : `${record.city} · ${zone}`;
   }
 
   function zonedDateTimeToUTC(localDateTime, zone) {
@@ -378,7 +371,8 @@
     const hour = Number(parts.hour);
     const minute = Number(parts.minute);
     const second = Number(parts.second);
-    const home = recordForZone(state.homeZone);
+    const home = placeFor(state.homeZone);
+    const offset = formatOffset(now, state.homeZone);
     const daySeconds = hour * 3600 + minute * 60 + second;
     const progress = (daySeconds / 86400) * 100;
     const untilMidnight = 86400 - daySeconds;
@@ -387,11 +381,17 @@
     elements.localMinutes.textContent = pad(minute);
     elements.localSeconds.textContent = pad(second);
     elements.localDate.textContent = formatLongDate(now, state.homeZone);
-    elements.localZoneName.textContent = `${state.homeZone} · ${formatOffset(now, state.homeZone)}`;
-    elements.topTimeZone.textContent = `${home.city} · ${formatOffset(now, state.homeZone)}`;
+    elements.localZoneName.textContent = `${home.label} · ${offset} · ${home.zone}`;
+    elements.topTimeZone.textContent = home.label;
+    elements.topTimeZone.title = `${home.zone} · ${offset}`;
     elements.homeCityLabel.textContent = home.city;
-    elements.utcOffset.textContent = `${state.homeZone} · ${formatOffset(now, state.homeZone)}`;
+    if (elements.homeCountryLabel) {
+      elements.homeCountryLabel.textContent = home.country || "Your zone";
+      elements.homeCountryLabel.hidden = !home.country;
+    }
+    elements.utcOffset.textContent = `${home.country ? `${home.country} · ` : ""}${offset}`;
     elements.calculatorZone.textContent = `Calculations in ${home.city} time`;
+
     elements.todayLabel.textContent = getFormatter("en-US", {
       timeZone: state.homeZone,
       weekday: "long",
@@ -412,13 +412,25 @@
     elements.midnightProgress.style.width = `${progress}%`;
     elements.midnightCountdown.textContent = formatTimerMilliseconds(untilMidnight * 1000);
     elements.sunsetCopy.textContent = `${Math.round(progress)}% through today`;
+    if (elements.sunIcon) {
+      const live = state.weather && state.weather.ok ? state.weather : null;
+      const symbol = live && live.symbol ? live.symbol : hour >= 6 && hour < 19 ? "☀" : "☾";
+      elements.sunIcon.textContent = symbol;
+      elements.sunIcon.title = live && live.condition ? `${live.condition} in ${home.city}` : "Local sky";
+    }
     if (hour < 6) elements.dayProgressLabel.textContent = "A new day is waking up";
     else if (hour < 12) elements.dayProgressLabel.textContent = "Your morning is underway";
     else if (hour < 18) elements.dayProgressLabel.textContent = "The day is in motion";
     else elements.dayProgressLabel.textContent = "The day is winding down";
 
+    state.localHour = hour;
+    state.localMinute = minute;
     document.title = `${pad(hour)}:${pad(minute)} · ${home.city} — Tempo`;
+
     updateWorldClockTimes(now);
+    // Every half minute is enough for a palette that follows the sun, and it
+    // keeps a sunrise or sunset switch from waiting on the next hour.
+    if (now.getSeconds() % 30 === 0) applyTheme();
   }
 
   // World clocks -----------------------------------------------------------
@@ -429,31 +441,48 @@
     return { text: difference === -1 ? "YESTERDAY" : `${difference} DAYS`, className: "day-behind" };
   }
 
+  function worldClockCard(zone, index, now) {
+    const record = placeFor(zone);
+    const clock = timeParts12(now, zone);
+    const day = worldDayLabel(now, zone);
+    const isHome = zone === state.homeZone;
+    const countries = record.countries.length > 1 ? ` Also ${record.countries.slice(1).map((c) => c.name).join(", ")}.` : "";
+    const legacyNote =
+      record.legacy && record.zone !== record.id
+        ? ` Tempo reads your browser’s “${record.id}” as the modern zone ${record.zone}.`
+        : "";
+    return `
+      <article class="world-card color-${index % 6}${isHome ? " is-home" : ""}" data-world-zone="${escapeHTML(zone)}" data-legacy="${String(
+        record.legacy && record.zone !== record.id
+      )}">
+        <div class="world-card-top">
+          <div class="city-label">
+            <span class="city-color-dot" aria-hidden="true"></span>
+            <strong class="city-place" title="${escapeHTML(`${record.label} — ${record.zone}${countries}${legacyNote}`)}">
+              <span class="city-country">${escapeHTML(record.country || record.zone.split("/")[0])}</span> · <span class="city-name">${escapeHTML(record.city)}</span>
+            </strong>
+          </div>
+          <button class="remove-city" type="button" data-remove-city="${escapeHTML(zone)}" aria-label="Remove ${escapeHTML(record.city)}">×</button>
+        </div>
+        ${isHome ? '<span class="world-home-flag">HOME</span>' : ""}
+        <div class="world-time"><span class="world-clock-value">${escapeHTML(`${clock.hour}:${clock.minute}`)}</span><span class="world-period">${escapeHTML((clock.dayPeriod || "").toUpperCase())}</span></div>
+        <div class="world-card-bottom"><span class="world-day-label ${day.className}">${day.text}</span><span class="world-offset">${escapeHTML(formatOffset(now, zone))}</span></div>
+      </article>
+    `;
+  }
+
   function renderWorldClocks() {
     const now = new Date();
-    elements.worldGrid.innerHTML = state.worldZones
-      .map((zone, index) => {
-        const record = recordForZone(zone);
-        const clock = timeParts12(now, zone);
-        const day = worldDayLabel(now, zone);
-        return `
-          <article class="world-card color-${index % 6}" data-world-zone="${escapeHTML(zone)}">
-            <div class="world-card-top">
-              <div class="city-label"><span class="city-color-dot"></span><strong title="${escapeHTML(record.region)}">${escapeHTML(record.city)}</strong></div>
-              <button class="remove-city" type="button" data-remove-city="${escapeHTML(zone)}" aria-label="Remove ${escapeHTML(record.city)}">×</button>
-            </div>
-            <div class="world-time"><span class="world-clock-value">${escapeHTML(clock.hour)}:${escapeHTML(clock.minute)}</span><span class="world-period">${escapeHTML((clock.dayPeriod || "").toUpperCase())}</span></div>
-            <div class="world-card-bottom"><span class="world-day-label ${day.className}">${day.text}</span><span class="world-offset">${formatOffset(now, zone)}</span></div>
-          </article>
-        `;
-      })
-      .join("");
+    elements.worldGrid.innerHTML = state.worldZones.map((zone, index) => worldClockCard(zone, index, now)).join("");
+    if (elements.worldCount) {
+      elements.worldCount.textContent = `${state.worldZones.length} of ${MAX_WORLD_CLOCKS} clocks`;
+    }
   }
 
   function updateWorldClockTimes(now = new Date()) {
-    $$('[data-world-zone]').forEach((card) => {
+    $$("[data-world-zone]").forEach((card) => {
       const zone = card.dataset.worldZone;
-      if (!zone || !isValidTimeZone(zone)) return;
+      if (!zone || !isValidZone(zone)) return;
       const clock = timeParts12(now, zone);
       const day = worldDayLabel(now, zone);
       $(".world-clock-value", card).textContent = `${clock.hour}:${clock.minute}`;
@@ -473,85 +502,146 @@
     }
   }
 
-  // Zone dialog ------------------------------------------------------------
-  function zoneOptionLabel(zone) {
-    const record = recordForZone(zone);
-    if (knownCities.some((city) => city.zone === zone)) {
-      return `${record.city} — ${record.region}`;
+  function addWorldZone(zone) {
+    const id = usableZone(zone);
+    if (!isValidZone(id)) return false;
+    if (state.worldZones.includes(id)) {
+      notify("That clock is already on your board.", "!");
+      return false;
     }
-    return zone.replace(/_/g, " ");
+    if (state.worldZones.length >= MAX_WORLD_CLOCKS) {
+      notify(`Keep up to ${MAX_WORLD_CLOCKS} clocks — remove one first.`, "!");
+      return false;
+    }
+    state.worldZones.push(id);
+    persistWorldZones();
+    renderWorldClocks();
+    notify(`${placeLabel(id)} added to your clocks.`);
+    return true;
   }
 
-  function populateZoneSelect(selectedZone, mode) {
-    const popular = knownCities
-      .map((record) => `<option value="${escapeHTML(record.zone)}" ${record.zone === selectedZone ? "selected" : ""}>${escapeHTML(zoneOptionLabel(record.zone))}</option>`)
-      .join("");
-
-    const customZones = allTimeZones.filter((zone) => !knownCities.some((city) => city.zone === zone));
-    const regions = customZones.reduce((groups, zone) => {
-      const group = zone.split("/")[0] || "Other";
-      if (!groups[group]) groups[group] = [];
-      groups[group].push(zone);
-      return groups;
-    }, {});
-    const regionOptions = Object.keys(regions)
-      .sort()
-      .map(
-        (region) =>
-          `<optgroup label="${escapeHTML(region)}">${regions[region]
-            .map(
-              (zone) =>
-                `<option value="${escapeHTML(zone)}" ${zone === selectedZone ? "selected" : ""}>${escapeHTML(zone.replace(/^.*\//, "").replace(/_/g, " "))}</option>`
-            )
-            .join("")}</optgroup>`
-      )
-      .join("");
-
-    const deviceOption = !allTimeZones.includes(systemTimeZone)
-      ? `<option value="${escapeHTML(systemTimeZone)}" ${systemTimeZone === selectedZone ? "selected" : ""}>My device zone — ${escapeHTML(systemTimeZone)}</option>`
-      : "";
-
-    elements.zoneSelect.innerHTML = `
-      <optgroup label="Popular places">${popular}</optgroup>
-      ${deviceOption}
-      ${regionOptions}
-    `;
-
-    if (mode === "add" && state.worldZones.includes(elements.zoneSelect.value)) {
-      const firstAvailable = Array.from(elements.zoneSelect.options).find(
-        (option) => !state.worldZones.includes(option.value)
-      );
-      if (firstAvailable) elements.zoneSelect.value = firstAvailable.value;
-    }
+  function removeWorldZone(zone) {
+    state.worldZones = state.worldZones.filter((item) => item !== zone);
+    persistWorldZones();
+    renderWorldClocks();
+    notify(`${placeLabel(zone)} removed.`);
   }
 
-  function openZoneDialog(mode) {
-    state.dialogMode = mode;
+  // Theme (Auto / Light / Dark) -------------------------------------------
+  let picker = null;
+
+  function applyTheme() {
+    if (!Number.isFinite(state.localHour)) {
+      const parts = partsFor(new Date(), state.homeZone);
+      state.localHour = Number(parts.hour);
+      state.localMinute = Number(parts.minute);
+    }
+    const result = resolveAppearance({
+      mode: state.themeMode,
+      hour: state.localHour,
+      minute: state.localMinute,
+      weather: state.weather && state.weather.ok ? state.weather : null,
+      now: Date.now(),
+    });
+    const applied = applyAppearance(document, { mode: state.themeMode, appearance: result.appearance });
+    state.appearance = applied.appearance;
+    document.body.dataset.weather = state.weather && state.weather.ok ? state.weather.mood || "unknown" : "none";
+
+    if (elements.themeCaption) {
+      const info = APPEARANCES[result.appearance] || APPEARANCES.light;
+      const place = placeLabel(state.homeZone).split(" · ").pop();
+      const weatherLine =
+        state.weather && state.weather.ok
+          ? `${state.weather.symbol} ${state.weather.condition} ${formatNumber(state.weather.temperature, 0)}${
+              state.weather.temperatureUnit === "°F" ? "°F" : "°C"
+            }`
+          : "no live weather";
+      const detail = state.themeMode === "auto" ? `Auto · ${place}` : "fixed by you";
+      elements.themeCaption.innerHTML =
+        `<b>${escapeHTML(`${info.icon} ${info.label}`)}</b><span>${escapeHTML(detail)}</span>` +
+        `<small>${escapeHTML(weatherLine)}</small>`;
+      elements.themeCaption.title = themeCaption({
+        mode: state.themeMode,
+        appearance: result.appearance,
+        place,
+        reason: result.reason,
+      });
+    }
+    $$(".theme-option", elements.themeSwitch || document).forEach((button) => {
+      const active = button.dataset.themeMode === state.themeMode;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-checked", String(active));
+    });
+    if (picker && picker.isOpen) picker.refresh();
+  }
+
+  function setThemeMode(mode) {
+    state.themeMode = mode;
+    writeMode(mode);
+    applyTheme();
+    const info = APPEARANCES[state.appearance] || APPEARANCES.light;
+    notify(
+      mode === "auto"
+        ? `Auto is back on — ${info.label.toLowerCase()} from your time and weather.`
+        : `${mode === "dark" ? "Dark" : "Light"} theme stays until you switch back to Auto.`
+    );
+  }
+
+  // Weather ----------------------------------------------------------------
+  const weatherCard = createWeatherCard({
+    elements: {
+      card: $("#weather-card"),
+      temp: $("#weather-temp"),
+      unit: $("#weather-unit"),
+      symbol: $("#weather-symbol"),
+      condition: $("#weather-condition"),
+      place: $("#weather-place"),
+      source: $("#weather-source"),
+      sunrise: $("#weather-sunrise"),
+      sunset: $("#weather-sunset"),
+      daylight: $("#weather-daylight"),
+      details: $("#weather-details"),
+      updated: $("#weather-updated"),
+      useLocation: $("#weather-use-location"),
+      retry: $("#weather-retry"),
+      units: $("#weather-units"),
+    },
+    getHomeZone: () => state.homeZone,
+    notify,
+    onSnapshot: (snapshot) => {
+      state.weather = snapshot;
+      applyTheme();
+      updateLiveTime();
+    },
+  });
+
+  // Zone picker -------------------------------------------------------------
+  function openPicker(mode) {
     const isAdding = mode === "add";
-    const selected = isAdding
-      ? knownCities.find((city) => !state.worldZones.includes(city.zone))?.zone || state.homeZone
-      : state.homeZone;
-    elements.dialogEyebrow.textContent = isAdding ? "STAY IN SYNC" : "MAKE IT YOURS";
-    elements.zoneDialogTitle.textContent = isAdding ? "Add a world clock" : "Set your home time zone";
-    elements.dialogCopy.textContent = isAdding
-      ? "Pick a city or region to keep at your fingertips. You can add up to eight clocks."
-      : "Choose the time zone Tempo should use as your home base for time and calculations.";
-    elements.zoneSubmit.textContent = isAdding ? "Add this clock" : "Save home zone";
-    populateZoneSelect(selected, mode);
-    if (typeof elements.zoneDialog.showModal === "function") elements.zoneDialog.showModal();
-    else elements.zoneDialog.setAttribute("open", "");
+    picker.open({
+      mode,
+      homeZone: state.homeZone,
+      selectedZone: isAdding ? firstUnaddedSuggested() : state.homeZone,
+      title: isAdding ? "Add a world clock" : "Set your home time zone",
+      eyebrow: isAdding ? "STAY IN SYNC" : "MAKE IT YOURS",
+      copy: isAdding
+        ? `Every zone your browser knows, grouped by country. Search any city — up to ${MAX_WORLD_CLOCKS} clocks at a time.`
+        : "Your home zone drives the clock, the day progress, the weather and the Auto theme.",
+      submitLabel: isAdding ? "Add this clock" : "Save home zone",
+    });
   }
 
-  function closeZoneDialog() {
-    if (typeof elements.zoneDialog.close === "function") elements.zoneDialog.close();
-    else elements.zoneDialog.removeAttribute("open");
+  function firstUnaddedSuggested() {
+    const found = SUGGESTED_ZONES.map((zone) => usableZone(zone)).find((zone) => !state.worldZones.includes(zone));
+    return found || state.homeZone;
   }
 
   function saveHomeZone(zone) {
-    if (!isValidTimeZone(zone)) return;
-    state.homeZone = zone;
+    const id = usableZone(zone);
+    if (!isValidZone(id)) return;
+    state.homeZone = id;
     try {
-      localStorage.setItem(keys.homeZone, zone);
+      localStorage.setItem(keys.homeZone, id);
     } catch (_) {
       // Time still changes for the current visit when storage is unavailable.
     }
@@ -559,7 +649,10 @@
     calculateDuration();
     updateLiveTime();
     renderWorldClocks();
-    notify(`${recordForZone(zone).city} is now your home time.`);
+    applyTheme();
+    // Weather follows the home zone unless the visitor opted into GPS.
+    weatherCard.followHomeZone();
+    notify(`${placeLabel(id)} is now your home time.`);
   }
 
   // Timer ------------------------------------------------------------------
@@ -794,7 +887,8 @@
     const startLabel = formatShortDateTime(start, state.homeZone);
     const endLabel = formatShortDateTime(end, state.homeZone);
 
-    elements.durationWords.textContent = difference < 0 ? `${words} back in time` : difference === 0 ? "The same exact moment" : words;
+    elements.durationWords.textContent =
+      difference < 0 ? `${words} back in time` : difference === 0 ? "The same exact moment" : words;
     elements.durationContext.textContent =
       difference === 0
         ? "Both fields point to the same moment."
@@ -809,7 +903,7 @@
       id: Date.now(),
       words: difference === 0 ? "Same moment" : `${words} ${direction}`,
       details: `${formatNumber(totalHoursExact, 2)} hours · ${startLabel} → ${endLabel}`,
-      zone: recordForZone(state.homeZone).city,
+      zone: placeFor(state.homeZone).city,
     };
   }
 
@@ -846,7 +940,9 @@
       .map((target) => {
         const converted = seconds / secondsPerUnit[target];
         const decimals = Number.isInteger(converted) ? 0 : 3;
-        return `<div class="conversion-result"><strong>${formatNumber(converted, decimals)}</strong><span>${escapeHTML(target.toUpperCase())}</span></div>`;
+        return `<div class="conversion-result"><strong>${formatNumber(converted, decimals)}</strong><span>${escapeHTML(
+          target.toUpperCase()
+        )}</span></div>`;
       })
       .join("");
 
@@ -854,7 +950,10 @@
       const converted = seconds / secondsPerUnit[target];
       return `${formatNumber(converted, Number.isInteger(converted) ? 0 : 3)} ${singular(converted, target)}`;
     });
-    elements.conversionHint.textContent = `${formatNumber(value, Number.isInteger(value) ? 0 : 3)} ${singular(value, unit)} is ${readableTargets.join(", ").replace(/, ([^,]*)$/, ", and $1")}.`;
+    elements.conversionHint.textContent = `${formatNumber(value, Number.isInteger(value) ? 0 : 3)} ${singular(
+      value,
+      unit
+    )} is ${readableTargets.join(", ").replace(/, ([^,]*)$/, ", and $1")}.`;
   }
 
   function persistSavedCalculations() {
@@ -886,7 +985,10 @@
 
   function saveCalculation() {
     if (!state.lastCalculation) return;
-    state.savedCalculations.unshift({ ...state.lastCalculation, id: `${Date.now()}-${Math.random().toString(16).slice(2)}` });
+    state.savedCalculations.unshift({
+      ...state.lastCalculation,
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    });
     state.savedCalculations = state.savedCalculations.slice(0, 8);
     persistSavedCalculations();
     renderSavedCalculations();
@@ -904,10 +1006,12 @@
     const sections = ["now", "world", "tools", "calculator"].map((id) => document.getElementById(id));
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
         if (!visible) return;
         const id = visible.target.id;
-        $$('[data-nav]').forEach((link) => link.classList.toggle("active", link.dataset.nav === id));
+        $$("[data-nav]").forEach((link) => link.classList.toggle("active", link.dataset.nav === id));
       },
       { rootMargin: "-22% 0px -60% 0px", threshold: [0.01, 0.2, 0.4] }
     );
@@ -915,46 +1019,44 @@
   }
 
   function bindEvents() {
-    elements.changeZoneButton.addEventListener("click", () => openZoneDialog("home"));
-    elements.quickZoneButton.addEventListener("click", () => openZoneDialog("home"));
+    elements.changeZoneButton.addEventListener("click", () => openPicker("home"));
+    elements.quickZoneButton.addEventListener("click", () => openPicker("home"));
     elements.addCityButton.addEventListener("click", () => {
-      if (state.worldZones.length >= 8) {
-        notify("You can keep up to eight world clocks at once.", "!");
+      if (state.worldZones.length >= MAX_WORLD_CLOCKS) {
+        notify(`You can keep up to ${MAX_WORLD_CLOCKS} world clocks at once.`, "!");
         return;
       }
-      openZoneDialog("add");
-    });
-    elements.dialogClose.addEventListener("click", closeZoneDialog);
-    elements.zoneForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const zone = elements.zoneSelect.value;
-      if (state.dialogMode === "add") {
-        if (state.worldZones.includes(zone)) {
-          notify("That clock is already on your dashboard.", "!");
-        } else if (state.worldZones.length < 8) {
-          state.worldZones.push(zone);
-          persistWorldZones();
-          renderWorldClocks();
-          notify(`${recordForZone(zone).city} was added to your clocks.`);
-        }
-      } else {
-        saveHomeZone(zone);
-      }
-      closeZoneDialog();
-    });
-    elements.zoneDialog.addEventListener("click", (event) => {
-      if (event.target === elements.zoneDialog) closeZoneDialog();
+      openPicker("add");
     });
 
     elements.worldGrid.addEventListener("click", (event) => {
       const button = event.target.closest("[data-remove-city]");
       if (!button) return;
-      const zone = button.dataset.removeCity;
-      state.worldZones = state.worldZones.filter((item) => item !== zone);
-      persistWorldZones();
-      renderWorldClocks();
-      notify(`${recordForZone(zone).city} was removed.`);
+      removeWorldZone(button.dataset.removeCity);
     });
+
+    if (elements.themeSwitch) {
+      elements.themeSwitch.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-theme-mode]");
+        if (!button) return;
+        const mode = button.dataset.themeMode;
+        if (mode === state.themeMode) return;
+        setThemeMode(mode);
+      });
+      // Roving tab index keeps the segmented control a single stop.
+      elements.themeSwitch.addEventListener("keydown", (event) => {
+        const buttons = $$(".theme-option", elements.themeSwitch);
+        const index = buttons.indexOf(document.activeElement);
+        if (index < 0) return;
+        let next = null;
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (index + 1) % buttons.length;
+        if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index - 1 + buttons.length) % buttons.length;
+        if (next === null) return;
+        event.preventDefault();
+        buttons[next].focus();
+        buttons[next].click();
+      });
+    }
 
     elements.timerMinutes.addEventListener("input", setTimerFromInputs);
     elements.timerSeconds.addEventListener("input", setTimerFromInputs);
@@ -998,39 +1100,65 @@
     elements.convertValue.addEventListener("input", updateConverter);
     elements.convertUnit.addEventListener("change", updateConverter);
 
-    elements.themeButton.addEventListener("click", () => {
-      const dark = document.body.classList.toggle("dark");
-      elements.themeButton.querySelector("span").textContent = dark ? "Bring light back" : "Dim lights";
-      try {
-        localStorage.setItem(keys.theme, dark ? "dark" : "light");
-      } catch (_) {
-        // Theme preference remains active for this visit.
-      }
-    });
-
     elements.mobileMenuButton.addEventListener("click", () => {
       elements.mobileNav.classList.toggle("open");
       elements.mobileNavBackdrop.classList.toggle("open");
     });
     elements.mobileNavBackdrop.addEventListener("click", closeMobileNav);
     $$(".mobile-nav a").forEach((link) => link.addEventListener("click", closeMobileNav));
-  }
 
-  function restoreTheme() {
-    try {
-      if (localStorage.getItem(keys.theme) === "dark") {
-        document.body.classList.add("dark");
-        elements.themeButton.querySelector("span").textContent = "Bring light back";
+    window.addEventListener("online", () => weatherCard.refresh({ force: true }));
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        updateLiveTime();
+        weatherCard.refresh();
+        applyTheme();
       }
-    } catch (_) {
-      // Default light theme is intentionally calm and readable.
-    }
+    });
+    // DST shifts and daylight boundaries both move the palette.
+    window.setInterval(applyTheme, 30 * 1000);
   }
 
   function initialise() {
     if (!Array.isArray(state.savedCalculations)) state.savedCalculations = [];
-    restoreTheme();
+    if (!Array.isArray(state.worldZones) || !state.worldZones.length) state.worldZones = [...defaultWorldZones];
+
+    picker = createCityPicker({
+      elements: {
+        dialog: $("#zone-dialog"),
+        form: $("#zone-form"),
+        title: $("#zone-dialog-title"),
+        eyebrow: $("#dialog-eyebrow"),
+        copy: $("#dialog-copy"),
+        submit: $("#zone-submit"),
+        close: $("#dialog-close"),
+        search: $("#zone-search"),
+        list: $("#picker-list"),
+        count: $("#picker-count"),
+        summary: $("#picker-summary"),
+        chips: $("#picker-chips"),
+      },
+      callbacks: {
+        formatOffset: (zone) => offsetForZone(zone),
+        isAdded: (zone) => state.worldZones.includes(zone),
+        onPick: (zone, mode) => {
+          if (mode === "add") return addWorldZone(zone);
+          saveHomeZone(zone);
+          return true;
+        },
+        onBlocked: (zone) => {
+          notify(`${placeLabel(zone)} is already on your board.`, "!");
+        },
+      },
+    });
+
+    // Migrate a board saved by an older browser (or an older Tempo) so the
+    // stored ids are the modern ones too.
+    const storedZones = getStoredJSON(keys.worldZones, null);
+    if (Array.isArray(storedZones) && storedZones.some((zone, i) => zone !== state.worldZones[i])) persistWorldZones();
+
     elements.footerYear.textContent = `© ${new Date().getFullYear()} Tempo`;
+    applyTheme();
     setDefaultDurationInputs();
     renderWorldClocks();
     renderTimer();
@@ -1043,7 +1171,9 @@
     setupNavigationObserver();
     updateLiveTime();
     window.setInterval(updateLiveTime, 1000);
+    weatherCard.init();
   }
 
-  initialise();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initialise);
+  else initialise();
 })();
