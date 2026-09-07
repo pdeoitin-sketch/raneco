@@ -82,15 +82,21 @@
                 <div class="live-label"><span></span> LIVE</div>
                 <p class="now-kicker">YOUR LOCAL TIME</p>
               </div>
-              <button class="soft-button light" id="change-zone-button" type="button">
+              <div class="now-card-controls">
+                <div class="hour-format-toggle" role="group" aria-label="Clock hour format">
+                  <button type="button" class="format-button active" id="format-24" aria-pressed="true">24H</button>
+                  <button type="button" class="format-button" id="format-12" aria-pressed="false">12H</button>
+                </div>
+                <button class="soft-button light" id="change-zone-button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"></path><path d="M3.6 9h16.8M3.6 15h16.8M12 3c2.4 2.4 3.6 5.4 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.4-3.6-9S9.6 5.4 12 3Z"></path></svg>
                 <span>Set home zone</span>
               </button>
+              </div>
             </div>
 
             <div class="now-main">
               <div>
-                <h2 id="now-title" class="digital-time"><span id="local-hours">--</span><b>:</b><span id="local-minutes">--</span><small id="local-seconds">--</small></h2>
+                <h2 id="now-title" class="digital-time"><span id="local-hours">--</span><b>:</b><span id="local-minutes">--</span><small id="local-seconds">--</small><span class="period" id="local-period" hidden>PM</span></h2>
                 <p class="local-date" id="local-date">Loading today...</p>
                 <p class="zone-name" id="local-zone-name">Finding your time zone</p>
               </div>
@@ -203,6 +209,30 @@
                 <ol class="laps-list" id="laps-list"><li class="empty-lap">Your laps will show up here.</li></ol>
               </div>
             </article>
+
+            <article class="tool-card alarm-card" aria-labelledby="alarm-title">
+              <div class="tool-heading">
+                <div>
+                  <p class="eyebrow">WAKE UP ON TIME</p>
+                  <h3 id="alarm-title">Alarm</h3>
+                </div>
+                <span class="tool-status neutral" id="alarm-status">OFF</span>
+              </div>
+              <div class="alarm-body">
+                <label class="alarm-field">
+                  <span>WAKE ME AT</span>
+                  <input id="alarm-time" type="time" value="07:00" />
+                </label>
+                <div class="alarm-info">
+                  <p class="alarm-eta" id="alarm-remaining">Pick a time, then arm the alarm.</p>
+                  <p class="alarm-zone" id="alarm-zone">Rings in your home zone</p>
+                </div>
+                <div class="alarm-actions">
+                  <button class="primary-button alarm-toggle" id="alarm-toggle" type="button"><span class="play-icon">⏰</span> Arm alarm</button>
+                  <button class="secondary-button" id="alarm-snooze" type="button" hidden>Snooze 10 min</button>
+                </div>
+              </div>
+            </article>
           </div>
         </section>
 
@@ -232,6 +262,10 @@
                 <button class="primary-button calculate-button" type="submit">Calculate time <span>→</span></button>
               </form>
               <div class="duration-answer" id="duration-answer" aria-live="polite">
+                <div class="live-remaining" id="live-remaining" hidden>
+                  <span class="live-badge"><span></span> LIVE</span>
+                  <span id="live-remaining-text">—</span>
+                </div>
                 <div class="answer-main"><strong id="duration-words">Set two moments to begin</strong><span id="duration-context">We'll calculate the gap precisely.</span></div>
                 <div class="answer-totals">
                   <div><span id="total-days">—</span><small>DAYS</small></div>

@@ -31,6 +31,7 @@
     worldZones: "tempo-world-zones",
     saved: "tempo-saved-calculations",
     theme: "tempo-theme",
+    hourFormat: "tempo-hour-format",
   };
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -94,12 +95,23 @@
     return valid.length ? valid : [...defaultWorldZones];
   }
 
+  function getStoredHourFormat() {
+    try {
+      return localStorage.getItem(keys.hourFormat) === "12" ? "12" : "24";
+    } catch (_) {
+      return "24";
+    }
+  }
+
   const state = {
     homeZone: getStoredZone(),
     worldZones: getStoredWorldZones(),
     savedCalculations: getStoredJSON(keys.saved, []),
     lastCalculation: null,
+    liveTarget: null,
     dialogMode: "home",
+    hourFormat: getStoredHourFormat(),
+    alarm: { time: "07:00", armed: false, ringing: false },
     timer: {
       original: 5 * 60 * 1000,
       remaining: 5 * 60 * 1000,
@@ -125,7 +137,18 @@
     localMinutes: $("#local-minutes"),
     localSeconds: $("#local-seconds"),
     localDate: $("#local-date"),
+    localPeriod: $("#local-period"),
+    format24: $("#format-24"),
+    format12: $("#format-12"),
     localZoneName: $("#local-zone-name"),
+    alarmTime: $("#alarm-time"),
+    alarmStatus: $("#alarm-status"),
+    alarmRemaining: $("#alarm-remaining"),
+    alarmZone: $("#alarm-zone"),
+    alarmToggle: $("#alarm-toggle"),
+    alarmSnooze: $("#alarm-snooze"),
+    liveRemaining: $("#live-remaining"),
+    liveRemainingText: $("#live-remaining-text"),
     hourHand: $("#hour-hand"),
     minuteHand: $("#minute-hand"),
     secondHand: $("#second-hand"),
@@ -340,6 +363,15 @@
     return `${pad(minutes)}:${pad(seconds)}`;
   }
 
+  function formatCountdownToMidnight(milliseconds) {
+    const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    return `${pad(minutes)}:${pad(seconds)}`;
+  }
+
   function formatStopwatchMilliseconds(milliseconds) {
     const centiseconds = Math.floor(milliseconds / 10);
     const minutes = Math.floor(centiseconds / 6000);
@@ -383,7 +415,16 @@
     const progress = (daySeconds / 86400) * 100;
     const untilMidnight = 86400 - daySeconds;
 
-    elements.localHours.textContent = pad(hour);
+    const period = hour < 12 ? "AM" : "PM";
+    if (state.hourFormat === "12") {
+      const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+      elements.localHours.textContent = String(hour12);
+      elements.localPeriod.textContent = period;
+      elements.localPeriod.hidden = false;
+    } else {
+      elements.localHours.textContent = pad(hour);
+      elements.localPeriod.hidden = true;
+    }
     elements.localMinutes.textContent = pad(minute);
     elements.localSeconds.textContent = pad(second);
     elements.localDate.textContent = formatLongDate(now, state.homeZone);
@@ -410,15 +451,19 @@
 
     elements.dayProgress.style.width = `${Math.max(2, progress)}%`;
     elements.midnightProgress.style.width = `${progress}%`;
-    elements.midnightCountdown.textContent = formatTimerMilliseconds(untilMidnight * 1000);
+    elements.midnightCountdown.textContent = formatCountdownToMidnight(untilMidnight * 1000);
     elements.sunsetCopy.textContent = `${Math.round(progress)}% through today`;
     if (hour < 6) elements.dayProgressLabel.textContent = "A new day is waking up";
     else if (hour < 12) elements.dayProgressLabel.textContent = "Your morning is underway";
     else if (hour < 18) elements.dayProgressLabel.textContent = "The day is in motion";
     else elements.dayProgressLabel.textContent = "The day is winding down";
 
-    document.title = `${pad(hour)}:${pad(minute)} · ${home.city} — Tempo`;
+    const titleHours = state.hourFormat === "12" ? String(hour % 12 === 0 ? 12 : hour % 12) : pad(hour);
+    const titlePeriod = state.hourFormat === "12" ? ` ${period}` : "";
+    document.title = `${titleHours}:${pad(minute)}${titlePeriod} · ${home.city} — Tempo`;
     updateWorldClockTimes(now);
+    updateLiveRemaining(now);
+    updateAlarm(now);
   }
 
   // World clocks -----------------------------------------------------------
@@ -618,22 +663,48 @@
     }
   }
 
-  function beep() {
+  let audioContext = null;
+
+  function ensureAudio() {
     try {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContextClass) return;
-      const audio = new AudioContextClass();
+      if (!AudioContextClass) return null;
+      if (!audioContext) audioContext = new AudioContextClass();
+      if (audioContext.state === "suspended") audioContext.resume().catch(() => {});
+      return audioContext;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function playTone(frequency, startOffset, duration, peak = 0.2) {
+    const audio = ensureAudio();
+    if (!audio) return;
+    try {
       const oscillator = audio.createOscillator();
       const gain = audio.createGain();
-      oscillator.frequency.value = 880;
-      gain.gain.setValueAtTime(0.025, audio.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.35);
+      const start = audio.currentTime + startOffset;
+      oscillator.type = "sine";
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(peak, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
       oscillator.connect(gain).connect(audio.destination);
-      oscillator.start();
-      oscillator.stop(audio.currentTime + 0.36);
+      oscillator.start(start);
+      oscillator.stop(start + duration + 0.02);
     } catch (_) {
       // A toast still tells the user the countdown finished if audio is blocked.
     }
+  }
+
+  function beep() {
+    playTone(880, 0, 0.35, 0.22);
+  }
+
+  function alarmRing() {
+    [0, 0.45, 0.9, 1.8, 2.25, 2.7].forEach((offset, index) => {
+      playTone(index % 2 === 0 ? 880 : 1175, offset, 0.32, 0.25);
+    });
   }
 
   function tickTimer() {
@@ -662,6 +733,7 @@
       notify("Set a timer longer than zero first.", "!");
       return;
     }
+    ensureAudio();
     state.timer.running = true;
     state.timer.endAt = Date.now() + state.timer.remaining;
     clearTimerInterval();
@@ -759,6 +831,148 @@
     renderStopwatch();
   }
 
+  // Hour format --------------------------------------------------------------
+  function setHourFormat(format) {
+    if (state.hourFormat === format) return;
+    state.hourFormat = format;
+    try {
+      localStorage.setItem(keys.hourFormat, format);
+    } catch (_) {
+      // The preference stays active for this visit if storage is unavailable.
+    }
+    elements.format24.classList.toggle("active", format === "24");
+    elements.format12.classList.toggle("active", format === "12");
+    elements.format24.setAttribute("aria-pressed", format === "24" ? "true" : "false");
+    elements.format12.setAttribute("aria-pressed", format === "12" ? "true" : "false");
+    updateLiveTime();
+  }
+
+  // Alarm --------------------------------------------------------------------
+  function formatAlarmTime(value) {
+    const match = /^(\d{2}):(\d{2})$/.exec(value || "");
+    if (!match) return value;
+    const hours = Number(match[1]);
+    const hours12 = hours % 12 === 0 ? 12 : hours % 12;
+    return `${hours12}:${match[2]} ${hours < 12 ? "AM" : "PM"}`;
+  }
+
+  function readAlarmTime() {
+    const match = /^(\d{2}):(\d{2})$/.exec(elements.alarmTime.value || "");
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59) return null;
+    return hours * 3600 + minutes * 60;
+  }
+
+  function updateAlarm(now) {
+    const targetSeconds = readAlarmTime();
+    if (targetSeconds === null) {
+      state.alarm.armed = false;
+      state.alarm.ringing = false;
+    }
+    const parts = partsFor(now, state.homeZone);
+    const daySeconds = Number(parts.hour) * 3600 + Number(parts.minute) * 60 + Number(parts.second);
+
+    if (state.alarm.armed && targetSeconds !== null && !state.alarm.ringing && daySeconds === targetSeconds) {
+      state.alarm.ringing = true;
+      alarmRing();
+      notify(`It's ${formatAlarmTime(state.alarm.time)} — alarm time!`, "⏰");
+    }
+
+    const { armed, ringing } = state.alarm;
+    let status = "OFF";
+    let statusClass = "tool-status neutral";
+    let remaining = "Pick a time, then arm the alarm.";
+
+    if (ringing) {
+      status = "RINGING";
+      statusClass = "tool-status";
+      remaining = "It's that time. Tap stop when you're ready.";
+    } else if (armed && targetSeconds !== null) {
+      let msUntil = (targetSeconds - daySeconds) * 1000;
+      let isTomorrow = false;
+      if (msUntil < 0) {
+        msUntil += 86400000;
+        isTomorrow = true;
+      }
+      const untilMinutes = Math.max(1, Math.round(msUntil / 60000));
+      const wholeHours = Math.floor(untilMinutes / 60);
+      const wholeMinutes = untilMinutes % 60;
+      status = "ARMED";
+      statusClass = "tool-status running";
+      remaining = `Fires ${isTomorrow ? "tomorrow" : "today"} at ${formatAlarmTime(state.alarm.time)} · in ${wholeHours}h ${pad(wholeMinutes)}m`;
+    }
+
+    elements.alarmStatus.textContent = status;
+    elements.alarmStatus.className = statusClass;
+    elements.alarmRemaining.textContent = remaining;
+    const home = recordForZone(state.homeZone);
+    elements.alarmZone.textContent = `Rings in ${home.city} time (${formatOffset(now, state.homeZone)})`;
+    elements.alarmToggle.innerHTML = ringing
+      ? '<span class="play-icon">■</span> Stop alarm'
+      : armed
+        ? '<span class="play-icon">⏰</span> Disarm'
+        : '<span class="play-icon">⏰</span> Arm alarm';
+    elements.alarmSnooze.hidden = !ringing;
+    elements.alarmTime.disabled = ringing;
+  }
+
+  function syncAlarmState() {
+    state.alarm.time = elements.alarmTime.value || "07:00";
+    updateAlarm(new Date());
+  }
+
+  function toggleAlarm() {
+    if (state.alarm.ringing) {
+      state.alarm.ringing = false;
+      state.alarm.armed = false;
+      notify("Alarm dismissed. Well rested.", "✓");
+      updateAlarm(new Date());
+      return;
+    }
+    if (readAlarmTime() === null) {
+      notify("Choose a valid alarm time first.", "!");
+      return;
+    }
+    ensureAudio();
+    state.alarm.armed = !state.alarm.armed;
+    updateAlarm(new Date());
+  }
+
+  function snoozeAlarm() {
+    const parts = partsFor(new Date(Date.now() + 10 * 60000), state.homeZone);
+    elements.alarmTime.value = `${parts.hour}:${parts.minute}`;
+    state.alarm.time = elements.alarmTime.value;
+    state.alarm.ringing = false;
+    state.alarm.armed = true;
+    ensureAudio();
+    updateAlarm(new Date());
+    notify("Snoozed — 10 more minutes.", "z");
+  }
+
+  // Live "time remaining" for the calculator ---------------------------------
+  function updateLiveRemaining(now = new Date()) {
+    const target = state.liveTarget;
+    if (!target || Number.isNaN(target.getTime())) {
+      elements.liveRemaining.hidden = true;
+      return;
+    }
+    const ms = target.getTime() - now.getTime();
+    if (ms <= 0) {
+      elements.liveRemaining.hidden = true;
+      return;
+    }
+    const totalSeconds = Math.floor(ms / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const dayPart = days > 0 ? `${days}d ` : "";
+    elements.liveRemainingText.textContent = `${dayPart}${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s left until ${formatShortDateTime(target, state.homeZone)}`;
+    elements.liveRemaining.hidden = false;
+  }
+
   // Time calculations ------------------------------------------------------
   function setDefaultDurationInputs() {
     const now = new Date();
@@ -780,6 +994,8 @@
       elements.durationContext.textContent = "Both date and time fields are needed.";
       elements.saveCalculation.disabled = true;
       state.lastCalculation = null;
+      state.liveTarget = null;
+      updateLiveRemaining();
       return;
     }
 
@@ -811,6 +1027,9 @@
       details: `${formatNumber(totalHoursExact, 2)} hours · ${startLabel} → ${endLabel}`,
       zone: recordForZone(state.homeZone).city,
     };
+
+    state.liveTarget = difference > 0 ? end : null;
+    updateLiveRemaining();
   }
 
   const secondsPerUnit = {
@@ -915,6 +1134,13 @@
   }
 
   function bindEvents() {
+    elements.format24.addEventListener("click", () => setHourFormat("24"));
+    elements.format12.addEventListener("click", () => setHourFormat("12"));
+
+    elements.alarmTime.addEventListener("input", syncAlarmState);
+    elements.alarmToggle.addEventListener("click", toggleAlarm);
+    elements.alarmSnooze.addEventListener("click", snoozeAlarm);
+
     elements.changeZoneButton.addEventListener("click", () => openZoneDialog("home"));
     elements.quickZoneButton.addEventListener("click", () => openZoneDialog("home"));
     elements.addCityButton.addEventListener("click", () => {
@@ -1031,6 +1257,11 @@
     if (!Array.isArray(state.savedCalculations)) state.savedCalculations = [];
     restoreTheme();
     elements.footerYear.textContent = `© ${new Date().getFullYear()} Tempo`;
+    elements.format24.classList.toggle("active", state.hourFormat === "24");
+    elements.format12.classList.toggle("active", state.hourFormat === "12");
+    elements.format24.setAttribute("aria-pressed", state.hourFormat === "24" ? "true" : "false");
+    elements.format12.setAttribute("aria-pressed", state.hourFormat === "12" ? "true" : "false");
+    state.alarm.time = elements.alarmTime.value || "07:00";
     setDefaultDurationInputs();
     renderWorldClocks();
     renderTimer();
