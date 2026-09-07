@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A calm, capable dashboard for your local time, world clocks, timers, stopwatch, and time calculations."
+    />
+    <title>Tempo — Time, made useful</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="#now" aria-label="Tempo home">
+          <span class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+          <span>tempo<span class="brand-dot">.</span></span>
+        </a>
+
+        <nav class="side-nav">
+          <a class="nav-link active" href="#now" data-nav="now">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M12 7.4v5.1l3.4 2"></path></svg>
+            <span>Right now</span>
+          </a>
+          <a class="nav-link" href="#world" data-nav="world">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M3.9 9h16.2M3.9 15h16.2M12 3.75c2.15 2.25 3.22 4.99 3.22 8.25S14.15 18 12 20.25C9.85 18 8.78 15.26 8.78 12S9.85 5.99 12 3.75Z"></path></svg>
+            <span>World clocks</span>
+          </a>
+          <a class="nav-link" href="#tools" data-nav="tools">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3.75h8M12 3.75v3.1M18.15 8.55l1.8-1.8M12 7.1a7.15 7.15 0 1 1-7.15 7.15A7.15 7.15 0 0 1 12 7.1Z"></path><path d="M12 10.35v4.2l2.75 1.7"></path></svg>
+            <span>Focus tools</span>
+          </a>
+          <a class="nav-link" href="#calculator" data-nav="calculator">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2.25"></rect><path d="M8 7.5h8M8.25 11.5h.01M12 11.5h.01M15.75 11.5h.01M8.25 15.25h.01M12 15.25h.01M15.75 15.25h.01M8.25 18h.01M12 18h3.75"></path></svg>
+            <span>Time calculator</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="little-card">
+            <div class="little-card-icon" aria-hidden="true">✦</div>
+            <p class="eyebrow">A little reminder</p>
+            <p>Time you enjoy wasting is not wasted time.</p>
+          </div>
+          <button class="quiet-button" id="theme-button" type="button" aria-label="Toggle color theme">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.25 14.4A7.85 7.85 0 0 1 9.6 3.75a8.25 8.25 0 1 0 10.65 10.65Z"></path></svg>
+            <span>Dim lights</span>
+          </button>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="today-label">YOUR TIME, RIGHT NOW</p>
+            <h1>Make every moment count.</h1>
+          </div>
+          <div class="topbar-actions">
+            <div class="status-pill" title="Your detected time zone">
+              <span class="status-dot"></span>
+              <span id="top-timezone">Detecting your time zone</span>
+            </div>
+            <button class="icon-button mobile-menu-button" id="mobile-menu-button" type="button" aria-label="Open navigation">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+            </button>
+          </div>
+        </header>
+
+        <section class="hero-section section-anchor" id="now" aria-labelledby="now-title">
+          <div class="now-card">
+            <div class="now-card-top">
+              <div>
+                <div class="live-label"><span></span> LIVE</div>
+                <p class="now-kicker">YOUR LOCAL TIME</p>
+              </div>
+              <button class="soft-button light" id="change-zone-button" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"></path><path d="M3.6 9h16.8M3.6 15h16.8M12 3c2.4 2.4 3.6 5.4 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.4-3.6-9S9.6 5.4 12 3Z"></path></svg>
+                <span>Set home zone</span>
+              </button>
+            </div>
+
+            <div class="now-main">
+              <div>
+                <h2 id="now-title" class="digital-time"><span id="local-hours">--</span><b>:</b><span id="local-minutes">--</span><small id="local-seconds">--</small></h2>
+                <p class="local-date" id="local-date">Loading today...</p>
+                <p class="zone-name" id="local-zone-name">Finding your time zone</p>
+              </div>
+              <div class="analog-clock" aria-label="Current analog time">
+                <div class="clock-tick tick-12"></div><div class="clock-tick tick-3"></div><div class="clock-tick tick-6"></div><div class="clock-tick tick-9"></div>
+                <span class="clock-number number-12">12</span><span class="clock-number number-3">3</span><span class="clock-number number-6">6</span><span class="clock-number number-9">9</span>
+                <span class="clock-hand hand-hour" id="hour-hand"></span>
+                <span class="clock-hand hand-minute" id="minute-hand"></span>
+                <span class="clock-hand hand-second" id="second-hand"></span>
+                <span class="clock-pin"></span>
+              </div>
+            </div>
+
+            <div class="now-card-bottom">
+              <div class="sun-state"><span class="sun-icon">☀</span><span id="day-progress-label">Today is in motion</span></div>
+              <div class="day-track" aria-hidden="true"><span id="day-progress"></span></div>
+              <span class="sunset-copy" id="sunset-copy">Day progress</span>
+            </div>
+          </div>
+
+          <div class="quick-stack">
+            <article class="quick-card coral-card">
+              <div class="card-topline"><span class="small-icon icon-coral">↗</span><span>UP NEXT</span></div>
+              <div class="quick-countdown" id="midnight-countdown">--:--:--</div>
+              <p>until tomorrow begins</p>
+              <div class="mini-progress"><span id="midnight-progress"></span></div>
+            </article>
+            <article class="quick-card mint-card">
+              <div class="card-topline"><span class="small-icon icon-mint">⌁</span><span>TIMEZONE</span></div>
+              <p class="quick-city" id="home-city-label">Your local place</p>
+              <p class="quick-subtitle" id="utc-offset">UTC offset loading</p>
+              <button class="text-button" id="quick-zone-button" type="button">Change home zone <span>→</span></button>
+            </article>
+          </div>
+        </section>
+
+        <section class="section world-section section-anchor" id="world" aria-labelledby="world-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">STAY IN SYNC</p>
+              <h2 id="world-title">Around the world</h2>
+              <p class="section-intro">A quick glance at the people and places that matter.</p>
+            </div>
+            <button class="outline-button" id="add-city-button" type="button">
+              <span class="button-plus">+</span> Add a city
+            </button>
+          </div>
+          <div class="world-grid" id="world-grid" aria-live="polite"></div>
+        </section>
+
+        <section class="section tools-section section-anchor" id="tools" aria-labelledby="tools-title">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="eyebrow">FOCUS, ON YOUR TERMS</p>
+              <h2 id="tools-title">Keep time with yourself</h2>
+            </div>
+            <p class="section-aside">Whether you're deep in work or just need a minute.</p>
+          </div>
+
+          <div class="tools-grid">
+            <article class="tool-card timer-card" aria-labelledby="timer-title">
+              <div class="tool-heading">
+                <div>
+                  <p class="eyebrow">COUNTDOWN</p>
+                  <h3 id="timer-title">Timer</h3>
+                </div>
+                <span class="tool-status" id="timer-status">READY</span>
+              </div>
+              <div class="timer-layout">
+                <div class="timer-ring" id="timer-ring" aria-label="Timer remaining">
+                  <div class="timer-ring-inner"><span id="timer-display">05:00</span><small>MIN : SEC</small></div>
+                </div>
+                <div class="timer-controls">
+                  <div class="time-inputs" aria-label="Set timer duration">
+                    <label><span>MIN</span><input id="timer-minutes" type="number" inputmode="numeric" min="0" max="999" value="5" aria-label="Minutes" /></label>
+                    <span class="input-colon">:</span>
+                    <label><span>SEC</span><input id="timer-seconds" type="number" inputmode="numeric" min="0" max="59" value="0" aria-label="Seconds" /></label>
+                  </div>
+                  <div class="preset-row">
+                    <button type="button" class="preset-button" data-seconds="60">1 min</button>
+                    <button type="button" class="preset-button" data-seconds="300">5 min</button>
+                    <button type="button" class="preset-button" data-seconds="900">15 min</button>
+                  </div>
+                  <div class="primary-actions">
+                    <button class="primary-button timer-start" id="timer-start" type="button"><span class="play-icon">▶</span> Start timer</button>
+                    <button class="icon-button reset-button" id="timer-reset" type="button" aria-label="Reset timer">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.4 8.5V4.75M4.4 4.75h3.75M4.7 12a7.3 7.3 0 1 0 2.14-5.17L4.4 8.5"></path></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="tool-card stopwatch-card" aria-labelledby="stopwatch-title">
+              <div class="tool-heading">
+                <div>
+                  <p class="eyebrow">TRACK ELAPSED TIME</p>
+                  <h3 id="stopwatch-title">Stopwatch</h3>
+                </div>
+                <span class="tool-status neutral" id="stopwatch-status">STOPPED</span>
+              </div>
+              <div class="stopwatch-display" id="stopwatch-display">00:00<span>.00</span></div>
+              <div class="stopwatch-actions">
+                <button class="secondary-button lap-button" id="lap-button" type="button" disabled>Lap</button>
+                <button class="primary-button stopwatch-start" id="stopwatch-start" type="button"><span class="play-icon">▶</span> Start</button>
+                <button class="secondary-button" id="stopwatch-reset" type="button">Reset</button>
+              </div>
+              <div class="laps-wrap">
+                <div class="laps-heading"><span>LAPS</span><span id="lap-count">—</span></div>
+                <ol class="laps-list" id="laps-list"><li class="empty-lap">Your laps will show up here.</li></ol>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="section calculator-section section-anchor" id="calculator" aria-labelledby="calculator-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">NO MENTAL MATH REQUIRED</p>
+              <h2 id="calculator-title">Time calculator</h2>
+              <p class="section-intro">Get the distance between two moments, or turn any unit into another.</p>
+            </div>
+            <div class="calculator-zone-note"><span class="status-dot"></span><span id="calculator-zone">Using your local time zone</span></div>
+          </div>
+
+          <div class="calculator-grid">
+            <article class="calculator-card duration-card" aria-labelledby="duration-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">BETWEEN TWO MOMENTS</p>
+                  <h3 id="duration-title">How much time is there?</h3>
+                </div>
+                <span class="formula-icon" aria-hidden="true">Δ</span>
+              </div>
+              <form id="duration-form" class="duration-form">
+                <label class="date-field"><span>FROM</span><input id="start-datetime" type="datetime-local" required /></label>
+                <span class="to-separator">to</span>
+                <label class="date-field"><span>UNTIL</span><input id="end-datetime" type="datetime-local" required /></label>
+                <button class="primary-button calculate-button" type="submit">Calculate time <span>→</span></button>
+              </form>
+              <div class="duration-answer" id="duration-answer" aria-live="polite">
+                <div class="answer-main"><strong id="duration-words">Set two moments to begin</strong><span id="duration-context">We'll calculate the gap precisely.</span></div>
+                <div class="answer-totals">
+                  <div><span id="total-days">—</span><small>DAYS</small></div>
+                  <div><span id="total-hours">—</span><small>HOURS</small></div>
+                  <div><span id="total-minutes">—</span><small>MINUTES</small></div>
+                  <div><span id="total-seconds">—</span><small>SECONDS</small></div>
+                </div>
+                <button type="button" class="save-calculation" id="save-calculation" disabled><span>＋</span> Save this calculation</button>
+              </div>
+            </article>
+
+            <article class="calculator-card convert-card" aria-labelledby="convert-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">QUICK CONVERTER</p>
+                  <h3 id="convert-title">Make time make sense</h3>
+                </div>
+                <span class="formula-icon soft" aria-hidden="true">⇄</span>
+              </div>
+              <div class="converter-form">
+                <label><span>I HAVE</span><input id="convert-value" type="number" min="0" step="any" value="5" /></label>
+                <label><span>OF</span><select id="convert-unit"><option value="days">days</option><option value="hours">hours</option><option value="minutes">minutes</option><option value="seconds">seconds</option><option value="weeks">weeks</option></select></label>
+              </div>
+              <div class="conversion-results" id="conversion-results" aria-live="polite"></div>
+              <p class="conversion-hint">For example: 5 days is 120 hours, 7,200 minutes, and 432,000 seconds.</p>
+            </article>
+          </div>
+
+          <div class="saved-section" id="saved-section">
+            <div class="saved-heading"><span class="saved-star">✦</span><span>SAVED CALCULATIONS</span><button type="button" id="clear-saved" hidden>Clear all</button></div>
+            <div class="saved-list" id="saved-list"><p class="empty-saved">Your useful answers can live here for later.</p></div>
+          </div>
+        </section>
+
+        <footer class="footer">
+          <p><span class="footer-mark">tempo.</span> A quieter way to keep up.</p>
+          <p id="footer-year"></p>
+        </footer>
+      </main>
+    </div>
+
+    <div class="mobile-nav-backdrop" id="mobile-nav-backdrop"></div>
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+      <a href="#now" data-nav="now">Right now</a>
+      <a href="#world" data-nav="world">World clocks</a>
+      <a href="#tools" data-nav="tools">Focus tools</a>
+      <a href="#calculator" data-nav="calculator">Time calculator</a>
+    </nav>
+
+    <dialog class="zone-dialog" id="zone-dialog" aria-labelledby="zone-dialog-title">
+      <form method="dialog" class="dialog-card" id="zone-form">
+        <button class="dialog-close" id="dialog-close" type="button" aria-label="Close dialog">×</button>
+        <p class="eyebrow" id="dialog-eyebrow">MAKE IT YOURS</p>
+        <h2 id="zone-dialog-title">Set your home time zone</h2>
+        <p class="dialog-copy" id="dialog-copy">Choose the time zone you want Tempo to use as your home base.</p>
+        <label class="dialog-select-label" for="zone-select">CITY OR REGION</label>
+        <select id="zone-select"></select>
+        <button class="primary-button dialog-submit" id="zone-submit" type="submit">Save home zone</button>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-icon">✓</span><span id="toast-message"></span></div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
