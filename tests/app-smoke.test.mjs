@@ -10,33 +10,34 @@ import { JSDOM, VirtualConsole } from "jsdom";
  *
  * It boots app.js against a jsdom document parsed from index.html, with fetch
  * stubbed to an Open-Meteo-shaped payload, and drives the parts a pure unit
- * test cannot reach: place labels, the searchable picker, the weather card,
- * the Auto palette — and the timer / stopwatch / calculator that must keep
- * working.
+ * test cannot reach: the page router, place labels for cities *and* zones, the
+ * searchable picker, the weather card with its own location, the Auto palette
+ * — and the timer, stopwatch and calculator that must keep working.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
-function weatherPayload({ now = Date.now(), code = 61, isDay = 1 } = {}) {
+function weatherPayload({ now = Date.now(), code = 61, isDay = 1, wind = 7.3 } = {}) {
   const iso = (epoch) => new Date(epoch).toISOString().slice(0, 16);
   return {
-    latitude: 27.7167,
-    longitude: 85.3167,
-    utc_offset_seconds: 20700,
-    timezone: "Asia/Kathmandu",
+    latitude: 28.6,
+    longitude: 77.2,
+    utc_offset_seconds: 19800,
+    timezone: "Asia/Kolkata",
     current: {
       time: iso(now),
       interval: 900,
-      temperature_2m: 21.4,
-      apparent_temperature: 24.1,
-      relative_humidity_2m: 88,
-      precipitation: 0.6,
+      temperature_2m: 31.4,
+      apparent_temperature: 34.1,
+      relative_humidity_2m: 62,
+      precipitation: 0,
       weather_code: code,
       is_day: isDay,
-      wind_speed_10m: 7.3,
+      wind_speed_10m: wind,
       wind_direction_10m: 210,
+      wind_gusts_10m: wind * 1.6,
     },
     daily: {
       time: [new Date(now).toISOString().slice(0, 10)],
@@ -85,6 +86,10 @@ async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload
   previous.set("fetch", Object.getOwnPropertyDescriptor(globalThis, "fetch"));
   expose("fetch", stubFetch);
 
+  // rAF drives the old clock's sweep hand; jsdom only provides it with
+  // pretendToBeVisual, which is on — but guard anyway so the suite is stable.
+  if (!dom.window.requestAnimationFrame) expose("requestAnimationFrame", (fn) => setTimeout(fn, 16));
+
   await import(`${pathToFileURL(resolve(root, "app.js")).href}?t=${Math.random()}`);
   await wait(80);
 
@@ -109,6 +114,15 @@ async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload
       input.value = value;
       input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
       await wait(90);
+    },
+    async go(route) {
+      dom.window.location.hash = `#/${route}`;
+      await wait(60);
+    },
+    visiblePages() {
+      return Array.from(document.querySelectorAll(".page"))
+        .filter((page) => !page.hidden)
+        .map((page) => page.dataset.page);
     },
     cleanup() {
       dom.window.close();
@@ -137,24 +151,93 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.$("#home-country-label").textContent, "Nepal");
     assert.match(app.$("#local-hours").textContent, /^\d{2}$/);
     assert.match(document.title, /Kathmandu — Tempo/);
+    // The home place is stored as a modern place id.
+    assert.equal(app.localStorage.getItem("tempo-home-zone"), "zone:Asia/Kathmandu");
   });
 
-  test("world clocks show country · city, and add / remove keep working", async () => {
+  test("each page is its own route, and only one shows at a time", async () => {
     app = await boot();
+    assert.deepEqual(app.visiblePages(), ["now"], "Right now is the landing page");
+    assert.match(app.$("#page-title").textContent, /moment/);
+    assert.equal(app.$('.nav-link[data-route="now"]').classList.contains("active"), true);
+
+    await app.go("clocks");
+    assert.deepEqual(app.visiblePages(), ["clocks"]);
+    assert.match(app.$("#page-title").textContent, /Around the world/);
+    assert.equal(app.$('.nav-link[data-route="clocks"]').getAttribute("aria-current"), "page");
+    assert.equal(app.$('.nav-link[data-route="now"]').getAttribute("aria-current"), null);
+
+    await app.go("timer");
+    assert.deepEqual(app.visiblePages(), ["timer"]);
+    await app.go("clock");
+    assert.deepEqual(app.visiblePages(), ["clock"]);
+    await app.go("focus");
+    assert.deepEqual(app.visiblePages(), ["focus"]);
+    await app.go("calculator");
+    assert.deepEqual(app.visiblePages(), ["calculator"]);
+    assert.match(app.$("#page-title").textContent, /mental maths/);
+
+    // A hash left over from an older build (or a typo) lands somewhere safe.
+    await app.go("nope");
+    assert.deepEqual(app.visiblePages(), ["now"]);
+  });
+
+  test("world clocks show country · city, cities have their own sun line", async () => {
+    // London is on the default board, so the HOME badge has something to mark.
+    app = await boot({ homeZone: "Europe/London" });
+    await app.go("clocks");
     const cards = app.$$(".world-card");
-    assert.equal(cards.length, 4, "the four default clocks render");
-    assert.equal(flatten(cards[0].querySelector(".city-place").textContent), "United States · New York");
-    assert.ok(cards.some((card) => card.classList.contains("is-home")), "the home zone is flagged");
-    assert.match(app.$("#world-count").textContent, /4 of 8 clocks/);
+    assert.ok(cards.length >= 4, `the default board renders, got ${cards.length}`);
+    assert.equal(flatten(cards[1].querySelector(".city-place").textContent), "United Kingdom · London");
+    assert.ok(cards.some((card) => card.classList.contains("is-home")), "the home place is flagged");
+    assert.match(app.$("#world-count").textContent, /of 12 clocks/);
+    // Every card carries a solar-time line computed from its own longitude.
+    for (const card of cards) {
+      assert.match(card.querySelector(".world-sun").textContent, /Sun time \d{2}:\d{2}/, card.dataset.place);
+    }
 
     app.click(".world-card .remove-city");
     await wait(30);
-    assert.equal(app.$$(".world-card").length, 3, "remove works");
-    assert.equal(JSON.parse(app.localStorage.getItem("tempo-world-zones")).length, 3);
+    assert.equal(app.$$(".world-card").length, cards.length - 1, "remove works");
+    assert.equal(JSON.parse(app.localStorage.getItem("tempo-world-zones")).length, cards.length - 1);
   });
 
-  test("the searchable picker lists every zone and fixes legacy spellings", async () => {
+  test("two cities in one zone stay two clocks, with different sun times", async () => {
     app = await boot();
+    await app.go("clocks");
+    // Clear the board, then add Delhi and Guwahati: both Asia/Kolkata.
+    while (app.$$(".world-card").length) {
+      app.click(".world-card .remove-city");
+      await wait(10);
+    }
+    app.click("#add-city-button");
+    await wait(60);
+    await app.typeIn("#zone-search", "delhi");
+    app.$$("#picker-list .picker-option")[0].click();
+    app.key("#zone-search", "Enter");
+    await wait(40);
+
+    app.click("#add-city-button");
+    await wait(60);
+    await app.typeIn("#zone-search", "guwahati");
+    app.$$("#picker-list .picker-option")[0].click();
+    app.key("#zone-search", "Enter");
+    await wait(40);
+
+    const stored = JSON.parse(app.localStorage.getItem("tempo-world-zones"));
+    assert.deepEqual(stored, ["city:delhi-in", "city:guwahati-in"]);
+    const cards = app.$$(".world-card");
+    assert.equal(cards.length, 2);
+    // Same clock…
+    assert.equal(cards[0].querySelector(".world-clock-value").textContent, cards[1].querySelector(".world-clock-value").textContent);
+    assert.equal(cards[0].querySelector(".world-offset").textContent, cards[1].querySelector(".world-offset").textContent);
+    // …different sun, which is the whole point.
+    assert.notEqual(cards[0].querySelector(".world-sun").textContent, cards[1].querySelector(".world-sun").textContent);
+  });
+
+  test("the searchable picker lists zones and cities, and fixes legacy spellings", async () => {
+    app = await boot();
+    await app.go("clocks");
     app.click("#add-city-button");
     await wait(60);
 
@@ -164,15 +247,16 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(highlighted.getAttribute("aria-selected"), "true", "highlight matches the selection");
     assert.ok(options.includes(highlighted), "and it is one of the places");
     const groups = app.$$("#picker-list .picker-group");
-    assert.ok(options.length > 300, `expected the full zone list, got ${options.length}`);
+    assert.ok(options.length > 600, `expected zones *and* cities, got ${options.length}`);
     assert.ok(groups.length > 100, `expected country groups, got ${groups.length}`);
     assert.match(flatten(groups[0].textContent), /^Afghanistan/);
-    assert.match(app.$("#picker-count").textContent, /zones in \d+ countries/);
+    assert.match(app.$("#picker-count").textContent, /places in \d+ countries/);
 
     await app.typeIn("#zone-search", "kiev");
     const found = app.$$("#picker-list .picker-option");
     assert.equal(found.length, 1, "the old spelling finds exactly one place");
-    assert.equal(found[0].dataset.place, "Europe/Kyiv");
+    assert.equal(found[0].dataset.place, "zone:Europe/Kyiv");
+    assert.equal(found[0].dataset.zone, "Europe/Kyiv");
     assert.equal(found[0].querySelector(".picker-city").textContent, "Kyiv");
 
     found[0].click();
@@ -180,7 +264,7 @@ describe("tempo in a browser-like DOM", () => {
     assert.match(app.$("#picker-summary").textContent, /Ukraine · Kyiv · UTC\+03:00 · Europe\/Kyiv/);
     app.key("#zone-search", "Enter");
     await wait(40);
-    assert.ok(app.$$(".world-card").some((card) => card.dataset.worldZone === "Europe/Kyiv"), "clock added");
+    assert.ok(app.$$(".world-card").some((card) => card.dataset.place === "zone:Europe/Kyiv"), "clock added");
 
     // A legacy id picked from search is stored as the modern zone id.
     app.click("#add-city-button");
@@ -188,51 +272,57 @@ describe("tempo in a browser-like DOM", () => {
     await app.typeIn("#zone-search", "calcutta");
     const kolkata = app.$$("#picker-list .picker-option");
     assert.equal(kolkata.length, 1);
-    assert.equal(kolkata[0].dataset.place, "Asia/Kolkata");
+    assert.equal(kolkata[0].dataset.zone, "Asia/Kolkata");
     kolkata[0].click();
     app.key("#zone-search", "Enter");
     await wait(40);
     const stored = JSON.parse(app.localStorage.getItem("tempo-world-zones"));
-    assert.ok(stored.includes("Asia/Kolkata"));
-    assert.ok(!stored.some((zone) => /Calcutta/.test(zone)));
+    assert.ok(stored.includes("zone:Asia/Kolkata"));
+    assert.ok(!stored.some((id) => /Calcutta/i.test(id)));
+
+    // A city no zone is named after is findable too.
+    app.click("#add-city-button");
+    await wait(40);
+    await app.typeIn("#zone-search", "ahmedabad");
+    const city = app.$$("#picker-list .picker-option")[0];
+    assert.equal(city.dataset.place, "city:ahmedabad-in");
   });
 
-  test("the picker moves the home zone and the whole page follows", async () => {
+  test("the picker moves the home place and the whole page follows", async () => {
     app = await boot({ homeZone: "Asia/Katmandu" });
     app.click("#quick-zone-button");
     await wait(40);
-    // The remembered selection is highlighted on the right row, even though
-    // country headers are interleaved with the options.
     const active = app.$("#picker-list .picker-option.active");
     assert.ok(active, "one option is active");
-    assert.equal(active.dataset.place, "Asia/Kathmandu");
-    assert.equal(active.getAttribute("aria-selected"), "true");
+    assert.equal(active.dataset.place, "zone:Asia/Kathmandu");
     assert.equal(active.querySelector(".picker-city").textContent, "Kathmandu");
+
     await app.typeIn("#zone-search", "ho chi minh");
     const option = app.$$("#picker-list .picker-option")[0];
-    assert.equal(option.dataset.place, "Asia/Ho_Chi_Minh");
+    assert.equal(option.dataset.zone, "Asia/Ho_Chi_Minh");
     assert.equal(option.querySelector(".picker-city").textContent, "Ho Chi Minh City");
     option.click();
     app.key("#zone-search", "Enter");
     await wait(60);
 
-    assert.equal(app.localStorage.getItem("tempo-home-zone"), "Asia/Ho_Chi_Minh");
+    assert.equal(app.localStorage.getItem("tempo-home-zone"), "zone:Asia/Ho_Chi_Minh");
     assert.equal(flatten(app.$("#top-timezone").textContent), "Vietnam · Ho Chi Minh City");
     assert.match(app.$("#local-zone-name").textContent, /Asia\/Ho_Chi_Minh/);
   });
 
-  test("weather renders in Right now and drives the Auto palette", async () => {
+  test("weather renders in Right now, drives the Auto palette, and names its place", async () => {
     app = await boot();
     await wait(60);
 
-    assert.equal(app.$("#weather-temp").textContent, "21");
+    assert.equal(app.$("#weather-temp").textContent, "31");
     assert.equal(app.$("#weather-unit").textContent, "°C");
     assert.equal(app.$("#weather-condition").textContent, "Light rain");
     assert.match(app.$("#weather-place").textContent, /Kathmandu/);
+    assert.match(app.$("#weather-coords").textContent, /\d+\.\d+° N, \d+\.\d+° E/);
     assert.match(app.$("#weather-sunrise").textContent, /^\d{2}:\d{2}$/);
     assert.match(app.$("#weather-sunset").textContent, /^\d{2}:\d{2}$/);
-    assert.match(app.$("#weather-details").textContent, /88% humidity/);
-    assert.equal(app.$$("#weather-card .weather-mini").length, 2);
+    assert.match(app.$("#weather-details").textContent, /62% humidity/);
+    assert.match(app.$("#weather-details").textContent, /wind 7 km\/h/);
     assert.equal(app.document.body.dataset.appearance, "rain");
     assert.equal(app.document.body.dataset.ui, "light");
     assert.match(app.$("#theme-caption").textContent, /Rainy/);
@@ -241,32 +331,55 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.fetchCalls.length, 1);
     const requested = new URL(app.fetchCalls[0]);
     assert.equal(requested.origin, "https://api.open-meteo.com");
-    assert.equal(requested.searchParams.get("latitude"), "27.7167");
-    assert.equal(requested.searchParams.get("longitude"), "85.3167");
+    assert.match(requested.searchParams.get("current"), /wind_gusts_10m/);
     assert.equal(requested.searchParams.get("daily"), "sunrise,sunset");
-    assert.match(requested.searchParams.get("current"), /^temperature_2m,apparent_temperature/);
+  });
+
+  test("weather can be pointed at a different place than the home clock", async () => {
+    app = await boot();
+    await wait(60);
+    app.click("#weather-set-location");
+    await wait(50);
+    assert.match(app.$("#zone-dialog-title").textContent, /Where should we look/);
+    await app.typeIn("#zone-search", "ahmedabad");
+    app.$$("#picker-list .picker-option")[0].click();
+    app.key("#zone-search", "Enter");
+    await wait(120);
+
+    const stored = JSON.parse(app.localStorage.getItem("tempo-weather-place"));
+    assert.equal(stored.kind, "place");
+    assert.equal(stored.placeId, "city:ahmedabad-in");
+    assert.match(app.$("#weather-place").textContent, /Ahmedabad/);
+    // The home clock did not move with it.
+    assert.equal(flatten(app.$("#top-timezone").textContent), "Nepal · Kathmandu");
+    const last = new URL(app.fetchCalls[app.fetchCalls.length - 1]);
+    assert.equal(last.searchParams.get("latitude"), "23.0225");
+    assert.equal(last.searchParams.get("longitude"), "72.5714");
   });
 
   test("the Auto palette changes with the sky, and manual modes win", async () => {
-    const clear = await boot({ weather: () => weatherPayload({ code: 0 }) });
+    const sunny = await boot({ weather: () => weatherPayload({ code: 0 }) });
     await wait(60);
-    assert.equal(clear.document.body.dataset.appearance, "clear");
-    assert.equal(clear.document.body.classList.contains("dark"), false);
-    assert.match(clear.$("#theme-caption").textContent, /Bright day/);
-    assert.match(clear.$("#theme-caption").querySelector("span").textContent, /Auto · Kathmandu/);
+    assert.equal(sunny.document.body.dataset.appearance, "sunny", "clear skies are the sunny (warm) palette");
+    assert.equal(sunny.document.body.classList.contains("dark"), false);
+    assert.match(sunny.$("#theme-caption").textContent, /Sunny day/);
 
-    clear.click('#theme-switch [data-theme-mode="dark"]');
-    await wait(20);
-    assert.equal(clear.document.body.dataset.appearance, "dark", "manual dark overrides a sunny sky");
-    assert.ok(clear.document.body.classList.contains("dark"));
-    assert.equal(clear.localStorage.getItem("tempo-theme-mode"), "dark");
-    assert.match(clear.$("#theme-caption").title, /Dark theme · fixed/);
+    const windy = await boot({ weather: () => weatherPayload({ code: 1, wind: 42 }) });
+    await wait(60);
+    assert.equal(windy.document.body.dataset.appearance, "wind", "a gale is a windy day, not a clear one");
+    windy.cleanup();
 
-    clear.click('#theme-switch [data-theme-mode="auto"]');
+    sunny.click('#theme-switch [data-theme-mode="dark"]');
     await wait(20);
-    assert.equal(clear.document.body.dataset.appearance, "clear", "Auto takes over again");
-    assert.equal(clear.document.body.classList.contains("dark"), false);
-    clear.cleanup();
+    assert.equal(sunny.document.body.dataset.appearance, "dark", "manual dark overrides a sunny sky");
+    assert.ok(sunny.document.body.classList.contains("dark"));
+    assert.equal(sunny.localStorage.getItem("tempo-theme-mode"), "dark");
+    assert.match(sunny.$("#theme-caption").title, /Dark theme · fixed/);
+
+    sunny.click('#theme-switch [data-theme-mode="auto"]');
+    await wait(20);
+    assert.equal(sunny.document.body.dataset.appearance, "sunny", "Auto takes over again");
+    sunny.cleanup();
 
     const storm = await boot({ weather: () => weatherPayload({ code: 95 }) });
     await wait(60);
@@ -284,6 +397,22 @@ describe("tempo in a browser-like DOM", () => {
     app = await boot();
   });
 
+  test("text size is a control, and it is remembered", async () => {
+    app = await boot();
+    assert.equal(app.document.documentElement.style.getPropertyValue("--type-scale"), "1.15");
+    app.click('#text-size-switch [data-text-size="1.32"]');
+    await wait(20);
+    assert.equal(app.document.documentElement.style.getPropertyValue("--type-scale"), "1.32");
+    assert.equal(app.localStorage.getItem("tempo-text-scale"), "1.32");
+    assert.equal(
+      app.$('#text-size-switch [data-text-size="1.32"]').getAttribute("aria-checked"),
+      "true"
+    );
+    app.click('#text-size-switch [data-text-size="1"]');
+    await wait(20);
+    assert.equal(app.document.documentElement.style.getPropertyValue("--type-scale"), "1");
+  });
+
   test("a remembered manual theme is applied before the clocks start", async () => {
     app = await boot({ homeZone: "Asia/Katmandu" });
     app.document.body.dataset.appearance = "pending";
@@ -299,15 +428,43 @@ describe("tempo in a browser-like DOM", () => {
     await wait(60);
     assert.match(app.$("#weather-condition").textContent, /unexpected|unavailable|not loaded/i);
     assert.ok(
-      ["clear", "dawn", "dusk", "night", "cloud"].includes(app.document.body.dataset.appearance),
+      ["sunny", "dawn", "dusk", "night", "cloud"].includes(app.document.body.dataset.appearance),
       `appearance was ${app.document.body.dataset.appearance}`
     );
     assert.equal(app.document.body.dataset.weather, "none");
   });
 
+  test("the old clock page draws a face and can be pointed at a city", async () => {
+    app = await boot();
+    await app.go("clock");
+    assert.equal(app.visiblePages()[0], "clock");
+    assert.ok(app.$$("#old-clock .face-tick").length === 60, "sixty ticks");
+    assert.equal(app.$$("#old-clock .face-number").length, 12);
+    assert.equal(app.$("#old-clock").dataset.numerals, "roman");
+    assert.equal(app.$("#old-clock .face-number em").textContent, "I");
+    assert.match(app.$("#old-clock-digital").textContent, /^\d{2}:\d{2}:\d{2}$/);
+    assert.match(app.$("#old-clock-meta").textContent, /UTC[+-]\d{2}:\d{2}/);
+    assert.match(app.$("#old-clock-place-name").textContent, /Kathmandu/);
+
+    app.click('#old-clock-numerals [data-numerals="arabic"]');
+    await wait(20);
+    assert.equal(app.$("#old-clock").dataset.numerals, "arabic");
+    assert.equal(app.$("#old-clock .face-number em").textContent, "1");
+
+    app.click("#old-clock-place");
+    await wait(60);
+    await app.typeIn("#zone-search", "delhi");
+    app.$$("#picker-list .picker-option")[0].click();
+    app.key("#zone-search", "Enter");
+    await wait(60);
+    assert.match(app.$("#old-clock-place-name").textContent, /Delhi/);
+    assert.match(app.$("#old-clock-place-label").textContent, /Delhi/);
+  });
+
   test("timer, stopwatch and calculator still work", async () => {
     app = await boot();
 
+    await app.go("timer");
     app.$("#timer-minutes").value = "1";
     app.$("#timer-minutes").dispatchEvent(new app.window.Event("input", { bubbles: true }));
     assert.equal(app.$("#timer-display").textContent, "01:00");
@@ -316,11 +473,17 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.$("#timer-status").textContent, "RUNNING");
     await wait(1100);
     assert.notEqual(app.$("#timer-display").textContent, "01:00", "it counts down");
+    // It keeps running while you are on another page.
+    await app.go("clocks");
+    await wait(300);
+    await app.go("timer");
+    assert.equal(app.$("#timer-status").textContent, "RUNNING");
     app.click("#timer-start");
     assert.equal(app.$("#timer-status").textContent, "PAUSED");
     app.click("#timer-reset");
     assert.equal(app.$("#timer-display").textContent, "01:00");
 
+    await app.go("focus");
     app.click("#stopwatch-start");
     await wait(80);
     assert.match(app.$("#stopwatch-display").textContent, /^\d{2}:\d{2}\.\d{2}$/);
@@ -332,6 +495,7 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.$("#stopwatch-display").textContent, "00:00.00");
     assert.equal(app.$("#stopwatch-status").textContent, "STOPPED");
 
+    await app.go("calculator");
     app.$("#start-datetime").value = "2026-09-07T09:00";
     app.$("#end-datetime").value = "2026-09-09T11:30";
     app.$("#duration-form").dispatchEvent(new app.window.Event("submit", { bubbles: true, cancelable: true }));
@@ -351,9 +515,81 @@ describe("tempo in a browser-like DOM", () => {
     assert.deepEqual(converted, ["120", "7,200", "432,000"]);
   });
 
+  test("'use my location' turns a GPS fix into a home place and a clock", async () => {
+    app = await boot();
+    await wait(40);
+
+    // Stand in for the browser's permission prompt. The stubbed fetch answers
+    // the zone lookup with the same Open-Meteo-shaped payload.
+    Object.defineProperty(app.window.navigator, "geolocation", {
+      configurable: true,
+      value: {
+        getCurrentPosition(onSuccess) {
+          onSuccess({ coords: { latitude: 28.6139, longitude: 77.209, accuracy: 20 } });
+        },
+      },
+    });
+
+    app.click("#use-location-button");
+    await wait(160);
+
+    const home = app.localStorage.getItem("tempo-home-zone");
+    assert.equal(home.startsWith("geo:"), true, `home place is the fix, got ${home}`);
+    assert.match(app.$("#top-timezone").textContent, /Delhi/);
+    assert.match(app.$("#home-sun-line").textContent, /Sun time/);
+    // The confirmed zone beats the gazetteer's guess.
+    assert.match(app.$("#local-zone-name").textContent, /Asia\/Kolkata/);
+    assert.match(app.$("#toast-message").textContent, /Found you near Delhi/);
+
+    const board = JSON.parse(app.localStorage.getItem("tempo-world-zones"));
+    assert.ok(board.includes(home), "and your own location joins the board");
+    const card = app.$$(".world-card").find((node) => node.dataset.place === home);
+    assert.ok(card, "the location clock is rendered");
+    assert.ok(card.querySelector(".world-pin"), "and flagged as coming from the device");
+  });
+
+  test("the clocks page can add your location without moving the home clock", async () => {
+    app = await boot();
+    await app.go("clocks");
+    Object.defineProperty(app.window.navigator, "geolocation", {
+      configurable: true,
+      value: {
+        getCurrentPosition(onSuccess) {
+          onSuccess({ coords: { latitude: 19.076, longitude: 72.8777, accuracy: 30 } });
+        },
+      },
+    });
+    const before = app.$$(".world-card").length;
+    app.click("#use-location-clock");
+    await wait(160);
+
+    assert.equal(app.$$(".world-card").length, before + 1);
+    assert.equal(app.localStorage.getItem("tempo-home-zone"), "zone:Asia/Kathmandu", "the home clock stayed put");
+    assert.ok(app.$$(".world-card").some((card) => card.dataset.place.startsWith("geo:")));
+  });
+
+  test("'use my location' explains a refusal instead of failing silently", async () => {
+    app = await boot();
+    Object.defineProperty(app.window.navigator, "geolocation", {
+      configurable: true,
+      value: {
+        getCurrentPosition(onSuccess, onError) {
+          onError({ code: 1 });
+        },
+      },
+    });
+    app.click("#use-location-button");
+    await wait(120);
+    assert.match(app.$("#toast-message").textContent, /declined/i);
+    assert.equal(app.$("#top-timezone").textContent, "Nepal · Kathmandu", "nothing changed");
+  });
+
   test("booting produces no console errors", async () => {
     app = await boot();
-    await wait(150);
+    await wait(200);
+    for (const route of ["clocks", "timer", "clock", "focus", "calculator", "now"]) {
+      await app.go(route);
+    }
     assert.deepEqual(app.errors, [], `console output: ${app.errors.join(" | ")}`);
   });
 });

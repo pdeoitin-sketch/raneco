@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="A calm, capable dashboard for your local time, world clocks, live weather, timers, stopwatch, and time calculations."
+      content="A calm, capable dashboard for your local time, world clocks, live weather, timers, stopwatch, and time calculations — with pages for each."
     />
     <title>Tempo — Time, made useful</title>
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#f7f7fb" />
     <script>
       // Runs before the first paint so a remembered Auto palette (or a manual
-      // dark choice) never flashes white. app.js re-reads the same key and
-      // stores "<appearance>|<canvas colour>" in localStorage.
+      // dark choice) and the chosen text size never flash the wrong way.
+      // app.js re-reads the same keys and keeps them in sync.
       (function () {
         try {
           var last = localStorage.getItem("tempo-theme-last");
@@ -21,11 +21,16 @@
             var parts = last.split("|");
             document.documentElement.setAttribute("data-appearance", parts[0]);
             if (parts[1]) document.documentElement.style.background = parts[1];
-            return;
-          }
-          if (localStorage.getItem("tempo-theme-mode") === "dark" || localStorage.getItem("tempo-theme") === "dark") {
+          } else if (
+            localStorage.getItem("tempo-theme-mode") === "dark" ||
+            localStorage.getItem("tempo-theme") === "dark"
+          ) {
             document.documentElement.setAttribute("data-appearance", "dark");
             document.documentElement.style.background = "#191923";
+          }
+          var scale = Number(localStorage.getItem("tempo-text-scale"));
+          if (scale >= 1 && scale <= 1.6) {
+            document.documentElement.style.setProperty("--type-scale", String(scale));
           }
         } catch (error) {
           /* private mode: the default light palette is fine */
@@ -43,8 +48,11 @@
   <body>
     <div class="sky" aria-hidden="true">
       <span class="sky-glow"></span>
+      <span class="sky-sun"></span>
       <span class="sky-stars"></span>
       <span class="sky-stars sky-stars-far"></span>
+      <span class="sky-clouds"></span>
+      <span class="sky-wind"></span>
       <span class="sky-rain"></span>
       <span class="sky-snow"></span>
       <span class="sky-moon"></span>
@@ -52,37 +60,54 @@
 
     <div class="app-shell">
       <aside class="sidebar" aria-label="Main navigation">
-        <a class="brand" href="#now" aria-label="Tempo home">
+        <a class="brand" href="#/now" aria-label="Tempo home">
           <span class="brand-mark" aria-hidden="true">
             <span></span><span></span><span></span>
           </span>
           <span>tempo<span class="brand-dot">.</span></span>
         </a>
 
-        <nav class="side-nav">
-          <a class="nav-link active" href="#now" data-nav="now">
+        <nav class="side-nav" id="side-nav">
+          <a class="nav-link active" href="#/now" data-route="now" data-nav="now">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M12 7.4v5.1l3.4 2"></path></svg>
             <span>Right now</span>
           </a>
-          <a class="nav-link" href="#world" data-nav="world">
+          <a class="nav-link" href="#/clocks" data-route="clocks" data-nav="clocks">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M3.9 9h16.2M3.9 15h16.2M12 3.75c2.15 2.25 3.22 4.99 3.22 8.25S14.15 18 12 20.25C9.85 18 8.78 15.26 8.78 12S9.85 5.99 12 3.75Z"></path></svg>
             <span>World clocks</span>
           </a>
-          <a class="nav-link" href="#tools" data-nav="tools">
+          <a class="nav-link" href="#/timer" data-route="timer" data-nav="timer">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3.75h8M12 3.75v3.1M18.15 8.55l1.8-1.8M12 7.1a7.15 7.15 0 1 1-7.15 7.15A7.15 7.15 0 0 1 12 7.1Z"></path><path d="M12 10.35v4.2l2.75 1.7"></path></svg>
-            <span>Focus tools</span>
+            <span>Timer</span>
           </a>
-          <a class="nav-link" href="#calculator" data-nav="calculator">
+          <a class="nav-link" href="#/clock" data-route="clock" data-nav="clock">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.5" r="7.75"></circle><path d="M12 8.25v4.5l3 1.85M9.4 3.6h5.2M12 3.6V5.5M6.6 20.4h10.8"></path></svg>
+            <span>Old clock</span>
+          </a>
+          <a class="nav-link" href="#/focus" data-route="focus" data-nav="focus">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><circle cx="12" cy="12" r="3.4"></circle><path d="M12 3.75V6M12 18v2.25M3.75 12H6M18 12h2.25"></path></svg>
+            <span>Focus</span>
+          </a>
+          <a class="nav-link" href="#/calculator" data-route="calculator" data-nav="calculator">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2.25"></rect><path d="M8 7.5h8M8.25 11.5h.01M12 11.5h.01M15.75 11.5h.01M8.25 15.25h.01M12 15.25h.01M15.75 15.25h.01M8.25 18h.01M12 18h3.75"></path></svg>
             <span>Time calculator</span>
           </a>
         </nav>
 
         <div class="sidebar-bottom">
-          <div class="little-card">
-            <div class="little-card-icon" aria-hidden="true">✦</div>
-            <p class="eyebrow">A little reminder</p>
-            <p>Time you enjoy wasting is not wasted time.</p>
+          <div class="text-size-block">
+            <p class="eyebrow">TEXT SIZE</p>
+            <div class="text-size-switch" id="text-size-switch" role="radiogroup" aria-label="Text size">
+              <button type="button" role="radio" aria-checked="false" data-text-size="1" title="Normal text" aria-label="Normal text">
+                <span aria-hidden="true">A</span>
+              </button>
+              <button type="button" role="radio" aria-checked="true" data-text-size="1.15" title="Large text (default)" aria-label="Large text">
+                <span aria-hidden="true">A</span>
+              </button>
+              <button type="button" role="radio" aria-checked="false" data-text-size="1.32" title="Extra large text" aria-label="Extra large text">
+                <span aria-hidden="true">A</span>
+              </button>
+            </div>
           </div>
 
           <div class="theme-block">
@@ -107,137 +132,173 @@
         <header class="topbar">
           <div>
             <p class="eyebrow" id="today-label">YOUR TIME, RIGHT NOW</p>
-            <h1>Make every moment count.</h1>
+            <h1 id="page-title">Make every moment count.</h1>
           </div>
           <div class="topbar-actions">
-            <div class="status-pill" title="Your detected time zone">
+            <button class="status-pill action-pill" id="location-button" type="button" title="Set the place Tempo should follow">
               <span class="status-dot"></span>
               <span id="top-timezone">Detecting your time zone</span>
-            </div>
+            </button>
+            <button class="pill-button" id="use-location-button" type="button">
+              <span class="pill-icon" aria-hidden="true">⌖</span> Use my location
+            </button>
             <button class="icon-button mobile-menu-button" id="mobile-menu-button" type="button" aria-label="Open navigation">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
             </button>
           </div>
         </header>
 
-        <section class="hero-section section-anchor" id="now" aria-labelledby="now-title">
-          <div class="now-card">
-            <div class="now-card-top">
-              <div>
-                <div class="live-label"><span></span> LIVE</div>
-                <p class="now-kicker">YOUR LOCAL TIME</p>
+        <!-- ============================================================ PAGE: RIGHT NOW -->
+        <section class="page" id="page-now" data-page="now" aria-labelledby="now-title">
+          <div class="hero-section">
+            <div class="now-card">
+              <div class="now-card-top">
+                <div>
+                  <div class="live-label"><span></span> LIVE</div>
+                  <p class="now-kicker">YOUR LOCAL TIME</p>
+                </div>
+                <button class="soft-button light" id="change-zone-button" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"></path><path d="M3.6 9h16.8M3.6 15h16.8M12 3c2.4 2.4 3.6 5.4 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.4-3.6-9S9.6 5.4 12 3Z"></path></svg>
+                  <span>Set home place</span>
+                </button>
               </div>
-              <button class="soft-button light" id="change-zone-button" type="button">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"></path><path d="M3.6 9h16.8M3.6 15h16.8M12 3c2.4 2.4 3.6 5.4 3.6 9s-1.2 6.6-3.6 9c-2.4-2.4-3.6-5.4-3.6-9S9.6 5.4 12 3Z"></path></svg>
-                <span>Set home zone</span>
-              </button>
-            </div>
 
-            <div class="now-main">
-              <div>
-                <h2 id="now-title" class="digital-time"><span id="local-hours">--</span><b>:</b><span id="local-minutes">--</span><small id="local-seconds">--</small></h2>
-                <p class="local-date" id="local-date">Loading today...</p>
-                <p class="zone-name" id="local-zone-name">Finding your time zone</p>
+              <div class="now-main">
+                <div>
+                  <h2 id="now-title" class="digital-time"><span id="local-hours">--</span><b>:</b><span id="local-minutes">--</span><small id="local-seconds">--</small></h2>
+                  <p class="local-date" id="local-date">Loading today...</p>
+                  <p class="zone-name" id="local-zone-name">Finding your time zone</p>
+                </div>
+                <div class="analog-clock" id="home-analog" aria-label="Current analog time"></div>
               </div>
-              <div class="analog-clock" aria-label="Current analog time">
-                <div class="clock-tick tick-12"></div><div class="clock-tick tick-3"></div><div class="clock-tick tick-6"></div><div class="clock-tick tick-9"></div>
-                <span class="clock-number number-12">12</span><span class="clock-number number-3">3</span><span class="clock-number number-6">6</span><span class="clock-number number-9">9</span>
-                <span class="clock-hand hand-hour" id="hour-hand"></span>
-                <span class="clock-hand hand-minute" id="minute-hand"></span>
-                <span class="clock-hand hand-second" id="second-hand"></span>
-                <span class="clock-pin"></span>
+
+              <div class="now-card-bottom">
+                <div class="sun-state"><span class="sun-icon" id="sun-icon">☀</span><span id="day-progress-label">Today is in motion</span></div>
+                <div class="day-track" aria-hidden="true"><span id="day-progress"></span></div>
+                <span class="sunset-copy" id="sunset-copy">Day progress</span>
               </div>
             </div>
 
-            <div class="now-card-bottom">
-              <div class="sun-state"><span class="sun-icon" id="sun-icon">☀</span><span id="day-progress-label">Today is in motion</span></div>
-              <div class="day-track" aria-hidden="true"><span id="day-progress"></span></div>
-              <span class="sunset-copy" id="sunset-copy">Day progress</span>
+            <div class="quick-stack">
+              <article class="quick-card coral-card">
+                <div class="card-topline"><span class="small-icon icon-coral">↗</span><span>UP NEXT</span></div>
+                <div class="quick-countdown" id="midnight-countdown">--:--:--</div>
+                <p>until tomorrow begins</p>
+                <div class="mini-progress"><span id="midnight-progress"></span></div>
+              </article>
+              <article class="quick-card mint-card">
+                <div class="card-topline"><span class="small-icon icon-mint">⌁</span><span>YOUR PLACE</span></div>
+                <p class="quick-country" id="home-country-label">Your country</p>
+                <p class="quick-city" id="home-city-label">Your local place</p>
+                <p class="quick-subtitle" id="utc-offset">UTC offset loading</p>
+                <p class="quick-subtitle sun-line" id="home-sun-line"></p>
+                <button class="text-button" id="quick-zone-button" type="button">Change home place <span>→</span></button>
+              </article>
             </div>
-          </div>
 
-          <div class="quick-stack">
-            <article class="quick-card coral-card">
-              <div class="card-topline"><span class="small-icon icon-coral">↗</span><span>UP NEXT</span></div>
-              <div class="quick-countdown" id="midnight-countdown">--:--:--</div>
-              <p>until tomorrow begins</p>
-              <div class="mini-progress"><span id="midnight-progress"></span></div>
-            </article>
-            <article class="quick-card mint-card">
-              <div class="card-topline"><span class="small-icon icon-mint">⌁</span><span>TIMEZONE</span></div>
-              <p class="quick-country" id="home-country-label">Your country</p>
-              <p class="quick-city" id="home-city-label">Your local place</p>
-              <p class="quick-subtitle" id="utc-offset">UTC offset loading</p>
-              <button class="text-button" id="quick-zone-button" type="button">Change home zone <span>→</span></button>
-            </article>
-          </div>
+            <article class="quick-card weather-card" id="weather-card" data-state="idle" aria-labelledby="weather-title">
+              <span class="card-stars" aria-hidden="true"></span>
+              <div class="card-topline">
+                <span class="small-icon icon-sky" id="weather-symbol" aria-hidden="true">☂</span>
+                <span id="weather-title">RIGHT NOW, OUTSIDE</span>
+                <span class="weather-actions">
+                  <button class="weather-mini" type="button" id="weather-units" title="Switch temperature units">°F</button>
+                  <button class="weather-mini" type="button" id="weather-retry" title="Check the weather again" aria-label="Check the weather again">↻</button>
+                </span>
+              </div>
 
-          <article class="quick-card weather-card" id="weather-card" data-state="idle" aria-labelledby="weather-title">
-            <span class="card-stars" aria-hidden="true"></span>
-            <div class="card-topline">
-              <span class="small-icon icon-sky" id="weather-symbol" aria-hidden="true">☂</span>
-              <span id="weather-title">RIGHT NOW, OUTSIDE</span>
-              <span class="weather-actions">
-                <button class="weather-mini" type="button" id="weather-units" title="Switch temperature units">°F</button>
-                <button class="weather-mini" type="button" id="weather-retry" title="Check the weather again" aria-label="Check the weather again">↻</button>
-              </span>
-            </div>
-            <div class="weather-body">
-              <div class="weather-main">
-                <p class="weather-temp"><span id="weather-temp">--</span><small id="weather-unit">°</small></p>
-                <div class="weather-summary">
-                  <p class="weather-place" id="weather-place">Your part of the world</p>
-                  <p class="weather-condition" id="weather-condition" aria-live="polite">Weather not loaded</p>
+              <div class="weather-body">
+                <div class="weather-main">
+                  <p class="weather-temp"><span id="weather-temp">--</span><small id="weather-unit">°</small></p>
+                  <div class="weather-summary">
+                    <p class="weather-place" id="weather-place">Your part of the world</p>
+                    <p class="weather-condition" id="weather-condition" aria-live="polite">Weather not loaded</p>
+                    <p class="weather-coords" id="weather-coords"></p>
+                  </div>
+                </div>
+
+                <div class="weather-sun-row">
+                  <div class="sun-arc" aria-hidden="true"><span id="sun-arc-dot"></span></div>
+                  <dl class="weather-sun">
+                    <div><dt>Sunrise</dt><dd id="weather-sunrise">--:--</dd></div>
+                    <div><dt>Sunset</dt><dd id="weather-sunset">--:--</dd></div>
+                  </dl>
+                </div>
+
+                <div class="weather-extra">
+                  <p class="weather-details" id="weather-details"></p>
+                  <p class="weather-foot"><span id="weather-daylight"></span><span id="weather-updated">one moment…</span></p>
+                  <p class="weather-source" id="weather-source">Live weather from Open-Meteo — no account, no key.</p>
+                </div>
+
+                <div class="weather-location-row">
+                  <button class="text-button weather-location" type="button" id="weather-use-location">Use my location</button>
+                  <button class="text-button weather-location" type="button" id="weather-set-location">Choose a place…</button>
                 </div>
               </div>
-              <dl class="weather-sun">
-                <div><dt>Sunrise</dt><dd id="weather-sunrise">--:--</dd></div>
-                <div><dt>Sunset</dt><dd id="weather-sunset">--:--</dd></div>
-              </dl>
-              <div class="weather-extra">
-                <p class="weather-details" id="weather-details"></p>
-                <p class="weather-foot"><span id="weather-daylight"></span><span id="weather-updated">one moment…</span></p>
-                <p class="weather-source" id="weather-source">Live weather from Open-Meteo — no account, no key.</p>
-              </div>
-              <button class="text-button weather-location" type="button" id="weather-use-location">Use my location</button>
-            </div>
-          </article>
+            </article>
+          </div>
+
+          <div class="now-notes">
+            <article class="note-card">
+              <p class="eyebrow">SOLAR TIME</p>
+              <h3 id="solar-title">Where the sun actually is</h3>
+              <p class="note-copy" id="solar-note">Pick a place to see how far its clock sits from its own sun.</p>
+            </article>
+            <article class="note-card">
+              <p class="eyebrow">TODAY</p>
+              <h3 id="daylight-title">Daylight</h3>
+              <p class="note-copy" id="daylight-note">Sunrise and sunset appear here once the sky is loaded.</p>
+            </article>
+          </div>
         </section>
 
-        <section class="section world-section section-anchor" id="world" aria-labelledby="world-title">
-          <div class="section-heading">
+        <!-- ========================================================= PAGE: WORLD CLOCKS -->
+        <section class="page" id="page-clocks" data-page="clocks" aria-labelledby="world-title" hidden>
+          <div class="page-intro">
             <div>
               <p class="eyebrow">STAY IN SYNC</p>
               <h2 id="world-title">Around the world</h2>
               <p class="section-intro">
-                Every clock shows its real country and city, spelled the way the place spells itself today.
+                Every clock shows its real country and city, spelled the way the place spells itself today —
+                with its own coordinates, so the sun line underneath is honest.
                 <span class="section-count" id="world-count"></span>
               </p>
             </div>
-            <button class="outline-button" id="add-city-button" type="button">
-              <span class="button-plus">+</span> Add a city
-            </button>
+            <div class="page-actions">
+              <button class="outline-button" id="use-location-clock" type="button">
+                <span class="button-plus" aria-hidden="true">⌖</span> Add my location
+              </button>
+              <button class="outline-button" id="add-city-button" type="button">
+                <span class="button-plus" aria-hidden="true">+</span> Add a city
+              </button>
+            </div>
           </div>
+
+          <div class="chip-row" id="popular-cities" aria-label="Add a popular city"></div>
+
           <div class="world-grid" id="world-grid" aria-live="polite"></div>
+          <p class="empty-state" id="world-empty" hidden>No clocks yet — add a city, or drop in your own location.</p>
         </section>
 
-        <section class="section tools-section section-anchor" id="tools" aria-labelledby="tools-title">
-          <div class="section-heading compact-heading">
+        <!-- ============================================================== PAGE: TIMER -->
+        <section class="page" id="page-timer" data-page="timer" aria-labelledby="timer-title" hidden>
+          <div class="page-intro">
             <div>
-              <p class="eyebrow">FOCUS, ON YOUR TERMS</p>
-              <h2 id="tools-title">Keep time with yourself</h2>
+              <p class="eyebrow">COUNTDOWN</p>
+              <h2 id="timer-title">Timer</h2>
+              <p class="section-intro">Set a length, start it, and get on with the thing you were avoiding.</p>
             </div>
-            <p class="section-aside">Whether you're deep in work or just need a minute.</p>
+            <span class="tool-status" id="timer-status">READY</span>
           </div>
 
-          <div class="tools-grid">
-            <article class="tool-card timer-card" aria-labelledby="timer-title">
-              <div class="tool-heading">
+          <div class="tool-page">
+            <article class="tool-card timer-card" aria-labelledby="timer-card-title">
+              <div class="calculator-card-heading">
                 <div>
-                  <p class="eyebrow">COUNTDOWN</p>
-                  <h3 id="timer-title">Timer</h3>
+                  <p class="card-label">REMAINING</p>
+                  <h3 id="timer-card-title">Time left</h3>
                 </div>
-                <span class="tool-status" id="timer-status">READY</span>
               </div>
               <div class="timer-layout">
                 <div class="timer-ring" id="timer-ring" aria-label="Timer remaining">
@@ -253,6 +314,8 @@
                     <button type="button" class="preset-button" data-seconds="60">1 min</button>
                     <button type="button" class="preset-button" data-seconds="300">5 min</button>
                     <button type="button" class="preset-button" data-seconds="900">15 min</button>
+                    <button type="button" class="preset-button" data-seconds="1500">25 min</button>
+                    <button type="button" class="preset-button" data-seconds="3600">1 hr</button>
                   </div>
                   <div class="primary-actions">
                     <button class="primary-button timer-start" id="timer-start" type="button"><span class="play-icon">▶</span> Start timer</button>
@@ -264,30 +327,123 @@
               </div>
             </article>
 
-            <article class="tool-card stopwatch-card" aria-labelledby="stopwatch-title">
-              <div class="tool-heading">
-                <div>
-                  <p class="eyebrow">TRACK ELAPSED TIME</p>
-                  <h3 id="stopwatch-title">Stopwatch</h3>
+            <article class="note-card timer-note">
+              <p class="eyebrow">GOOD TO KNOW</p>
+              <h3>When it finishes</h3>
+              <p class="note-copy">
+                The ring empties, Tempo plays a short chime and a note slides up from the bottom of the page.
+                The timer keeps running while you visit the other pages — it lives in the background.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <!-- ========================================================= PAGE: OLD CLOCK -->
+        <section class="page" id="page-clock" data-page="clock" aria-labelledby="old-clock-title" hidden>
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">A SLOWER KIND OF CLOCK</p>
+              <h2 id="old-clock-title">Old clock</h2>
+              <p class="section-intro">A full-face clock with hands, for when watching time pass is the point.</p>
+            </div>
+            <div class="page-actions">
+              <button class="outline-button" id="old-clock-place" type="button">
+                <span class="button-plus" aria-hidden="true">⌖</span> <span id="old-clock-place-label">Choose a place</span>
+              </button>
+              <button class="outline-button" id="old-clock-fullscreen" type="button">
+                <span class="button-plus" aria-hidden="true">⤢</span> Full screen
+              </button>
+            </div>
+          </div>
+
+          <div class="old-clock-wrap" id="old-clock-wrap">
+            <div class="old-clock" id="old-clock" data-numerals="roman" data-seconds="true"></div>
+            <div class="old-clock-side">
+              <p class="eyebrow" id="old-clock-eyebrow">SHOWING</p>
+              <h3 id="old-clock-place-name">Your place</h3>
+              <p class="old-clock-digital" id="old-clock-digital">--:--:--</p>
+              <p class="old-clock-meta" id="old-clock-meta"></p>
+              <p class="old-clock-meta" id="old-clock-sun"></p>
+
+              <div class="old-clock-controls">
+                <div class="control-group" role="group" aria-label="Clock face numerals">
+                  <p class="eyebrow">NUMERALS</p>
+                  <div class="segmented" id="old-clock-numerals">
+                    <button type="button" class="seg-button active" data-numerals="roman" aria-pressed="true">XII</button>
+                    <button type="button" class="seg-button" data-numerals="arabic" aria-pressed="false">12</button>
+                    <button type="button" class="seg-button" data-numerals="none" aria-pressed="false">—</button>
+                  </div>
                 </div>
-                <span class="tool-status neutral" id="stopwatch-status">STOPPED</span>
+                <div class="control-group" role="group" aria-label="Second hand movement">
+                  <p class="eyebrow">SECOND HAND</p>
+                  <div class="segmented" id="old-clock-motion">
+                    <button type="button" class="seg-button" data-motion="tick" aria-pressed="false">Tick</button>
+                    <button type="button" class="seg-button active" data-motion="sweep" aria-pressed="true">Sweep</button>
+                  </div>
+                </div>
+                <div class="control-group">
+                  <p class="eyebrow">CHIME</p>
+                  <button type="button" class="pill-button wide" id="old-clock-chime" aria-pressed="false">
+                    <span class="pill-icon" aria-hidden="true">🔔</span> Chime on the hour
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== PAGE: FOCUS -->
+        <section class="page" id="page-focus" data-page="focus" aria-labelledby="stopwatch-title" hidden>
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">TRACK ELAPSED TIME</p>
+              <h2 id="stopwatch-title">Focus</h2>
+              <p class="section-intro">Start it when you begin. Lap it when you finish a piece. Nothing else competes for your attention here.</p>
+            </div>
+            <span class="tool-status neutral" id="stopwatch-status">STOPPED</span>
+          </div>
+
+          <div class="tool-page">
+            <article class="tool-card stopwatch-card" aria-labelledby="stopwatch-card-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">ELAPSED</p>
+                  <h3 id="stopwatch-card-title">Stopwatch</h3>
+                </div>
               </div>
               <div class="stopwatch-display" id="stopwatch-display">00:00<span>.00</span></div>
+              <div class="target-track" aria-hidden="true"><span id="target-progress"></span></div>
+              <p class="target-copy" id="target-copy">Set an optional goal to watch yourself fill it.</p>
+              <div class="target-row" id="target-row" role="group" aria-label="Focus goal">
+                <button type="button" class="preset-button" data-target="900">15 min</button>
+                <button type="button" class="preset-button" data-target="1500">25 min</button>
+                <button type="button" class="preset-button" data-target="2700">45 min</button>
+                <button type="button" class="preset-button" data-target="3600">60 min</button>
+                <button type="button" class="preset-button" data-target="0">No goal</button>
+              </div>
               <div class="stopwatch-actions">
                 <button class="secondary-button lap-button" id="lap-button" type="button" disabled>Lap</button>
                 <button class="primary-button stopwatch-start" id="stopwatch-start" type="button"><span class="play-icon">▶</span> Start</button>
                 <button class="secondary-button" id="stopwatch-reset" type="button">Reset</button>
               </div>
-              <div class="laps-wrap">
-                <div class="laps-heading"><span>LAPS</span><span id="lap-count">—</span></div>
-                <ol class="laps-list" id="laps-list"><li class="empty-lap">Your laps will show up here.</li></ol>
+            </article>
+
+            <article class="tool-card laps-card" aria-labelledby="laps-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">SPLITS</p>
+                  <h3 id="laps-title">Laps</h3>
+                </div>
+                <span class="lap-count-pill" id="lap-count">—</span>
               </div>
+              <ol class="laps-list" id="laps-list"><li class="empty-lap">Your laps will show up here.</li></ol>
             </article>
           </div>
         </section>
 
-        <section class="section calculator-section section-anchor" id="calculator" aria-labelledby="calculator-title">
-          <div class="section-heading">
+        <!-- ========================================================= PAGE: CALCULATOR -->
+        <section class="page" id="page-calculator" data-page="calculator" aria-labelledby="calculator-title" hidden>
+          <div class="page-intro">
             <div>
               <p class="eyebrow">NO MENTAL MATH REQUIRED</p>
               <h2 id="calculator-title">Time calculator</h2>
@@ -355,10 +511,12 @@
 
     <div class="mobile-nav-backdrop" id="mobile-nav-backdrop"></div>
     <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
-      <a href="#now" data-nav="now">Right now</a>
-      <a href="#world" data-nav="world">World clocks</a>
-      <a href="#tools" data-nav="tools">Focus tools</a>
-      <a href="#calculator" data-nav="calculator">Time calculator</a>
+      <a href="#/now" data-route="now" data-nav="now">Right now</a>
+      <a href="#/clocks" data-route="clocks" data-nav="clocks">World clocks</a>
+      <a href="#/timer" data-route="timer" data-nav="timer">Timer</a>
+      <a href="#/clock" data-route="clock" data-nav="clock">Old clock</a>
+      <a href="#/focus" data-route="focus" data-nav="focus">Focus</a>
+      <a href="#/calculator" data-route="calculator" data-nav="calculator">Time calculator</a>
     </nav>
 
     <dialog class="zone-dialog picker-dialog" id="zone-dialog" aria-labelledby="zone-dialog-title">
@@ -375,7 +533,7 @@
             type="search"
             autocomplete="off"
             spellcheck="false"
-            placeholder="Kathmandu, Kyiv, Kolkata, Nepal, Asia/Saigon…"
+            placeholder="Delhi, Ahmedabad, Kolkata, India, Asia/Saigon…"
             aria-label="Search cities and countries"
             role="combobox"
             aria-expanded="true"
@@ -389,6 +547,8 @@
           <div class="picker-chips" id="picker-chips" role="group" aria-label="Filter the list">
             <button type="button" class="picker-chip active" data-filter="all" aria-pressed="true">All places</button>
             <button type="button" class="picker-chip" data-filter="suggested" aria-pressed="false">★ Popular</button>
+            <button type="button" class="picker-chip" data-filter="city" aria-pressed="false">Cities</button>
+            <button type="button" class="picker-chip" data-filter="zone" aria-pressed="false">Zones</button>
           </div>
           <span class="picker-count" id="picker-count">loading…</span>
         </div>
@@ -396,7 +556,10 @@
         <div class="picker-list" id="picker-list" role="listbox" aria-label="Countries and cities" tabindex="-1"></div>
 
         <p class="picker-summary" id="picker-summary">Start typing, or pick from the list below.</p>
-        <button class="primary-button dialog-submit" id="zone-submit" type="submit">Use this place</button>
+        <div class="dialog-actions">
+          <button type="button" class="secondary-button" id="picker-use-location">⌖ Use my location</button>
+          <button class="primary-button dialog-submit" id="zone-submit" type="submit">Use this place</button>
+        </div>
       </form>
     </dialog>
 

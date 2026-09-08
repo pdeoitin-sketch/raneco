@@ -1,51 +1,106 @@
 # raneco
 
-**Tempo** — a browser dashboard for your local time, world clocks, live
-weather, a countdown timer, a stopwatch, and time calculations. Built with
-[Vite](https://vite.dev/) and deployed as a static site; there is no backend and
-no API key to manage.
+**Tempo** — a browser dashboard for your local time, world clocks, live weather,
+an old-style clock, focus timers, a stopwatch, and time calculations. Built with
+[Vite](https://vite.dev/), deployed as a static site: there is no backend and no
+API key to manage.
 
 Live site: https://pdeoitin-sketch.github.io/raneco/
+
+## Pages
+
+Tempo is six real pages with a permanent sidebar (and a bottom tab bar on
+phones). Page changes are routed on the URL hash (`#/clocks`, `#/focus`, …),
+so links, bookmarks, back and forward all work, and each page keeps its own
+state while you move around.
+
+| Page | Route | What it does |
+| --- | --- | --- |
+| **Right now** | `#/now` | Home clock (analog + digital), live sky, weather card, sun note, quick jump buttons |
+| **World clocks** | `#/clocks` | Add up to 12 places, compare them against home, reorder and remove |
+| **Focus timer** | `#/timer` | Countdown with presets, progress ring, laps and keyboard shortcuts |
+| **Old clock** | `#/clock` | Full-screen retro clock with calm/graph/mirror finishes and a ticking hand |
+| **Stopwatch** | `#/focus` | Centisecond stopwatch with laps, fastest/slowest summary and splits |
+| **Time calculator** | `#/calculator` | Add/subtract durations from a date-time, difference between two moments, saved results |
+
+Everything persists in `localStorage`: home place, board, timer settings,
+stopwatch laps, saved calculations, theme, unit system and text size.
 
 ## What is in the box
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| Place names for every clock | `src/tz-places.js` | Country + modern city for each IANA zone, built from vendored tzdb data |
-| Searchable city picker | `src/city-picker.js` | Grouped Country → City, covers every zone `Intl.supportedValuesOf("timeZone")` reports |
-| Live weather | `src/weather.js`, `src/weather-card.js` | [Open-Meteo](https://open-meteo.com/) (free, key-less): temperature, condition, sunrise/sunset |
-| Auto / Light / Dark theme | `src/theme.js` + the palette block in `styles.css` | Auto reads the local clock *and* the live sky |
-| Timer, stopwatch, calculator | `app.js` | Plain local-time maths; independent of the above |
+| Routed pages | `src/router.js`, `app.js` | Hash router with keyboard nav, back/forward and deep links |
+| Place model | `src/places.js` | 419 IANA zones + 328 curated cities = 747 searchable places |
+| City gazetteer | `src/cities.js` | Country, region, coordinates and UTC offset for every city |
+| Legacy zone ids | `src/tz-places.js` | `Asia/Calcutta` → `Asia/Kolkata` and friends, so saved boards survive |
+| Searchable picker | `src/city-picker.js` | Grouped Country → City, diacritic-free search, keyboard navigation |
+| Live weather | `src/weather.js`, `src/weather-card.js` | [Open-Meteo](https://open-meteo.com/) (free, key-less): temperature, wind, snow, sunrise/sunset |
+| Device location | `src/location.js` | `navigator.geolocation` + an Open-Meteo zone lookup to confirm the zone |
+| Solar time | `src/places.js` | Longitude-based sun time, so a wide country stops being one flat clock |
+| Weather palettes | `src/theme.js` + the palette block in `styles.css` | Twelve palettes keyed on the local clock *and* the live sky |
+| Timer, stopwatch, calculator | `src/timer.js`, `src/stopwatch.js`, `src/calculator.js` | Plain local-time maths; independent of the network |
 
-### World clocks name places correctly
+### Cities and countries
 
-Browsers report whatever time-zone ids their bundled ICU knows, so older builds
-say `Asia/Katmandu`, `Asia/Calcutta`, `Europe/Kiev`, `Asia/Saigon` or
-`Asia/Rangoon`. Tempo folds those legacy ids onto the modern canonical zone
-(using tzdb's `backward` links) and labels every clock with its real country,
-so the UI reads **Nepal · Kathmandu**, **India · Kolkata**, **Ukraine · Kyiv**,
-**Vietnam · Ho Chi Minh City**, **Myanmar · Yangon**. Country names come from
-`Intl.DisplayNames`, so they localise with the browser.
+The world clock is no longer limited to what the browser's ICU happens to
+know. On top of all 419 IANA zones it ships **328 curated cities** (`src/cities.js`)
+with their own coordinates, region and standard offset — from Delhi, Mumbai,
+Guwahati and Ahmedabad to Nukuʻalofa, Timbuktu and Ushuaia. Search accepts
+diacritic-free text (`munchen` finds **München**, `nukualofa` finds
+**Nukuʻalofa**), country names, regions, ISO country codes and IANA ids, so
+`delhi`, `India`, `IN` and `Asia/Kolkata` all reach the same place.
 
-* Adding a clock opens a searchable picker listing every zone the browser
-  understands, grouped Country → City, with keyboard navigation and filters.
-  Searching `calcutta`, `kolkata`, `IN` or `Asia/Kolkata` finds the same place.
-* Add, remove (×) and the home zone all still work; saved boards are migrated
-  to the modern ids on the next load.
+### Use my location
 
-### Weather and the Auto theme
+*Every* place list has a **Use my location** button — the home clock, the world
+clock board and the weather card. With the browser's permission, Tempo takes a
+GPS fix and then:
 
-* The "Right now" weather card uses your browser location when it has already
-  been granted and otherwise the home-zone city's coordinates (from
-  `zone1970.tab`), so nothing is requested without asking. A button in the card
-  switches between the two, and °C/°F can be toggled.
-* **Auto** (the default) re-tints the whole page from the local clock and the
-  live sky: sunrise is warm, a bright day is clean white with a blue sky hero,
-  cloud is soft grey, rain is slate blue, snow is icy, a thunderstorm goes dark
-  and stormy, and night is dark with a starfield. **Light** and **Dark** fix the
-  look instead. The choice is remembered in `localStorage`, and palettes
-  cross-fade via registered custom properties (`@property`), with
-  `prefers-reduced-motion` respected.
+1. names the fix after the **nearest city** in the gazetteer, and
+2. asks Open-Meteo which time zone legally covers those coordinates, so a fix
+   taken a few kilometres from a border gets the zone right instead of the
+   gazetteer's best guess.
+
+The result is a `geo:` place: it keeps its real latitude and longitude, so the
+clock, the sun-time line and the weather are all computed for the spot where you
+actually are. If permission is refused, or the device has no fix, the button
+says so and nothing changes.
+
+### Sun time: when one country is not one clock
+
+Inside a single time zone the clock can run far from the sun. India (UTC+5:30)
+is the clearest example: **Guwahati's clock is 37 minutes behind its sun while
+Ahmedabad's is 40 minutes ahead** — a 77-minute spread of real daylight inside
+one legal time. Tempo computes that offset from longitude (plus the equation of
+time) and shows it everywhere it matters:
+
+* the home card's **sun time** line (clock vs. sun, in minutes),
+* every world clock card, alongside the hour difference from home,
+* a plain-language note in the sidebar ("the sun lags the clock by 37 minutes"),
+* a warning when a place's legal time is more than two hours from its sun.
+
+### Weather themes
+
+**Auto** (the default) re-tints the page from the local clock *and* the live
+sky, in twelve palettes rather than a light/dark pair: dawn (cool lilac),
+sunny (clean white with a warm sun and drifting clouds), cloudy (soft slate),
+fog, rain (blue-slate with a soft drizzle), wind (pale mint with streaking
+gusts), snow (icy blue), dusk (low amber), storm (dark slate with rain),
+night (deep indigo with a starfield), plus the fixed light and dark palettes.
+Wind only shows its palette when the wind is genuinely worth mentioning
+(≥ 26 km/h sustained, or a ≥ 48 km/h gust) and the card then says *breezy*,
+*windy* or *gusting*, with direction. Palettes cross-fade through registered
+custom properties (`@property`) and `prefers-reduced-motion` is respected.
+**Light** and **Dark** fix the look instead. The choice is remembered in
+`localStorage`.
+
+### Bigger text
+
+Every font size is a multiple of a single `--type-scale` custom property, so the
+whole interface scales together. The default scale is **15 % larger** than the
+original design, and the sidebar switch offers **A · A⁺ · A⁺⁺** (100 %, 115 %,
+132 %); the choice is remembered across visits.
 
 ## Time zone data
 
@@ -68,11 +123,13 @@ drift apart, so the data can never be edited by hand.
 npm test
 ```
 
-`node --test` covers the pure logic in Node (place naming, the tzdb data
-pipeline, the Open-Meteo client, the theme decision table) and boots the real
-`app.js` in a jsdom document — with `fetch` stubbed — to check the clock labels,
-the picker, the weather card, the Auto palette, and that the timer, stopwatch
-and calculator still work.
+`node --test` covers the pure logic in Node — place naming and search, the
+city gazetteer, the tzdb data pipeline, the Open-Meteo client, the theme
+decision table, the router, and the geolocation service (with the permission
+prompt and `fetch` both stubbed) — and boots the real `app.js` in a jsdom
+document to check the six pages, the clock labels, the picker, "use my
+location", the weather card, the Auto palettes, the text-size switch, and that
+the timer, stopwatch and calculator still work.
 
 ## Local development
 
@@ -94,6 +151,9 @@ On every push to `main` (or a manual run from the **Actions** tab) the workflow:
 3. builds the site with `vite build`, passing the Pages base path
    (`/raneco`) so asset URLs resolve under the project sub-path,
 4. uploads `dist/` as the Pages artifact and deploys it.
+
+Because the site is a single-page app on hash routing, GitHub Pages needs no
+rewrite rules — every route is served by the same `index.html`.
 
 ### One-time repository setting
 

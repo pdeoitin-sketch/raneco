@@ -69,6 +69,7 @@ export function buildForecastUrl({ lat, lon, units = "metric", timezone = "auto"
       "is_day",
       "wind_speed_10m",
       "wind_direction_10m",
+      "wind_gusts_10m",
     ].join(","),
     daily: "sunrise,sunset",
     forecast_days: "1",
@@ -119,6 +120,7 @@ export function parseForecast(payload, { lat, lon, units = "metric", label = "" 
     windSpeed: Number.isFinite(current.wind_speed_10m) ? Number(current.wind_speed_10m) : null,
     windUnit: units === "imperial" ? "mph" : "km/h",
     windDirection: Number.isFinite(current.wind_direction_10m) ? Number(current.wind_direction_10m) : null,
+    windGust: Number.isFinite(current.wind_gusts_10m) ? Number(current.wind_gusts_10m) : null,
     code,
     condition: described.label,
     symbol: described.symbol,
@@ -168,6 +170,51 @@ export async function fetchWeather(options = {}) {
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+/* ------------------------------------------------------------------- mood */
+
+/**
+ * "What does it *feel* like out there?" — the mood the theme engine paints
+ * with. It starts from the WMO code but lets the wind have its say: a gale
+ * under a blue sky is a windy day, not a "clear" one, and that used to be the
+ * one sky the page got wrong.
+ *
+ * @param {object|null} snapshot parsed weather (see `parseForecast`)
+ * @returns {string} one of storm · snow · rain · fog · wind · cloud · sunny
+ */
+export function effectiveMood(snapshot, { windKph = 26, gustKph = 48 } = {}) {
+  if (!snapshot || !snapshot.ok) return (snapshot && snapshot.mood) || "cloud";
+  const mood = snapshot.mood || "cloud";
+  if (mood === "storm") return "storm";
+  const speed = Number(snapshot.windSpeed);
+  const gust = Number(snapshot.windGust);
+  const breezy =
+    (Number.isFinite(speed) && speed >= windKph) || (Number.isFinite(gust) && gust >= gustKph);
+  // Precipitation and low cloud still own the look; only fair skies hand
+  // themselves over to the wind.
+  if (breezy && ["clear", "cloud", "fog"].includes(mood)) return "wind";
+  if (mood === "clear") return "sunny";
+  return mood;
+}
+
+/** "12 km/h SW", "gusting 48 km/h" — the wind in words. */
+export function windDescription(snapshot) {
+  const has = (value) => value !== null && value !== undefined && Number.isFinite(Number(value));
+  if (!snapshot || !has(snapshot.windSpeed)) return "";
+  const speed = Math.round(Number(snapshot.windSpeed));
+  const unit = snapshot.windUnit || "km/h";
+  const gust = has(snapshot.windGust) ? Math.round(Number(snapshot.windGust)) : null;
+  const arrow = has(snapshot.windDirection) ? ` ${compass(snapshot.windDirection)}` : "";
+  const gusting = gust && gust >= 30 ? `, gusting ${gust}` : "";
+  return `${speed} ${unit}${arrow}${gusting}`;
+}
+
+/** 210° -> "SW". Eight points is plenty for a weather card. */
+export function compass(degrees) {
+  const points = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const index = Math.round((((Number(degrees) % 360) + 360) % 360) / 45) % 8;
+  return points[index];
 }
 
 /* ------------------------------------------------------------ geolocation */
