@@ -13,7 +13,7 @@
  * the decision table is unit tested in tests/theme.test.mjs.
  */
 
-import { wallClock } from "./weather.js";
+import { effectiveMood, wallClock, windDescription } from "./weather.js";
 
 export const MODE_STORAGE_KEY = "tempo-theme-mode";
 export const LAST_STORAGE_KEY = "tempo-theme-last";
@@ -21,18 +21,24 @@ export const MODES = ["auto", "light", "dark"];
 
 /** Every appearance, with the words used in captions and the <meta> colour. */
 export const APPEARANCES = {
-  light: { label: "Light", icon: "☀", dark: false, canvas: "#f7f7fb" },
-  dark: { label: "Dark", icon: "☾", dark: true, canvas: "#191923" },
-  dawn: { label: "Sunrise", icon: "🌅", dark: false, canvas: "#fdf0e2" },
-  clear: { label: "Bright day", icon: "☀", dark: false, canvas: "#ffffff" },
-  cloud: { label: "Overcast", icon: "☁", dark: false, canvas: "#eceef2" },
-  fog: { label: "Foggy", icon: "🌫", dark: false, canvas: "#eaeef1" },
-  rain: { label: "Rainy", icon: "☂", dark: false, canvas: "#e6edf4" },
-  snow: { label: "Snowy", icon: "❄", dark: false, canvas: "#eef4f9" },
-  dusk: { label: "Golden hour", icon: "🌇", dark: true, canvas: "#241a24" },
-  storm: { label: "Stormy", icon: "⛈", dark: true, canvas: "#14161f" },
-  night: { label: "Night sky", icon: "✦", dark: true, canvas: "#0d1020" },
+  light: { label: "Light", icon: "☀", dark: false, canvas: "#f7f7fb", kind: "fixed" },
+  dark: { label: "Dark", icon: "☾", dark: true, canvas: "#191923", kind: "fixed" },
+  dawn: { label: "Sunrise", icon: "🌅", dark: false, canvas: "#fdeadb", kind: "sunrise" },
+  sunny: { label: "Sunny day", icon: "☀", dark: false, canvas: "#fffbe9", kind: "sunny" },
+  cloud: { label: "Overcast", icon: "☁", dark: false, canvas: "#eceef2", kind: "cloud" },
+  fog: { label: "Foggy", icon: "🌫", dark: false, canvas: "#e9eef1", kind: "fog" },
+  wind: { label: "Windy", icon: "🍃", dark: false, canvas: "#eaf6f1", kind: "wind" },
+  rain: { label: "Rainy", icon: "☂", dark: false, canvas: "#e3ecf6", kind: "rain" },
+  snow: { label: "Snowy", icon: "❄", dark: false, canvas: "#edf4fa", kind: "snow" },
+  dusk: { label: "Sunset", icon: "🌇", dark: false, canvas: "#ffd97a", kind: "sunset" },
+  storm: { label: "Stormy", icon: "⛈", dark: true, canvas: "#14161f", kind: "storm" },
+  night: { label: "Night sky", icon: "✦", dark: true, canvas: "#0d1020", kind: "night" },
 };
+
+/** Wind speeds (km/h) at which a plain sky is better described as "windy". */
+export const WINDY_SPEED_KMH = 26;
+export const WINDY_GUST_KMH = 48;
+
 
 /** Windows around the sun's own moments, in minutes. */
 export const SUNRISE_WINDOW = { before: 25, after: 60 };
@@ -45,7 +51,7 @@ export function isDarkAppearance(appearance) {
 /** Rough day part when there is no weather (or no sunrise data) to lean on. */
 export function dayPartFromClock(hour) {
   if (hour >= 5 && hour < 7) return "dawn";
-  if (hour >= 7 && hour < 17) return "clear";
+  if (hour >= 7 && hour < 17) return "sunny";
   if (hour >= 17 && hour < 20) return "dusk";
   return "night";
 }
@@ -70,14 +76,14 @@ export function resolveAppearance({ mode = "auto", hour = 12, weather = null, no
     const part = dayPartFromClock(hour);
     const labels = {
       dawn: "Sunrise hours",
-      clear: "Clear daytime look",
-      dusk: "Evening hours",
+      sunny: "Clear daytime look",
+      dusk: "Sunset hours",
       night: "Night hours",
     };
     return { appearance: part, reason: `${labels[part]} · no weather yet`, weather: null, clock };
   }
 
-  const mood = code.mood || "cloud";
+  const mood = effectiveMood(code);
   const isDay = code.isDay !== false;
   const toSunrise = minutesUntilEpoch(code.sunrise, now);
   const toSunset = minutesUntilEpoch(code.sunset, now);
@@ -91,9 +97,30 @@ export function resolveAppearance({ mode = "auto", hour = 12, weather = null, no
   if (toSunset !== null && toSunset >= -SUNSET_WINDOW.before && toSunset <= SUNSET_WINDOW.after) {
     return { appearance: "dusk", reason: `Sunset at ${wallClock(code.sunset, code.utcOffsetSeconds)}`, weather: code, clock };
   }
-  const allowed = new Set(["clear", "cloud", "rain", "snow", "fog"]);
-  const appearance = allowed.has(mood) ? mood : "clear";
-  return { appearance, reason: `${code.condition || "Live weather"} · ${isDay ? "daytime" : "night"}`, weather: code, clock };
+  const allowed = new Set(["sunny", "cloud", "rain", "snow", "fog", "wind"]);
+  const appearance = allowed.has(mood) ? mood : "sunny";
+  const windNote = isBreezy(code)
+    ? ` · wind ${Math.round(Number(code.windSpeed) || 0)} ${code.windUnit || "km/h"}`
+    : "";
+  return {
+    appearance,
+    reason: `${code.condition || "Live weather"} · ${isDay ? "daytime" : "night"}${windNote}`,
+    weather: code,
+    clock,
+  };
+}
+
+/** True when the air itself is part of the story, whatever the clouds say. */
+export function isBreezy(weather) {
+  if (!weather || !weather.ok) return false;
+  const speed = Number(weather.windSpeed);
+  const gust = Number(weather.windGust);
+  return (Number.isFinite(speed) && speed >= WINDY_SPEED_KMH) || (Number.isFinite(gust) && gust >= WINDY_GUST_KMH);
+}
+
+/** One word for the wind, used in captions and the weather card. */
+export function windWord(weather) {
+  return windDescription(weather);
 }
 
 function minutesUntilEpoch(epoch, now) {

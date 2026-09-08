@@ -1,21 +1,28 @@
 /**
- * Searchable place picker — the replacement for the old <select> of cities.
+ * Searchable place picker.
  *
- * It lists every zone the browser understands, grouped Country → City, and
- * keeps typing honest: "kiev" and "kyiv", "calcutta" and "kolkata", "saigon"
- * and "ho chi minh city" all land on the same correctly spelled place.
+ * One dialog, four jobs: set the home place, add a world clock, choose where
+ * the weather looks, and pick the city the Old clock shows. It lists every
+ * time zone *and* every curated city, grouped Country → City, and keeps typing
+ * honest: "kiev" and "kyiv", "calcutta" and "kolkata", "saigon" and
+ * "ho chi minh city" all land on the same correctly spelled place.
  *
- * The knowledge lives in tz-places.js; this file is rendering, keyboard
- * support and the small amount of state a picker needs. It is used for both
- * "add a world clock" and "set your home zone", which is why `onPick` receives
- * the mode.
+ * The knowledge lives in places.js; this file is rendering, keyboard support
+ * and the small amount of state a picker needs.
  */
 
-import { allPlaces, pickerRows, recordFor, SUGGESTED_ZONES } from "./tz-places.js";
+import { allPlaceRecords, placeGroups, placeRecord, POPULAR_PLACES, searchPlacesAny, zoneOffsetLabel } from "./places.js";
 
-const suggestedZones = new Set(SUGGESTED_ZONES);
+const popular = new Set(POPULAR_PLACES);
 
-export function createCityPicker({ elements, callbacks = {} }) {
+const FILTERS = {
+  all: () => true,
+  suggested: (record) => popular.has(record.id),
+  city: (record) => record.kind === "city",
+  zone: (record) => record.kind === "zone",
+};
+
+export function createCityPicker({ elements, callbacks = {} } = {}) {
   const els = {
     dialog: elements.dialog,
     form: elements.form,
@@ -29,11 +36,12 @@ export function createCityPicker({ elements, callbacks = {} }) {
     count: elements.count,
     summary: elements.summary,
     chips: Array.from(elements.chips ? elements.chips.querySelectorAll("[data-filter]") : []),
+    useLocation: elements.useLocation || null,
   };
 
   const state = {
     mode: "home",
-    homeZone: "",
+    homeId: "",
     query: "",
     filter: "all",
     selected: "",
@@ -48,20 +56,23 @@ export function createCityPicker({ elements, callbacks = {} }) {
     return typeof fn === "function" ? fn(...args) : undefined;
   };
 
-  /* ---------------------------------------------------------- rendering */
+  /* --------------------------------------------------------- formatting */
 
-  const offsetText = (zone) => {
-    const value = hook("formatOffset", zone);
-    return typeof value === "string" ? value : "";
+  const offsetText = (id) => {
+    const value = hook("formatOffset", id);
+    return typeof value === "string" ? value : zoneOffsetLabel(placeRecord(id).zone);
   };
 
-  const isAdded = (zone) => Boolean(hook("isAdded", zone));
+  const isAdded = (id) => Boolean(hook("isAdded", id));
+
+  /* ---------------------------------------------------------- rendering */
 
   function tagsFor(record) {
     const tags = [];
-    if (state.mode === "home" && record.id === state.homeZone) tags.push({ text: "Home", kind: "home" });
+    if (state.mode === "home" && record.id === state.homeId) tags.push({ text: "Home", kind: "home" });
     if (state.mode === "add" && isAdded(record.id)) tags.push({ text: "On your board", kind: "added" });
-    if (suggestedZones.has(record.zone)) tags.push({ text: "Popular", kind: "popular" });
+    if (popular.has(record.id)) tags.push({ text: "Popular", kind: "popular" });
+    if (record.kind === "city") tags.push({ text: "City", kind: "city" });
     return tags;
   }
 
@@ -70,8 +81,8 @@ export function createCityPicker({ elements, callbacks = {} }) {
     node.className = "picker-option";
     node.setAttribute("role", "option");
     node.id = `picker-option-${index}`;
-    node.dataset.zone = record.id;
-    node.dataset.place = record.zone;
+    node.dataset.place = record.id;
+    node.dataset.zone = record.zone;
     node.setAttribute("aria-selected", String(record.id === state.selected));
     if (state.mode === "add" && isAdded(record.id)) node.dataset.disabled = "true";
 
@@ -81,7 +92,7 @@ export function createCityPicker({ elements, callbacks = {} }) {
 
     const meta = document.createElement("span");
     meta.className = "picker-meta";
-    meta.textContent = [record.country, record.note].filter(Boolean).join(" · ") || record.zone;
+    meta.textContent = [record.country || record.region, record.note].filter(Boolean).join(" · ") || record.zone;
 
     const offset = document.createElement("span");
     offset.className = "picker-offset";
@@ -114,22 +125,34 @@ export function createCityPicker({ elements, callbacks = {} }) {
     name.textContent = label;
     node.appendChild(name);
     const number = document.createElement("em");
-    number.textContent = `${count} ${count === 1 ? "zone" : "zones"}`;
+    number.textContent = `${count} ${count === 1 ? "place" : "places"}`;
     node.appendChild(number);
     if (code) node.title = code;
     return node;
   }
 
-  function countPlacesInGroup(rows, groupIndex) {
-    let count = 0;
-    for (let i = groupIndex + 1; i < rows.length && rows[i].type === "place"; i += 1) count += 1;
-    return count;
+  /** `[{type:"group"}, {type:"place", record}]`, the flat list we render. */
+  function pickerRows() {
+    const filter = FILTERS[state.filter] || FILTERS.all;
+    if (state.query) {
+      const matches = searchPlacesAny(state.query).filter(filter);
+      if (!matches.length) return [];
+      return [
+        { type: "group", country: "Matching places", code: "", count: matches.length },
+        ...matches.map((record) => ({ type: "place", record })),
+      ];
+    }
+    const groups = placeGroups()
+      .map((group) => ({ ...group, entries: group.entries.filter(filter) }))
+      .filter((group) => group.entries.length);
+    return groups.flatMap((group) => [
+      { type: "group", country: group.country, code: group.code, count: group.entries.length },
+      ...group.entries.map((record) => ({ type: "place", record })),
+    ]);
   }
 
   function render() {
-    state.rows = pickerRows(state.query, {
-      filter: state.filter === "suggested" ? (record) => suggestedZones.has(record.zone) : null,
-    });
+    state.rows = pickerRows();
     state.places = state.rows.filter((row) => row.type === "place");
 
     const fragment = document.createDocumentFragment();
@@ -140,19 +163,17 @@ export function createCityPicker({ elements, callbacks = {} }) {
       fragment.appendChild(empty);
     }
     state.rows.forEach((row, index) => {
-      if (row.type === "group") {
-        fragment.appendChild(groupNode(row.country, countPlacesInGroup(state.rows, index), row.code));
-      } else {
-        fragment.appendChild(optionNode(row.record, index));
-      }
+      if (row.type === "group") fragment.appendChild(groupNode(row.country, row.count, row.code));
+      else fragment.appendChild(optionNode(row.record, index));
     });
     els.list.replaceChildren(fragment);
 
     const countries = state.rows.filter((row) => row.type === "group").length;
-    els.count.textContent =
-      state.query || state.filter === "suggested"
-        ? `${state.places.length} place${state.places.length === 1 ? "" : "s"}`
-        : `${allPlaces().length} zones in ${countries} countries`;
+    els.count.textContent = state.query
+      ? `${state.places.length} place${state.places.length === 1 ? "" : "s"}`
+      : state.filter === "all"
+        ? `${allPlaceRecords().length} places in ${countries} countries`
+        : `${state.places.length} places`;
 
     state.activeIndex = -1;
     updateSummary();
@@ -166,11 +187,11 @@ export function createCityPicker({ elements, callbacks = {} }) {
       delete els.summary.dataset.legacy;
       return;
     }
-    const record = recordFor(state.selected);
+    const record = placeRecord(state.selected);
     els.summary.textContent = `${record.label} · ${offsetText(state.selected)} · ${record.zone}`;
-    els.summary.dataset.legacy = String(record.legacy);
-    els.summary.title = record.legacy
-      ? `Your browser reports “${state.selected}”; Tempo maps it to the modern zone id.`
+    els.summary.dataset.legacy = String(Boolean(record.legacyZone));
+    els.summary.title = record.legacyZone
+      ? `Your browser reports “${record.legacyZone}”; Tempo maps it to the modern zone id.`
       : record.zone;
   }
 
@@ -198,38 +219,46 @@ export function createCityPicker({ elements, callbacks = {} }) {
     }
   }
 
-  function activeZone() {
+  function activeId() {
     const options = optionNodes();
     const node = options[state.activeIndex] || options[0];
-    return node ? node.dataset.zone : state.selected;
+    return node ? node.dataset.place : state.selected;
   }
 
-  function select(zone) {
-    if (!zone) return;
-    state.selected = zone;
-    optionNodes().forEach((option) => option.setAttribute("aria-selected", String(option.dataset.zone === zone)));
+  function select(id) {
+    if (!id) return;
+    state.selected = id;
+    optionNodes().forEach((option) => option.setAttribute("aria-selected", String(option.dataset.place === id)));
     updateSummary();
   }
 
   function commit() {
-    const zone = state.selected || activeZone();
-    if (!zone) return;
-    if (state.mode === "add" && isAdded(zone)) {
-      hook("onBlocked", zone);
+    const id = state.selected || activeId();
+    if (!id) return;
+    if (state.mode === "add" && isAdded(id)) {
+      hook("onBlocked", id);
       return;
     }
-    if (hook("onPick", zone, state.mode) !== false) api.close();
+    if (hook("onPick", id, state.mode) !== false) api.close();
   }
 
   /* -------------------------------------------------------------- events */
 
   let typingTimer = 0;
 
+  function syncChips() {
+    els.chips.forEach((chip) => {
+      const active = chip.dataset.filter === state.filter;
+      chip.classList.toggle("active", active);
+      chip.setAttribute("aria-pressed", String(active));
+    });
+  }
+
   function attach() {
     els.list.addEventListener("click", (event) => {
       const option = event.target.closest(".picker-option");
       if (!option) return;
-      select(option.dataset.zone);
+      select(option.dataset.place);
       setActive(optionNodes().indexOf(option), false);
     });
     els.list.addEventListener("dblclick", (event) => {
@@ -252,7 +281,7 @@ export function createCityPicker({ elements, callbacks = {} }) {
       }
       if (event.key === "Enter") {
         event.preventDefault();
-        select(activeZone());
+        select(activeId());
         commit();
         return;
       }
@@ -271,22 +300,26 @@ export function createCityPicker({ elements, callbacks = {} }) {
     });
     els.chips.forEach((chip) => {
       chip.addEventListener("click", () => {
-        state.filter = chip.dataset.filter === "all" || state.filter === chip.dataset.filter ? "all" : chip.dataset.filter;
+        state.filter = chip.dataset.filter === state.filter ? "all" : chip.dataset.filter;
         syncChips();
         render();
       });
     });
-    if (els.form) els.form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      commit();
-    });
+    if (els.useLocation) {
+      els.useLocation.addEventListener("click", () => hook("onUseLocation", state.mode));
+    }
+    if (els.form)
+      els.form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        commit();
+      });
     if (els.close) els.close.addEventListener("click", () => api.close());
     if (els.dialog) {
       els.dialog.addEventListener("click", (event) => {
         if (event.target === els.dialog) api.close();
       });
       els.dialog.addEventListener("cancel", (event) => {
-        // Let Escape out of the dialog, but not out of a typed query first.
+        // Escape leaves the dialog, but clears a typed query first.
         if (state.query) {
           event.preventDefault();
           els.search.value = "";
@@ -301,38 +334,29 @@ export function createCityPicker({ elements, callbacks = {} }) {
     }
   }
 
-  function syncChips() {
-    els.chips.forEach((chip) => {
-      const active = chip.dataset.filter === state.filter;
-      chip.classList.toggle("active", active);
-      chip.setAttribute("aria-pressed", String(active));
-    });
-  }
-
   /* ------------------------------------------------------------------ api */
 
   const api = {
     open(config = {}) {
       state.mode = config.mode || "home";
-      state.homeZone = config.homeZone || "";
+      state.homeId = config.homeId || config.homeZone || "";
       state.query = "";
       state.filter = config.filter || "all";
-      state.selected = config.selectedZone || "";
+      state.selected = config.selectedId || config.selectedZone || "";
       els.search.value = "";
       syncChips();
       if (els.title) els.title.textContent = config.title || "Choose a place";
-      if (els.eyebrow) els.eyebrow.textContent = config.eyebrow || "EVERY ZONE ON EARTH";
+      if (els.eyebrow) els.eyebrow.textContent = config.eyebrow || "EVERY PLACE ON EARTH";
       if (els.copy) els.copy.textContent = config.copy || "";
       if (els.submit) els.submit.textContent = config.submitLabel || "Use this place";
+      if (els.useLocation) els.useLocation.hidden = config.allowLocation === false;
       render();
       state.open = true;
       if (typeof els.dialog.showModal === "function") els.dialog.showModal();
       else els.dialog.setAttribute("open", "");
-      if (typeof window.requestAnimationFrame === "function") {
-        window.requestAnimationFrame(() => els.search.focus());
-      } else {
-        els.search.focus();
-      }
+      const focus = () => els.search && els.search.focus();
+      if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(focus);
+      else focus();
     },
     close() {
       if (!state.open) return;
@@ -340,7 +364,7 @@ export function createCityPicker({ elements, callbacks = {} }) {
       else if (els.dialog) els.dialog.removeAttribute("open");
       state.open = false;
     },
-    /** Re-render (offsets change across DST, so the app nudges this hourly). */
+    /** Re-render (offsets move across DST; the app nudges this now and then). */
     refresh: render,
     select,
     get state() {

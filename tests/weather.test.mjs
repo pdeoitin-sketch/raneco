@@ -4,11 +4,14 @@ import test from "node:test";
 import {
   WEATHER_CODES,
   buildForecastUrl,
+  compass,
   describeWeatherCode,
+  effectiveMood,
   fetchWeather,
   parseForecast,
   preferImperial,
   wallClock,
+  windDescription,
 } from "../src/weather.js";
 
 const HOUR = 3600 * 1000;
@@ -61,9 +64,10 @@ test("the request asks Open-Meteo for exactly what the card shows", () => {
   assert.equal(url.origin, "https://api.open-meteo.com");
   assert.equal(url.pathname, "/v1/forecast");
   assert.equal(url.searchParams.get("latitude"), "27.7167");
-  assert.equal(url.searchParams.get("current").split(",").length, 8);
+  assert.equal(url.searchParams.get("current").split(",").length, 9);
   assert.match(url.searchParams.get("current"), /weather_code/);
   assert.match(url.searchParams.get("current"), /is_day/);
+  assert.match(url.searchParams.get("current"), /wind_gusts_10m/, "gusts decide whether a day reads as windy");
   assert.equal(url.searchParams.get("daily"), "sunrise,sunset");
   assert.equal(url.searchParams.get("forecast_days"), "1");
   assert.equal(url.searchParams.get("timezone"), "auto");
@@ -180,4 +184,32 @@ test("sunrise math survives a missing or malformed time", () => {
   assert.equal(wallClock(null, 0), "—");
   assert.equal(wallClock(undefined, 0), "—");
   assert.equal(wallClock(Date.UTC(2026, 0, 1, 0, 0), -5 * 3600), "19:00", "offsets are seconds, not ms");
+});
+
+test("wind has its own say in the mood, but weather keeps priority", () => {
+  const base = { ok: true, mood: "clear", windSpeed: 5, windGust: 10 };
+  assert.equal(effectiveMood(base), "sunny", "a calm clear day is sunny");
+  assert.equal(effectiveMood({ ...base, windSpeed: 30 }), "wind");
+  assert.equal(effectiveMood({ ...base, windGust: 55 }), "wind");
+  assert.equal(effectiveMood({ ...base, mood: "cloud", windSpeed: 30 }), "wind");
+  assert.equal(effectiveMood({ ...base, mood: "rain", windSpeed: 60 }), "rain", "rain outranks wind");
+  assert.equal(effectiveMood({ ...base, mood: "snow", windSpeed: 60 }), "snow");
+  assert.equal(effectiveMood({ ...base, mood: "storm", windSpeed: 60 }), "storm");
+  assert.equal(effectiveMood({ ok: false }), "cloud", "no data is not a mood");
+  // Thresholds are options, so a future change is a one-line edit.
+  assert.equal(effectiveMood({ ...base, windSpeed: 20 }, { windKph: 15 }), "wind");
+});
+
+test("the wind reads the way a person would say it", () => {
+  assert.equal(windDescription({ windSpeed: 12.4, windUnit: "km/h", windDirection: 210, windGust: 20 }), "12 km/h SW");
+  assert.equal(
+    windDescription({ windSpeed: 30, windUnit: "km/h", windDirection: 180, windGust: 52 }),
+    "30 km/h S, gusting 52"
+  );
+  assert.equal(windDescription({ windSpeed: null }), "");
+  assert.equal(compass(0), "N");
+  assert.equal(compass(90), "E");
+  assert.equal(compass(225), "SW");
+  assert.equal(compass(359), "N");
+  assert.equal(compass(-45), "NW", "negative bearings are normalised");
 });
