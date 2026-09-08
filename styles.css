@@ -140,6 +140,14 @@ h1 { margin-bottom: 0; font-size: clamp(calc(25px * var(--type-scale)), 2.5vw, c
 h2 { margin: 0; letter-spacing: -1.2px; font-size: calc(26px * var(--type-scale)); line-height: 1.15; }
 h3 { margin: 0; letter-spacing: -.75px; line-height: 1.15; font-size: calc(19px * var(--type-scale)); }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
+.topbar-heading { min-width: 0; }
+.topbar-brand { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--ink); font-size: calc(15px * var(--type-scale)); font-weight: 700; letter-spacing: -.6px; }
+.topbar-brand:hover { color: var(--violet); }
+.topbar-brand .brand-mark { width: 20px; height: 20px; border-radius: 7px; padding: 4px; gap: 2px; box-shadow: 0 3px 8px rgba(95, 72, 226, .25); }
+.topbar-brand .brand-mark span { width: 2.5px; }
+.topbar-brand .brand-mark span:nth-child(1) { height: 5px; }
+.topbar-brand .brand-mark span:nth-child(2) { height: 10px; }
+.topbar-brand .brand-mark span:nth-child(3) { height: 7px; }
 .status-pill, .calculator-zone-note { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); padding: 8px 12px; border-radius: 100px; background: var(--surface); color: var(--ink-2); font-size: calc(11px * var(--type-scale)); white-space: nowrap; box-shadow: 0 2px 9px rgba(30, 30, 50, .025); }
 .status-dot { width: 7px; height: 7px; flex: 0 0 7px; display: inline-block; border-radius: 50%; background: #56cda5; box-shadow: 0 0 0 3px rgba(86, 205, 165, .12); }
 .icon-button { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink-2); display: inline-grid; place-items: center; background: var(--surface); transition: transform .15s ease, color .15s ease, border-color .15s ease; }
@@ -977,14 +985,20 @@ body[data-ui="dark"] .world-sun { color: var(--ink-3); }
 .clock-face .face-tick { position: absolute; left: calc(50% - .5px); top: 0; width: 1px; height: 100%; transform: rotate(var(--angle)); }
 .clock-face .face-tick:before { content: ""; position: absolute; top: 5%; left: 0; width: 1px; height: 4.5%; background: currentColor; opacity: .3; }
 .clock-face .face-tick.major:before { width: 2px; left: -.5px; height: 8%; opacity: .72; }
-.clock-face .face-number { position: absolute; inset: 0; display: grid; place-items: center; transform: rotate(var(--angle)); }
+.clock-face .face-number { position: absolute; inset: 0; display: grid; place-items: start center; transform: rotate(var(--angle)); }
 .clock-face .face-number em {
   font-style: normal;
   font-family: var(--font-display);
   font-size: calc(11px * var(--type-scale));
   font-weight: 600;
+  line-height: 1;
   opacity: .72;
-  transform: translateY(-39%) rotate(calc(-1 * var(--angle)));
+  /* A % margin resolves against the face — which is always square — so this
+     parks every glyph just inside the tick ring at any face size. (A %
+     translate would resolve against the glyph itself and pile all twelve
+     numerals on top of each other at the centre.) */
+  margin-top: 12%;
+  transform: rotate(calc(-1 * var(--angle)));
 }
 .clock-face[data-numerals="none"] .face-numbers { display: none; }
 .clock-face[data-numerals="roman"] .face-number em { font-size: calc(10px * var(--type-scale)); letter-spacing: 1px; }
