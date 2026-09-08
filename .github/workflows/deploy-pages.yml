@@ -1,12 +1,15 @@
 # Build the Vite project and deploy the `dist/` folder to GitHub Pages.
 #
-# Triggered on every push to `main` (and manually from the Actions tab).
+# Triggered on every push to `main` (and manually from the Actions tab);
+# pull requests are tested and built, but never deployed.
 # Requires the repository's Pages source to be set to "GitHub Actions"
 # (Settings → Pages → Build and deployment → Source).
 name: Deploy to GitHub Pages
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -20,12 +23,40 @@ permissions:
 # Only one Pages deployment at a time. Don't cancel an in-flight deployment;
 # let it finish and then deploy the newest queued commit.
 concurrency:
-  group: pages
+  # Pull-request verification must not queue behind an in-flight deployment.
+  group: pages-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
+  # A pull request only has to prove the dashboard still works; `npm run build`
+  # uses the default base path ("/"), which is exactly what a local dev build
+  # does, so a broken bundle fails here instead of after a merge to `main`.
+  verify:
+    name: Verify pull request
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
   build:
     name: Build site
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -67,6 +98,7 @@ jobs:
   deploy:
     name: Deploy to Pages
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

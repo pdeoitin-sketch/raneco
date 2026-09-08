@@ -144,7 +144,9 @@ npm run preview # serve the production build locally
 
 Deployment is automated by
 [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml).
-On every push to `main` (or a manual run from the **Actions** tab) the workflow:
+Pull requests run a lightweight **Verify pull request** job (`npm ci`,
+`npm test`, `npm run build`) and are never deployed. On every push to `main`
+(or a manual run from the **Actions** tab) the workflow:
 
 1. installs dependencies with `npm ci`,
 2. runs `npm test` so a broken dashboard can never be deployed,
