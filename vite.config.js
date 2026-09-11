@@ -42,7 +42,7 @@ function normalizeBase(path) {
 }
 
 export default defineConfig({
-  base: resolveBase(),
+  base: "/raneco/",
   server: {
     host: "0.0.0.0",
     allowedHosts: true,
