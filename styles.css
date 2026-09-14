@@ -939,17 +939,57 @@ body[data-ui="dark"] .weather-card .text-button:hover { color: var(--violet-dark
    (sun, clouds, wind) each Auto palette switches on.
    ==================================================================== */
 
-/* --------------------------------------------------------------- pages */
+/* ------------------------------------------------------------- sections */
 
-.page { max-width: 1200px; margin: 0 auto; }
+/*
+ * Tempo is one scroll now, not six routed pages. Each `.page` is a section
+ * stacked in document order, separated by a hairline rule so the eye can tell
+ * where one subject ends and the next begins without a page transition.
+ *
+ * `scroll-margin-top` is what makes a jump from the sidebar (and a deep link
+ * like `#/timer`) land with the heading clear of the sticky top bar instead of
+ * tucked underneath it.
+ */
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-top: 46px;
+  padding-bottom: 10px;
+  scroll-margin-top: 92px;
+}
+.page + .page { border-top: 1px solid var(--line); margin-top: 40px; }
+.page:first-of-type { padding-top: 0; }
+/* Kept so any code (or bookmark) that still hides a section behaves. */
 .page[hidden] { display: none; }
-.page-enter { animation: page-in .4s cubic-bezier(.22,.68,.3,1) both; }
+
+/*
+ * Sections fade up the first time they are scrolled to. `.is-active` is set by
+ * the scroll spy; the animation only ever runs once per section, which is why
+ * it is `both` and not `infinite`.
+ */
+.page-enter, .page.is-active { animation: page-in .4s cubic-bezier(.22,.68,.3,1) both; }
 @keyframes page-in {
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .page-enter { animation: none; }
+  .page-enter, .page.is-active { animation: none; }
+  html { scroll-behavior: auto; }
+}
+
+/* The scroll-spy sidebar: a rail marks the section you are reading. */
+.nav-eyebrow { margin-bottom: 10px; padding-left: 13px; opacity: .75; }
+.side-nav { position: relative; }
+.nav-link { position: relative; }
+.nav-link.active::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 11px;
+  bottom: 11px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--violet);
 }
 
 .page-intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 26px; flex-wrap: wrap; margin-bottom: 24px; }
@@ -1206,4 +1246,379 @@ body[data-ui="dark"] .world-sun { color: var(--ink-3); }
 @media (max-height: 660px) {
   .side-nav { margin-top: 20px; gap: 2px; }
   .nav-link { min-height: 38px; }
+}
+
+/* ====================================================================
+   SINGLE-SCROLL UPGRADE — weather section, forecast, alarm picker and
+   the location panel. Everything here is keyed on the palette custom
+   properties, so all twelve Auto appearances get it for free.
+   ==================================================================== */
+
+/* ------------------------------------------------------- weather section */
+
+.weather-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.weather-layout .weather-card { height: 100%; }
+
+/* ------------------------------------------------------- location panel */
+
+.location-card { display: grid; gap: 0; align-content: start; }
+.location-name {
+  margin: 14px 0 2px;
+  font-size: calc(23px * var(--type-scale));
+  font-weight: 700;
+  letter-spacing: -.8px;
+  line-height: 1.15;
+}
+.location-detail { margin: 0 0 16px; color: var(--ink-2); font-size: calc(12.5px * var(--type-scale)); line-height: 1.5; }
+.location-facts { display: grid; gap: 9px; margin: 0 0 14px; }
+.location-facts > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.location-facts dt {
+  color: var(--ink-3);
+  font-size: calc(9.5px * var(--type-scale));
+  font-weight: 700;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+}
+.location-facts dd {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: calc(11.5px * var(--type-scale));
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* The accuracy badge earns its colour: green for GPS, amber for an IP guess. */
+.location-card[data-precision="gps"] .location-facts dd:first-of-type,
+.location-card[data-precision="fine"] .location-facts dd:first-of-type { color: #2f9e78; }
+.location-card[data-precision="coarse"] .location-facts dd:first-of-type { color: #b8860b; }
+.location-card[data-precision="ip"] .location-facts dd:first-of-type { color: #c26043; }
+body[data-ui="dark"] .location-card[data-precision="gps"] .location-facts dd:first-of-type,
+body[data-ui="dark"] .location-card[data-precision="fine"] .location-facts dd:first-of-type { color: #7fdcb8; }
+body[data-ui="dark"] .location-card[data-precision="ip"] .location-facts dd:first-of-type { color: #f0a294; }
+
+.location-card[data-precision="locating"] .location-name::after {
+  content: " …";
+  animation: locating-dots 1.1s steps(3, end) infinite;
+}
+@keyframes locating-dots { 0% { opacity: .3; } 50% { opacity: 1; } 100% { opacity: .3; } }
+
+.location-warning {
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--coral) 35%, transparent);
+  background: color-mix(in srgb, var(--coral) 9%, transparent);
+  color: var(--ink-2);
+  font-size: calc(11.5px * var(--type-scale));
+  line-height: 1.5;
+}
+.location-foot { margin: 12px 0 0; color: var(--ink-3); font-size: calc(10.5px * var(--type-scale)); line-height: 1.5; }
+
+/* ------------------------------------------------------------- forecast */
+
+.forecast-card + .forecast-card { margin-top: 18px; }
+.forecast-place { color: var(--ink-2); font-size: calc(12px * var(--type-scale)); font-weight: 600; }
+.forecast-zone { color: var(--ink-3); font-family: var(--font-mono); font-size: calc(10px * var(--type-scale)); }
+
+/* The hourly strip scrolls sideways rather than wrapping: 24 columns in a
+   grid would squeeze each one into illegibility on a phone. */
+.hour-strip {
+  display: flex;
+  gap: 4px;
+  margin: 18px 0 0;
+  padding: 0 0 10px;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.hour-cell {
+  flex: 0 0 auto;
+  width: 56px;
+  min-height: 168px;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto auto;
+  align-items: end;
+  justify-items: center;
+  gap: 5px;
+  padding: 10px 4px 8px;
+  border-radius: 13px;
+  scroll-snap-align: start;
+  transition: background .2s ease;
+}
+.hour-cell:hover { background: var(--canvas-soft); }
+.hour-cell.is-now { background: var(--violet-soft); }
+.hour-cell[data-night="true"] .hour-bar { background: linear-gradient(180deg, #8b7ff0, #5d4fd0); }
+.hour-temp { font-family: var(--font-mono); font-size: calc(12px * var(--type-scale)); font-weight: 600; color: var(--ink); }
+.hour-bar {
+  width: 8px;
+  min-height: 6px;
+  border-radius: 100px;
+  align-self: end;
+  background: linear-gradient(180deg, #ffcf7a, #f2a365);
+}
+.hour-symbol { font-size: calc(14px * var(--type-scale)); line-height: 1; }
+.hour-rain { min-height: 1em; color: #5d8fd6; font-size: calc(9px * var(--type-scale)); font-weight: 600; }
+.hour-time { color: var(--ink-3); font-family: var(--font-mono); font-size: calc(9.5px * var(--type-scale)); }
+.hour-cell.is-now .hour-time { color: var(--violet-dark); font-weight: 700; }
+
+/* The 7-day list: a range bar makes "cold week / warm week" readable at a
+   glance, which a column of numbers never is. */
+.day-list { display: grid; gap: 2px; margin: 18px 0 0; padding: 0; list-style: none; }
+.day-row {
+  display: grid;
+  grid-template-columns: 88px 26px minmax(0, 1fr) 44px 38px minmax(70px, 1.3fr) 38px;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 10px;
+  border-radius: 11px;
+  font-size: calc(12.5px * var(--type-scale));
+}
+.day-row:hover { background: var(--canvas-soft); }
+.day-row.is-today { background: var(--violet-soft); font-weight: 600; }
+.day-name { color: var(--ink); font-weight: 600; }
+.day-symbol { font-size: calc(16px * var(--type-scale)); line-height: 1; text-align: center; }
+.day-condition { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.day-rain { color: #5d8fd6; font-size: calc(10.5px * var(--type-scale)); font-weight: 600; text-align: right; }
+.day-low, .day-high { font-family: var(--font-mono); font-size: calc(12px * var(--type-scale)); text-align: right; }
+.day-low { color: var(--ink-3); }
+.day-high { color: var(--ink); font-weight: 600; }
+.day-range { position: relative; height: 6px; border-radius: 100px; background: var(--canvas-soft); overflow: hidden; }
+.day-range-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 100px;
+  background: linear-gradient(90deg, #7fc4ef, #ffc46b, #f2845c);
+}
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+#page-forecast[data-state="loading"] .hour-strip,
+#page-forecast[data-state="loading"] .day-list { opacity: .45; }
+
+/* ---------------------------------------------------------------- alarm */
+
+.ringing-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--coral) 45%, transparent);
+  background: color-mix(in srgb, var(--coral) 12%, var(--surface));
+  box-shadow: var(--shadow-small);
+}
+.ringing-bar[hidden] { display: none; }
+.ringing-pulse {
+  width: 13px; height: 13px;
+  flex: 0 0 13px;
+  border-radius: 50%;
+  background: var(--coral);
+  animation: ring-pulse 1s ease-in-out infinite;
+}
+@keyframes ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--coral) 55%, transparent); }
+  50% { box-shadow: 0 0 0 11px transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .ringing-pulse { animation: none; } }
+.ringing-copy { flex: 1; display: grid; gap: 3px; }
+.ringing-copy strong { font-size: calc(16px * var(--type-scale)); letter-spacing: -.4px; }
+.ringing-copy span { color: var(--ink-2); font-size: calc(12px * var(--type-scale)); }
+.timer-ring.is-ringing { animation: ring-shake .9s ease-in-out infinite; }
+@keyframes ring-shake { 0%, 100% { transform: none; } 25% { transform: rotate(-1.6deg); } 75% { transform: rotate(1.6deg); } }
+@media (prefers-reduced-motion: reduce) { .timer-ring.is-ringing { animation: none; } }
+.tool-status.ringing { color: var(--coral); font-weight: 700; }
+
+.alarm-card { display: grid; align-content: start; }
+.current-sound {
+  padding: 5px 11px;
+  border-radius: 100px;
+  background: var(--violet-soft);
+  color: var(--violet-dark);
+  font-size: calc(10.5px * var(--type-scale));
+  font-weight: 700;
+  white-space: nowrap;
+}
+body[data-ui="dark"] .current-sound { color: #c3b8ff; }
+
+.alarm-settings { display: grid; gap: 16px; margin: 20px 0 18px; }
+.alarm-field { display: grid; gap: 8px; }
+.alarm-field-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.alarm-field .eyebrow { display: flex; align-items: center; justify-content: space-between; margin: 0; }
+.volume-value { color: var(--ink); font-family: var(--font-mono); letter-spacing: 0; }
+.segmented.wrap { flex-wrap: wrap; }
+.alarm-volume { width: 100%; accent-color: var(--violet); cursor: pointer; }
+
+/* The catalogue. A scrolling panel rather than a <select>, because the point
+   of sixteen sounds is being able to hear them before committing. */
+.sound-list {
+  display: grid;
+  gap: 16px;
+  max-height: 330px;
+  padding: 4px 10px 4px 2px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding-top: 16px;
+  padding-bottom: 16px;
+  scrollbar-width: thin;
+}
+.sound-group-label {
+  margin: 0 0 8px;
+  color: var(--ink-3);
+  font-size: calc(9.5px * var(--type-scale));
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.sound-options { display: grid; gap: 5px; }
+.sound-option {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+.sound-option:hover { border-color: #cfc7ff; transform: translateY(-1px); }
+.sound-option:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+.sound-option.active { border-color: var(--violet); background: var(--violet-soft); }
+.sound-option.active::after {
+  content: "✓";
+  position: absolute;
+  top: 9px;
+  right: 44px;
+  color: var(--violet-dark);
+  font-size: calc(12px * var(--type-scale));
+  font-weight: 700;
+}
+.sound-name {
+  grid-column: 1;
+  color: var(--ink);
+  font-size: calc(12.5px * var(--type-scale));
+  font-weight: 600;
+}
+.sound-note {
+  grid-column: 1;
+  color: var(--ink-3);
+  font-size: calc(10.5px * var(--type-scale));
+  line-height: 1.45;
+}
+.sound-play {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: 30px; height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: calc(10px * var(--type-scale));
+  transition: color .15s ease, border-color .15s ease;
+}
+.sound-play:hover { color: var(--violet); border-color: var(--violet); }
+.sound-option-custom { grid-template-columns: minmax(0, 1fr); }
+.sound-option-custom.active::after { right: 11px; }
+
+.custom-sound { margin-top: 18px; display: grid; gap: 10px; }
+.note-copy.small { margin: 0; font-size: calc(11.5px * var(--type-scale)); line-height: 1.55; }
+.note-copy.muted { color: var(--ink-3); font-size: calc(10.5px * var(--type-scale)); }
+.custom-sound code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--canvas-soft);
+  font-family: var(--font-mono);
+  font-size: .92em;
+}
+.custom-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.custom-row input {
+  flex: 1 1 220px;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: calc(12px * var(--type-scale));
+}
+.custom-row input:focus { outline: 2px solid var(--violet); outline-offset: 1px; border-color: var(--violet); }
+.file-field { display: grid; gap: 6px; }
+.file-field > span {
+  color: var(--ink-3);
+  font-size: calc(10.5px * var(--type-scale));
+  font-weight: 600;
+}
+.file-field input[type="file"] { font-size: calc(10.5px * var(--type-scale)); color: var(--ink-2); }
+.file-field input[type="file"]::file-selector-button {
+  margin-right: 9px;
+  padding: 6px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: calc(10.5px * var(--type-scale));
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/*
+ * A YouTube or Spotify alarm needs a real, painted iframe: `display: none`
+ * and `visibility: hidden` both stop autoplay in Chrome and Safari. So it is
+ * parked off-screen at 1×1 instead — present and playing, but invisible.
+ */
+.alarm-stream { position: fixed; left: -9999px; bottom: 0; width: 1px; height: 1px; overflow: hidden; }
+.alarm-stream-frame { width: 320px; height: 180px; border: 0; }
+
+/* ------------------------------------------------------------ responsive */
+
+@media (max-width: 1020px) {
+  .weather-layout { grid-template-columns: 1fr; }
+  .page { padding-top: 38px; scroll-margin-top: 74px; }
+  .day-row { grid-template-columns: 74px 24px minmax(0, 1fr) 38px 34px minmax(50px, 1fr) 34px; gap: 8px; }
+}
+@media (max-width: 760px) {
+  .page { padding-top: 32px; scroll-margin-top: 18px; }
+  .page + .page { margin-top: 28px; }
+  .nav-eyebrow { display: none; }
+  .weather-layout { gap: 13px; }
+  .location-name { font-size: calc(20px * var(--type-scale)); }
+  .forecast-card + .forecast-card { margin-top: 13px; }
+  .hour-cell { width: 50px; min-height: 150px; }
+  /* Below this width the condition text is the first thing to go: the icon
+     already says "rain", and the numbers are what people scan for. */
+  .day-row { grid-template-columns: 66px 22px 34px 32px minmax(40px, 1fr) 32px; font-size: calc(11.5px * var(--type-scale)); }
+  .day-condition { display: none; }
+  .ringing-bar { flex-wrap: wrap; gap: 12px; padding: 14px 16px; }
+  .ringing-bar .primary-button { width: 100%; }
+  .sound-list { max-height: 290px; }
+}
+@media (max-width: 480px) {
+  .day-row { grid-template-columns: 58px 20px 30px 30px minmax(30px, 1fr) 30px; gap: 6px; padding: 10px 6px; }
+  .day-rain { font-size: calc(9px * var(--type-scale)); }
+  .hour-cell { width: 46px; }
+  .custom-row input { flex-basis: 100%; }
+  .custom-row .secondary-button { width: 100%; }
 }

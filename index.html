@@ -67,10 +67,19 @@
           <span>tempo<span class="brand-dot">.</span></span>
         </a>
 
-        <nav class="side-nav" id="side-nav">
+        <nav class="side-nav" id="side-nav" aria-label="Jump to a section">
+          <p class="eyebrow nav-eyebrow">ON THIS PAGE</p>
           <a class="nav-link active" href="#/now" data-route="now" data-nav="now">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M12 7.4v5.1l3.4 2"></path></svg>
             <span>Right now</span>
+          </a>
+          <a class="nav-link" href="#/weather" data-route="weather" data-nav="weather">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.4 18.5h9.3a3.9 3.9 0 0 0 .5-7.77 5.6 5.6 0 0 0-10.8-1.1A3.94 3.94 0 0 0 7.4 18.5Z"></path></svg>
+            <span>Weather</span>
+          </a>
+          <a class="nav-link" href="#/forecast" data-route="forecast" data-nav="forecast">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18.5h5M4 14h9M4 9.5h7"></path><path d="M14.5 5.5a4 4 0 0 1 3.9 3.1 3 3 0 0 1-.4 5.9"></path></svg>
+            <span>Forecast</span>
           </a>
           <a class="nav-link" href="#/clocks" data-route="clocks" data-nav="clocks">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M3.9 9h16.2M3.9 15h16.2M12 3.75c2.15 2.25 3.22 4.99 3.22 8.25S14.15 18 12 20.25C9.85 18 8.78 15.26 8.78 12S9.85 5.99 12 3.75Z"></path></svg>
@@ -78,7 +87,7 @@
           </a>
           <a class="nav-link" href="#/timer" data-route="timer" data-nav="timer">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3.75h8M12 3.75v3.1M18.15 8.55l1.8-1.8M12 7.1a7.15 7.15 0 1 1-7.15 7.15A7.15 7.15 0 0 1 12 7.1Z"></path><path d="M12 10.35v4.2l2.75 1.7"></path></svg>
-            <span>Timer</span>
+            <span>Timer &amp; alarm</span>
           </a>
           <a class="nav-link" href="#/clock" data-route="clock" data-nav="clock">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.5" r="7.75"></circle><path d="M12 8.25v4.5l3 1.85M9.4 3.6h5.2M12 3.6V5.5M6.6 20.4h10.8"></path></svg>
@@ -152,7 +161,7 @@
           </div>
         </header>
 
-        <!-- ============================================================ PAGE: RIGHT NOW -->
+        <!-- ========================================================= SECTION: RIGHT NOW -->
         <section class="page" id="page-now" data-page="now" aria-labelledby="now-title">
           <div class="hero-section">
             <div class="now-card">
@@ -200,6 +209,44 @@
               </article>
             </div>
 
+          </div>
+
+          <div class="now-notes">
+            <article class="note-card">
+              <p class="eyebrow">SOLAR TIME</p>
+              <h3 id="solar-title">Where the sun actually is</h3>
+              <p class="note-copy" id="solar-note">Pick a place to see how far its clock sits from its own sun.</p>
+            </article>
+            <article class="note-card">
+              <p class="eyebrow">TODAY</p>
+              <h3 id="daylight-title">Daylight</h3>
+              <p class="note-copy" id="daylight-note">Sunrise and sunset appear here once the sky is loaded.</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- =========================================================== SECTION: WEATHER -->
+        <section class="page" id="page-weather" data-page="weather" aria-labelledby="weather-section-title">
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">RIGHT NOW, OUTSIDE</p>
+              <h2 id="weather-section-title">Weather</h2>
+              <p class="section-intro">
+                Measured at a point, not a country — live from Open-Meteo, refreshed while you watch.
+                <span class="section-count" id="weather-live-note"></span>
+              </p>
+            </div>
+            <div class="page-actions">
+              <button class="outline-button" id="weather-use-location-top" type="button">
+                <span class="button-plus" aria-hidden="true">⌖</span> Use my location
+              </button>
+              <button class="outline-button" id="weather-set-location-top" type="button">
+                <span class="button-plus" aria-hidden="true">◎</span> Choose a place
+              </button>
+            </div>
+          </div>
+
+          <div class="weather-layout">
             <article class="quick-card weather-card" id="weather-card" data-state="idle" aria-labelledby="weather-title">
               <span class="card-stars" aria-hidden="true"></span>
               <div class="card-topline">
@@ -241,24 +288,72 @@
                 </div>
               </div>
             </article>
-          </div>
 
-          <div class="now-notes">
-            <article class="note-card">
-              <p class="eyebrow">SOLAR TIME</p>
-              <h3 id="solar-title">Where the sun actually is</h3>
-              <p class="note-copy" id="solar-note">Pick a place to see how far its clock sits from its own sun.</p>
-            </article>
-            <article class="note-card">
-              <p class="eyebrow">TODAY</p>
-              <h3 id="daylight-title">Daylight</h3>
-              <p class="note-copy" id="daylight-note">Sunrise and sunset appear here once the sky is loaded.</p>
+            <article class="note-card location-card" id="location-card" data-precision="unknown" aria-labelledby="location-card-title">
+              <div class="card-topline">
+                <span class="small-icon icon-mint" aria-hidden="true">⌖</span>
+                <span id="location-card-title">WHERE WE THINK YOU ARE</span>
+              </div>
+              <p class="location-name" id="location-name">Not located yet</p>
+              <p class="location-detail" id="location-detail">
+                Tempo never reads your location until you ask it to.
+              </p>
+              <dl class="location-facts">
+                <div><dt>Accuracy</dt><dd id="location-accuracy">—</dd></div>
+                <div><dt>Coordinates</dt><dd id="location-coords">—</dd></div>
+                <div><dt>Time zone</dt><dd id="location-zone">—</dd></div>
+              </dl>
+              <p class="location-warning" id="location-warning" hidden></p>
+              <button class="pill-button wide" type="button" id="location-locate">
+                <span class="pill-icon" aria-hidden="true">⌖</span> Locate me precisely
+              </button>
+              <p class="location-foot">
+                Uses your device's GPS, then names the spot with a real gazetteer — not the nearest big city.
+              </p>
             </article>
           </div>
         </section>
 
-        <!-- ========================================================= PAGE: WORLD CLOCKS -->
-        <section class="page" id="page-clocks" data-page="clocks" aria-labelledby="world-title" hidden>
+        <!-- ========================================================== SECTION: FORECAST -->
+        <section class="page" id="page-forecast" data-page="forecast" data-state="idle" aria-labelledby="forecast-title">
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">THE WEEK AHEAD</p>
+              <h2 id="forecast-title">Forecast</h2>
+              <p class="section-intro" id="forecast-summary">Loading the week…</p>
+            </div>
+            <div class="page-actions">
+              <span class="forecast-place" id="forecast-place"></span>
+              <button class="icon-button" id="forecast-refresh" type="button" aria-label="Reload the forecast" title="Reload the forecast">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.4 8.5V4.75M4.4 4.75h3.75M4.7 12a7.3 7.3 0 1 0 2.14-5.17L4.4 8.5"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          <article class="tool-card forecast-card">
+            <div class="calculator-card-heading">
+              <div>
+                <p class="card-label">NEXT 24 HOURS</p>
+                <h3>Hour by hour</h3>
+              </div>
+              <span class="forecast-zone" id="forecast-zone"></span>
+            </div>
+            <ol class="hour-strip" id="forecast-hours" aria-label="Hourly forecast"></ol>
+          </article>
+
+          <article class="tool-card forecast-card">
+            <div class="calculator-card-heading">
+              <div>
+                <p class="card-label">NEXT 7 DAYS</p>
+                <h3>Day by day</h3>
+              </div>
+            </div>
+            <ol class="day-list" id="forecast-days" aria-label="Daily forecast"></ol>
+          </article>
+        </section>
+
+        <!-- ====================================================== SECTION: WORLD CLOCKS -->
+        <section class="page" id="page-clocks" data-page="clocks" aria-labelledby="world-title">
           <div class="page-intro">
             <div>
               <p class="eyebrow">STAY IN SYNC</p>
@@ -285,15 +380,27 @@
           <p class="empty-state" id="world-empty" hidden>No clocks yet — add a city, or drop in your own location.</p>
         </section>
 
-        <!-- ============================================================== PAGE: TIMER -->
-        <section class="page" id="page-timer" data-page="timer" aria-labelledby="timer-title" hidden>
+        <!-- =========================================================== SECTION: TIMER -->
+        <section class="page" id="page-timer" data-page="timer" aria-labelledby="timer-title">
           <div class="page-intro">
             <div>
               <p class="eyebrow">COUNTDOWN</p>
-              <h2 id="timer-title">Timer</h2>
-              <p class="section-intro">Set a length, start it, and get on with the thing you were avoiding.</p>
+              <h2 id="timer-title">Timer &amp; alarm</h2>
+              <p class="section-intro">
+                Set a length, start it, and get on with the thing you were avoiding. When it ends the alarm
+                <em>keeps going</em> until you stop it — sixteen sounds, your own music, or a link.
+              </p>
             </div>
             <span class="tool-status" id="timer-status">READY</span>
+          </div>
+
+          <div class="ringing-bar" id="timer-ringing" hidden role="alert">
+            <span class="ringing-pulse" aria-hidden="true"></span>
+            <div class="ringing-copy">
+              <strong>Time's up</strong>
+              <span id="timer-ringing-note">Your timer has finished.</span>
+            </div>
+            <button class="primary-button" type="button" id="timer-dismiss">Stop the alarm</button>
           </div>
 
           <div class="tool-page">
@@ -331,19 +438,76 @@
               </div>
             </article>
 
-            <article class="note-card timer-note">
-              <p class="eyebrow">GOOD TO KNOW</p>
-              <h3>When it finishes</h3>
-              <p class="note-copy">
-                The ring empties, Tempo plays a short chime and a note slides up from the bottom of the page.
-                The timer keeps running while you visit the other pages — it lives in the background.
-              </p>
+            <article class="tool-card alarm-card" aria-labelledby="alarm-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">WHEN IT ENDS</p>
+                  <h3 id="alarm-title">Alarm sound</h3>
+                </div>
+                <span class="current-sound" id="alarm-current">Soft chime</span>
+              </div>
+
+              <div class="alarm-settings">
+                <div class="alarm-field">
+                  <p class="eyebrow">KEEP RINGING FOR</p>
+                  <div class="segmented wrap" id="alarm-durations" role="radiogroup" aria-label="How long the alarm rings">
+                    <button type="button" class="seg-button" role="radio" aria-checked="false" data-alarm-duration="5">5 s</button>
+                    <button type="button" class="seg-button" role="radio" aria-checked="false" data-alarm-duration="15">15 s</button>
+                    <button type="button" class="seg-button active" role="radio" aria-checked="true" data-alarm-duration="30">30 s</button>
+                    <button type="button" class="seg-button" role="radio" aria-checked="false" data-alarm-duration="60">1 min</button>
+                    <button type="button" class="seg-button" role="radio" aria-checked="false" data-alarm-duration="0">Until I stop it</button>
+                  </div>
+                </div>
+
+                <div class="alarm-field">
+                  <p class="eyebrow">VOLUME <span class="volume-value" id="alarm-volume-label">70%</span></p>
+                  <input class="alarm-volume" id="alarm-volume" type="range" min="0" max="100" value="70" aria-label="Alarm volume" />
+                </div>
+
+                <div class="alarm-field alarm-field-row">
+                  <button class="pill-button" type="button" id="alarm-test">
+                    <span class="pill-icon" aria-hidden="true">▶</span> Test the alarm
+                  </button>
+                  <button class="pill-button" type="button" id="alarm-notify" aria-pressed="false">
+                    <span class="pill-icon" aria-hidden="true">🔔</span> Notify me too
+                  </button>
+                </div>
+              </div>
+
+              <div class="sound-list" id="alarm-sounds" role="radiogroup" aria-label="Alarm sound"></div>
+
+              <div class="custom-sound">
+                <p class="eyebrow">YOUR OWN MUSIC</p>
+                <p class="note-copy small">
+                  Paste a YouTube, YouTube Music or Spotify link and it plays in an embedded player when the
+                  timer ends. A direct audio link (<code>.mp3</code>, <code>.ogg</code>) plays inline.
+                </p>
+                <div class="custom-row">
+                  <input
+                    id="alarm-custom"
+                    type="url"
+                    inputmode="url"
+                    spellcheck="false"
+                    placeholder="https://open.spotify.com/track/… or https://youtu.be/…"
+                    aria-label="Custom alarm link"
+                  />
+                  <button class="secondary-button" type="button" id="alarm-custom-apply">Use this</button>
+                </div>
+                <label class="file-field">
+                  <span>…or pick a file from this device</span>
+                  <input id="alarm-file" type="file" accept="audio/*" />
+                </label>
+                <p class="note-copy small muted">
+                  A file stays on your device — nothing is uploaded — but the browser forgets it when you close
+                  the tab, so pick it again next visit.
+                </p>
+              </div>
             </article>
           </div>
         </section>
 
-        <!-- ========================================================= PAGE: OLD CLOCK -->
-        <section class="page" id="page-clock" data-page="clock" aria-labelledby="old-clock-title" hidden>
+        <!-- ========================================================= SECTION: OLD CLOCK -->
+        <section class="page" id="page-clock" data-page="clock" aria-labelledby="old-clock-title">
           <div class="page-intro">
             <div>
               <p class="eyebrow">A SLOWER KIND OF CLOCK</p>
@@ -396,8 +560,8 @@
           </div>
         </section>
 
-        <!-- ============================================================== PAGE: FOCUS -->
-        <section class="page" id="page-focus" data-page="focus" aria-labelledby="stopwatch-title" hidden>
+        <!-- ============================================================= SECTION: FOCUS -->
+        <section class="page" id="page-focus" data-page="focus" aria-labelledby="stopwatch-title">
           <div class="page-intro">
             <div>
               <p class="eyebrow">TRACK ELAPSED TIME</p>
@@ -445,8 +609,8 @@
           </div>
         </section>
 
-        <!-- ========================================================= PAGE: CALCULATOR -->
-        <section class="page" id="page-calculator" data-page="calculator" aria-labelledby="calculator-title" hidden>
+        <!-- ======================================================== SECTION: CALCULATOR -->
+        <section class="page" id="page-calculator" data-page="calculator" aria-labelledby="calculator-title">
           <div class="page-intro">
             <div>
               <p class="eyebrow">NO MENTAL MATH REQUIRED</p>
@@ -516,12 +680,21 @@
     <div class="mobile-nav-backdrop" id="mobile-nav-backdrop"></div>
     <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
       <a href="#/now" data-route="now" data-nav="now">Right now</a>
+      <a href="#/weather" data-route="weather" data-nav="weather">Weather</a>
+      <a href="#/forecast" data-route="forecast" data-nav="forecast">Forecast</a>
       <a href="#/clocks" data-route="clocks" data-nav="clocks">World clocks</a>
-      <a href="#/timer" data-route="timer" data-nav="timer">Timer</a>
+      <a href="#/timer" data-route="timer" data-nav="timer">Timer &amp; alarm</a>
       <a href="#/clock" data-route="clock" data-nav="clock">Old clock</a>
       <a href="#/focus" data-route="focus" data-nav="focus">Focus</a>
       <a href="#/calculator" data-route="calculator" data-nav="calculator">Time calculator</a>
     </nav>
+
+    <!--
+      Where a YouTube / Spotify alarm mounts its embed. It is visually hidden
+      rather than display:none, because a hidden iframe is not allowed to
+      autoplay in several browsers.
+    -->
+    <div class="alarm-stream" id="alarm-stream" aria-hidden="true"></div>
 
     <dialog class="zone-dialog picker-dialog" id="zone-dialog" aria-labelledby="zone-dialog-title">
       <form method="dialog" class="dialog-card picker-card" id="zone-form">

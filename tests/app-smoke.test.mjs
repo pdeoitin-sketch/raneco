@@ -19,6 +19,45 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
+/**
+ * The hourly + daily arrays the Forecast section asks for. Merged into the
+ * current-conditions payload below, so one stub answers both shapes.
+ */
+function seriesFields(now) {
+  const iso = (epoch) => new Date(epoch).toISOString().slice(0, 16);
+  const day = (epoch) => new Date(epoch).toISOString().slice(0, 10);
+  const hourly = {
+    time: [], temperature_2m: [], weather_code: [], precipitation_probability: [], wind_speed_10m: [], is_day: [],
+  };
+  for (let i = 0; i < 30; i += 1) {
+    hourly.time.push(iso(now + i * 3600 * 1000));
+    hourly.temperature_2m.push(24 + (i % 8));
+    hourly.weather_code.push(i % 4 === 0 ? 61 : 1);
+    hourly.precipitation_probability.push((i * 11) % 100);
+    hourly.wind_speed_10m.push(9);
+    hourly.is_day.push(i % 24 < 12 ? 1 : 0);
+  }
+  const daily = {
+    time: [], weather_code: [], temperature_2m_max: [], temperature_2m_min: [],
+    precipitation_probability_max: [], precipitation_sum: [], wind_speed_10m_max: [],
+    sunrise: [], sunset: [], uv_index_max: [],
+  };
+  for (let i = 0; i < 7; i += 1) {
+    const at = now + i * 86400000;
+    daily.time.push(day(at));
+    daily.weather_code.push(i === 1 ? 63 : 2);
+    daily.temperature_2m_max.push(29 + i);
+    daily.temperature_2m_min.push(17 + i);
+    daily.precipitation_probability_max.push(i === 1 ? 75 : 15);
+    daily.precipitation_sum.push(i === 1 ? 8 : 0);
+    daily.wind_speed_10m_max.push(16);
+    daily.sunrise.push(iso(at - 4 * 3600 * 1000));
+    daily.sunset.push(iso(at + 4 * 3600 * 1000));
+    daily.uv_index_max.push(7);
+  }
+  return { hourly, daily };
+}
+
 function weatherPayload({ now = Date.now(), code = 61, isDay = 1, wind = 7.3 } = {}) {
   const iso = (epoch) => new Date(epoch).toISOString().slice(0, 16);
   return {
@@ -47,7 +86,54 @@ function weatherPayload({ now = Date.now(), code = 61, isDay = 1, wind = 7.3 } =
   };
 }
 
-async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload() } = {}) {
+/**
+ * BigDataCloud's reverse-geocode shape, for whichever coordinates were asked
+ * for. Two fixtures is enough: Delhi and Mumbai are the two the suite uses.
+ */
+function geocodePayload(url) {
+  const query = new URL(url).searchParams;
+  const lat = Number(query.get("latitude"));
+  const mumbai = Math.abs(lat - 19.076) < 0.5;
+  return mumbai
+    ? {
+        latitude: 19.076,
+        longitude: 72.8777,
+        lookupSource: "coordinates",
+        countryName: "India",
+        countryCode: "IN",
+        principalSubdivision: "Maharashtra",
+        city: "Mumbai",
+        locality: "Dadar",
+        postcode: "400014",
+        localityInfo: {
+          administrative: [
+            { adminLevel: 2, name: "India" },
+            { adminLevel: 4, name: "Maharashtra" },
+            { adminLevel: 8, name: "Mumbai" },
+          ],
+        },
+      }
+    : {
+        latitude: 28.6139,
+        longitude: 77.209,
+        lookupSource: "coordinates",
+        countryName: "India",
+        countryCode: "IN",
+        principalSubdivision: "Delhi",
+        city: "Delhi",
+        locality: "Connaught Place",
+        postcode: "110001",
+        localityInfo: {
+          administrative: [
+            { adminLevel: 2, name: "India" },
+            { adminLevel: 4, name: "Delhi" },
+            { adminLevel: 8, name: "Delhi" },
+          ],
+        },
+      };
+}
+
+async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload(), hash = "" } = {}) {
   const html = readFileSync(resolve(root, "index.html"), "utf8")
     // jsdom does not run ES module scripts or stylesheets; the bundle is
     // imported below and the CSS is checked by build, not by this test.
@@ -60,15 +146,30 @@ async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload
   virtualConsole.on("jsdomError", (error) => errors.push(`jsdomError: ${error.message}`));
   virtualConsole.on("error", (...args) => errors.push(`console.error: ${args.join(" ")}`));
 
-  const dom = new JSDOM(html, { url: "http://localhost:5173/", pretendToBeVisual: true, virtualConsole });
+  const dom = new JSDOM(html, {
+    url: `http://localhost:5173/${hash}`,
+    pretendToBeVisual: true,
+    virtualConsole,
+  });
+  // jsdom has no IntersectionObserver and no layout, so the scroll spy uses
+  // its positional fallback. Stubbing scrollIntoView keeps the jump silent.
+  dom.window.Element.prototype.scrollIntoView = function scrollIntoView() {};
   const { document, localStorage } = dom.window;
   localStorage.clear();
   if (homeZone) localStorage.setItem("tempo-home-zone", homeZone);
 
   const fetchCalls = [];
   const stubFetch = async (url) => {
-    fetchCalls.push(String(url));
-    const body = weather(String(url));
+    const href = String(url);
+    fetchCalls.push(href);
+    // Three endpoints are in play now, each with its own shape:
+    //   • BigDataCloud   names a GPS fix,
+    //   • Open-Meteo     current conditions (the weather card),
+    //   • Open-Meteo     hourly + daily arrays (the forecast section).
+    let body;
+    if (href.includes("bigdatacloud")) body = geocodePayload(href);
+    else if (href.includes("hourly=")) body = { ...weather(href), ...seriesFields(Date.now()) };
+    else body = weather(href);
     return { ok: true, status: 200, json: async () => body };
   };
   dom.window.fetch = stubFetch;
@@ -115,14 +216,31 @@ async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload
       input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
       await wait(90);
     },
+    /**
+     * Navigate the way a reader does: click the nav link. With one scrolling
+     * page there is nothing to swap, so this asserts on the spy's answer.
+     */
     async go(route) {
-      dom.window.location.hash = `#/${route}`;
-      await wait(60);
+      const link = document.querySelector(`.nav-link[data-route="${route}"]`);
+      if (link) link.click();
+      else dom.window.location.hash = `#/${route}`;
+      await wait(80);
     },
+    /**
+     * Every section is in the DOM at once now, so "which page is showing" has
+     * become "which section is the scroll spy pointing at".
+     */
     visiblePages() {
       return Array.from(document.querySelectorAll(".page"))
         .filter((page) => !page.hidden)
         .map((page) => page.dataset.page);
+    },
+    activeSection() {
+      return document.body.dataset.currentPage || null;
+    },
+    activeNav() {
+      const link = document.querySelector(".nav-link[aria-current]");
+      return link ? link.dataset.route : null;
     },
     cleanup() {
       dom.window.close();
@@ -155,31 +273,57 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.localStorage.getItem("tempo-home-zone"), "zone:Asia/Kathmandu");
   });
 
-  test("each page is its own route, and only one shows at a time", async () => {
+  test("every section is on one scroll, and the nav follows the reader", async () => {
     app = await boot();
-    assert.deepEqual(app.visiblePages(), ["now"], "Right now is the landing page");
+
+    // The whole dashboard is present at once — that is the upgrade.
+    assert.deepEqual(
+      app.visiblePages(),
+      ["now", "weather", "forecast", "clocks", "timer", "clock", "focus", "calculator"],
+      "all eight sections share one page"
+    );
+    assert.equal(app.activeSection(), "now", "and the reader starts at the top");
     assert.match(app.$("#page-title").textContent, /moment/);
     assert.equal(app.$('.nav-link[data-route="now"]').classList.contains("active"), true);
 
+    // Weather and Forecast are sections of their own now, not a card.
+    assert.ok(app.$("#page-weather"), "weather has its own section");
+    assert.ok(app.$("#page-forecast"), "so does the forecast");
+    assert.ok(app.$("#page-weather").contains(app.$("#weather-card")), "the weather card lives in it");
+
     await app.go("clocks");
-    assert.deepEqual(app.visiblePages(), ["clocks"]);
+    assert.equal(app.activeSection(), "clocks");
     assert.match(app.$("#page-title").textContent, /Around the world/);
-    assert.equal(app.$('.nav-link[data-route="clocks"]').getAttribute("aria-current"), "page");
-    assert.equal(app.$('.nav-link[data-route="now"]').getAttribute("aria-current"), null);
+    assert.equal(app.activeNav(), "clocks");
+    assert.equal(app.$('.nav-link[data-route="now"]').hasAttribute("aria-current"), false);
+    // Nothing was hidden to get there.
+    assert.equal(app.visiblePages().length, 8, "sections are never torn down");
 
-    await app.go("timer");
-    assert.deepEqual(app.visiblePages(), ["timer"]);
-    await app.go("clock");
-    assert.deepEqual(app.visiblePages(), ["clock"]);
-    await app.go("focus");
-    assert.deepEqual(app.visiblePages(), ["focus"]);
-    await app.go("calculator");
-    assert.deepEqual(app.visiblePages(), ["calculator"]);
-    assert.match(app.$("#page-title").textContent, /mental maths/);
+    for (const [route, heading] of [
+      ["weather", /sky/i],
+      ["forecast", /week/i],
+      ["timer", /timer/i],
+      ["calculator", /mental maths/],
+    ]) {
+      await app.go(route);
+      assert.equal(app.activeSection(), route, `#/${route} selects its section`);
+      assert.match(app.$("#page-title").textContent, heading);
+    }
 
-    // A hash left over from an older build (or a typo) lands somewhere safe.
+    // A hash left over from an older build (or a typo) changes nothing.
+    const before = app.activeSection();
     await app.go("nope");
-    assert.deepEqual(app.visiblePages(), ["now"]);
+    assert.equal(app.activeSection(), before, "an unknown hash is ignored, not a 404");
+  });
+
+  test("old #/page bookmarks still resolve to their section", async () => {
+    // Someone bookmarked #/timer when Tempo was six routed pages. That link
+    // has to keep working, or the upgrade breaks the web.
+    app = await boot({ hash: "#/timer" });
+    await wait(140);
+    assert.equal(app.activeSection(), "timer", "a deep link lands on its section");
+    assert.equal(app.activeNav(), "timer");
+    assert.ok(app.$("#page-timer"), "and the section is present");
   });
 
   test("world clocks show country · city, cities have their own sun line", async () => {
@@ -434,10 +578,10 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.document.body.dataset.weather, "none");
   });
 
-  test("the old clock page draws a face and can be pointed at a city", async () => {
+  test("the old clock section draws a face and can be pointed at a city", async () => {
     app = await boot();
     await app.go("clock");
-    assert.equal(app.visiblePages()[0], "clock");
+    assert.equal(app.activeSection(), "clock");
     assert.ok(app.$$("#old-clock .face-tick").length === 60, "sixty ticks");
     assert.equal(app.$$("#old-clock .face-number").length, 12);
     assert.equal(app.$("#old-clock").dataset.numerals, "roman");
@@ -519,12 +663,15 @@ describe("tempo in a browser-like DOM", () => {
     app = await boot();
     await wait(40);
 
-    // Stand in for the browser's permission prompt. The stubbed fetch answers
-    // the zone lookup with the same Open-Meteo-shaped payload.
+    // Stand in for the browser's permission prompt, and capture the options
+    // Tempo asks with — they are the difference between a GPS fix and a
+    // cached IP guess.
+    let lastPositionOptions = {};
     Object.defineProperty(app.window.navigator, "geolocation", {
       configurable: true,
       value: {
-        getCurrentPosition(onSuccess) {
+        getCurrentPosition(onSuccess, _onError, options) {
+          lastPositionOptions = options || {};
           onSuccess({ coords: { latitude: 28.6139, longitude: 77.209, accuracy: 20 } });
         },
       },
@@ -539,7 +686,26 @@ describe("tempo in a browser-like DOM", () => {
     assert.match(app.$("#home-sun-line").textContent, /Sun time/);
     // The confirmed zone beats the gazetteer's guess.
     assert.match(app.$("#local-zone-name").textContent, /Asia\/Kolkata/);
-    assert.match(app.$("#toast-message").textContent, /Found you near Delhi/);
+    // The toast now reports how much to trust the fix, not just the place:
+    // a 20 m GPS reading and a 40 km network guess must not read the same.
+    // The gazetteer resolves the neighbourhood, not just the nearest big city
+    // in Tempo's own 328-row table — that was the "it picks something random"
+    // complaint.
+    assert.match(app.$("#toast-message").textContent, /You are in Connaught Place, Delhi/);
+    assert.match(app.$("#toast-message").textContent, /±20 m — GPS/);
+
+    // …and the location panel says the same thing in full.
+    assert.equal(app.$("#location-card").dataset.precision, "gps");
+    assert.equal(app.$("#location-name").textContent, "Delhi");
+    assert.match(app.$("#location-detail").textContent, /Connaught Place/);
+    assert.match(app.$("#location-accuracy").textContent, /±20 m/);
+    assert.match(app.$("#location-zone").textContent, /Asia\/Kolkata/);
+    assert.equal(app.$("#location-warning").hidden, true, "a good fix needs no warning");
+
+    // The fix is high-accuracy and barely cached: a stale, coarse position is
+    // what the browser hands back otherwise, and that is the actual bug.
+    assert.equal(lastPositionOptions.enableHighAccuracy, true);
+    assert.ok(lastPositionOptions.maximumAge <= 60 * 1000, "a ten-minute cache is how you get yesterday's city");
 
     const board = JSON.parse(app.localStorage.getItem("tempo-world-zones"));
     assert.ok(board.includes(home), "and your own location joins the board");
@@ -582,6 +748,120 @@ describe("tempo in a browser-like DOM", () => {
     await wait(120);
     assert.match(app.$("#toast-message").textContent, /declined/i);
     assert.equal(app.$("#top-timezone").textContent, "Nepal · Kathmandu", "nothing changed");
+  });
+
+  test("the alarm picker offers every sound, and remembers the choice", async () => {
+    app = await boot();
+    await app.go("timer");
+
+    const options = app.$$("#alarm-sounds [data-sound]");
+    // Sixteen synthesised sounds plus "custom music".
+    assert.equal(options.length, 17, `expected the catalogue plus custom, got ${options.length}`);
+    assert.ok(
+      options.some((option) => option.dataset.sound === "custom"),
+      "your own music is one of the choices"
+    );
+    // Grouped by mood, so "something soft" is one glance not sixteen reads.
+    const groups = app.$$("#alarm-sounds .sound-group-label").map((node) => node.textContent);
+    for (const mood of ["Soft & sweet", "Melodious", "Rock & band", "Loud & strong", "Ringtone"]) {
+      assert.ok(groups.includes(mood), `${mood} is a group`);
+    }
+    // Every catalogue entry has a preview button; a sound you cannot hear
+    // before choosing is not really a choice.
+    assert.equal(app.$$("#alarm-sounds [data-preview]").length, 16);
+
+    const rock = app.$('#alarm-sounds [data-sound="rock-band"]');
+    rock.click();
+    await wait(20);
+    assert.equal(app.localStorage.getItem("tempo-alarm-sound"), "rock-band");
+    assert.equal(rock.getAttribute("aria-checked"), "true");
+    assert.match(app.$("#alarm-current").textContent, /Rock band/);
+
+    // How long it rings, and how loud, are choices too — and they persist.
+    app.click('#alarm-durations [data-alarm-duration="0"]');
+    await wait(20);
+    assert.equal(app.localStorage.getItem("tempo-alarm-duration"), "0");
+
+    const volume = app.$("#alarm-volume");
+    volume.value = "35";
+    volume.dispatchEvent(new app.window.Event("input", { bubbles: true }));
+    await wait(20);
+    assert.equal(app.localStorage.getItem("tempo-alarm-volume"), "0.35");
+    assert.equal(app.$("#alarm-volume-label").textContent, "35%");
+  });
+
+  test("a pasted Spotify or YouTube link becomes the alarm", async () => {
+    app = await boot();
+    await app.go("timer");
+
+    app.$("#alarm-custom").value = "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT";
+    app.click("#alarm-custom-apply");
+    await wait(30);
+
+    assert.equal(app.localStorage.getItem("tempo-alarm-sound"), "custom");
+    assert.match(app.localStorage.getItem("tempo-alarm-custom"), /open\.spotify\.com/);
+    assert.match(app.$("#toast-message").textContent, /Spotify track/);
+    assert.match(app.$("#alarm-current").textContent, /Spotify/);
+
+    // Rubbish is refused with a reason rather than silently accepted.
+    app.$("#alarm-custom").value = "definitely not a link";
+    app.click("#alarm-custom-apply");
+    await wait(30);
+    assert.match(app.$("#toast-message").textContent, /does not look like a link|cannot be played/i);
+  });
+
+  test("when the timer ends the alarm keeps going until it is dismissed", async () => {
+    app = await boot();
+    await app.go("timer");
+
+    // Ring until stopped, so the end state is unambiguous.
+    app.click('#alarm-durations [data-alarm-duration="0"]');
+    app.$("#timer-minutes").value = "0";
+    app.$("#timer-seconds").value = "1";
+    app.$("#timer-seconds").dispatchEvent(new app.window.Event("input", { bubbles: true }));
+    assert.equal(app.$("#timer-display").textContent, "00:01");
+
+    app.click("#timer-start");
+    await wait(1400);
+
+    // The old ending was a 0.4s chime and a toast that vanished. Now the page
+    // itself says so, and keeps saying so.
+    assert.equal(app.$("#timer-status").textContent, "TIME'S UP");
+    assert.equal(app.$("#timer-ringing").hidden, false, "the dismiss bar is showing");
+    assert.match(app.$("#toast-message").textContent, /Time's up/);
+
+    app.click("#timer-dismiss");
+    await wait(40);
+    assert.equal(app.$("#timer-ringing").hidden, true, "and it stops when told to");
+    assert.notEqual(app.$("#timer-status").textContent, "TIME'S UP");
+  });
+
+  test("the weather and forecast sections share one place", async () => {
+    app = await boot();
+    await wait(80);
+
+    // The weather card moved into its own section, with the location panel.
+    assert.ok(app.$("#page-weather").contains(app.$("#weather-card")));
+    assert.ok(app.$("#page-weather").contains(app.$("#location-card")));
+
+    // The forecast is below the fold, so it must not fire on load.
+    const before = app.fetchCalls.filter((url) => url.includes("hourly=")).length;
+    assert.equal(before, 0, "the forecast waits until it is reached");
+
+    await app.go("forecast");
+    await wait(140);
+
+    const forecastCalls = app.fetchCalls.filter((url) => url.includes("hourly="));
+    assert.equal(forecastCalls.length, 1, "and then asks exactly once");
+    const requested = new URL(forecastCalls[0]);
+    assert.match(requested.searchParams.get("daily"), /temperature_2m_max/);
+    // Same coordinates as the weather card: the two can never disagree.
+    const current = app.fetchCalls.find((url) => url.includes("current=") && !url.includes("hourly="));
+    assert.equal(requested.searchParams.get("latitude"), new URL(current).searchParams.get("latitude"));
+
+    assert.ok(app.$$("#forecast-hours .hour-cell").length > 0, "hours are drawn");
+    assert.ok(app.$$("#forecast-days .day-row").length > 0, "days are drawn");
+    assert.match(app.$("#forecast-summary").textContent, /\w/);
   });
 
   test("booting produces no console errors", async () => {
