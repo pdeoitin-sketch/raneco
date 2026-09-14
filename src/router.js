@@ -67,8 +67,11 @@ export function activeFromPositions(entries, { scrollTop = 0, viewportHeight = 8
  *   @param {Array<{id: string, page: Element|null, title?: string}>} sections
  *   @param {(section: object, info: {changed: boolean, reason: string}) => void} [onChange]
  *   @param {string} [fallback]
+ *   @param {Record<string, string>} [aliases] old route ids that still
+ *        resolve — e.g. `{ focus: "stopwatch" }` keeps a bookmarked `#/focus`
+ *        landing on the section that used to be called Focus.
  */
-export function createScrollNav({ sections = [], onChange, fallback = DEFAULT_ROUTE, offset = 120 } = {}) {
+export function createScrollNav({ sections = [], onChange, fallback = DEFAULT_ROUTE, offset = 120, aliases = {} } = {}) {
   const known = sections.map((section) => section.id);
   const byId = new Map(sections.map((section) => [section.id, section]));
   const links = [];
@@ -77,6 +80,15 @@ export function createScrollNav({ sections = [], onChange, fallback = DEFAULT_RO
   let settling = 0;
   let hashTimer = 0;
   const seen = new Set();
+
+  /** A hash, honouring the alias table for ids that were renamed. */
+  function routeFromHashAliased(hash) {
+    const id = routeFromHash(hash, known);
+    if (id) return id;
+    const raw = String(hash || "").replace(/^#\/?/, "").trim().split(/[?#]/)[0];
+    const aliased = aliases[raw];
+    return aliased && known.includes(aliased) ? aliased : null;
+  }
 
   function syncLinks(id) {
     for (const link of links) {
@@ -187,7 +199,7 @@ export function createScrollNav({ sections = [], onChange, fallback = DEFAULT_RO
   }
 
   function onHashChange() {
-    const id = routeFromHash(window.location.hash, known);
+    const id = routeFromHashAliased(window.location.hash);
     if (!id) return;
     if (id === currentId) return;
     scrollToSection(id);
@@ -243,7 +255,7 @@ export function createScrollNav({ sections = [], onChange, fallback = DEFAULT_RO
       }
       // Even with an observer, one positional read settles the initial state
       // in environments where the observer never fires (jsdom, print).
-      const landing = routeFromHash(window.location.hash, known);
+      const landing = routeFromHashAliased(window.location.hash);
       markActive(landing || fallback, "hash");
       if (landing) {
         // Let the layout settle before jumping to a deep-linked section.
