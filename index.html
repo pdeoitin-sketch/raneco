@@ -5,15 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="A calm, capable dashboard for your local time, world clocks, live weather, timers, stopwatch, and time calculations — with pages for each."
+      content="A calm, capable dashboard for your local time, alarms that ring at a wall-clock time, world clocks, live weather and forecast, a timer, a stopwatch, and time arithmetic — one page, in your browser."
     />
     <title>Tempo — Time, made useful</title>
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#f7f7fb" />
     <script>
       // Runs before the first paint so a remembered Auto palette (or a manual
-      // dark choice) and the chosen text size never flash the wrong way.
-      // app.js re-reads the same keys and keeps them in sync.
+      // dark choice) never flashes the wrong way. app.js re-reads the same
+      // keys and keeps them in sync. (Text size used to live here too; the
+      // sizes are now a fixed ramp in styles.css, so there is nothing to
+      // restore — see the "Small text, fixed" note in the README.)
       (function () {
         try {
           var last = localStorage.getItem("tempo-theme-last");
@@ -27,10 +29,6 @@
           ) {
             document.documentElement.setAttribute("data-appearance", "dark");
             document.documentElement.style.background = "#191923";
-          }
-          var scale = Number(localStorage.getItem("tempo-text-scale"));
-          if (scale >= 1 && scale <= 1.6) {
-            document.documentElement.style.setProperty("--type-scale", String(scale));
           }
         } catch (error) {
           /* private mode: the default light palette is fine */
@@ -73,6 +71,30 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M12 7.4v5.1l3.4 2"></path></svg>
             <span>Right now</span>
           </a>
+          <a class="nav-link" href="#/alarms" data-route="alarms" data-nav="alarms">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5a5.5 5.5 0 1 1-5.5 5.5A5.5 5.5 0 0 1 12 6.5Z"></path><path d="M12 9v3l2 1.4M5 3.8 3.2 5.4M19 3.8l1.8 1.6M5 3.8h14"></path></svg>
+            <span>Alarms</span>
+          </a>
+          <a class="nav-link" href="#/timer" data-route="timer" data-nav="timer">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3.75h8M12 3.75v3.1M18.15 8.55l1.8-1.8M12 7.1a7.15 7.15 0 1 1-7.15 7.15A7.15 7.15 0 0 1 12 7.1Z"></path><path d="M12 10.35v4.2l2.75 1.7"></path></svg>
+            <span>Timer</span>
+          </a>
+          <a class="nav-link" href="#/stopwatch" data-route="stopwatch" data-nav="stopwatch">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><circle cx="12" cy="12" r="3.4"></circle><path d="M12 3.75V6M12 18v2.25M3.75 12H6M18 12h2.25"></path></svg>
+            <span>Stopwatch</span>
+          </a>
+          <a class="nav-link" href="#/clocks" data-route="clocks" data-nav="clocks">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M3.9 9h16.2M3.9 15h16.2M12 3.75c2.15 2.25 3.22 4.99 3.22 8.25S14.15 18 12 20.25C9.85 18 8.78 15.26 8.78 12S9.85 5.99 12 3.75Z"></path></svg>
+            <span>World clocks</span>
+          </a>
+          <a class="nav-link" href="#/clock" data-route="clock" data-nav="clock">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.5" r="7.75"></circle><path d="M12 8.25v4.5l3 1.85M9.4 3.6h5.2M12 3.6V5.5M6.6 20.4h10.8"></path></svg>
+            <span>Old clock</span>
+          </a>
+          <a class="nav-link" href="#/calculator" data-route="calculator" data-nav="calculator">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2.25"></rect><path d="M8 7.5h8M8.25 11.5h.01M12 11.5h.01M15.75 11.5h.01M8.25 15.25h.01M12 15.25h.01M15.75 15.25h.01M8.25 18h.01M12 18h3.75"></path></svg>
+            <span>Time calculator</span>
+          </a>
           <a class="nav-link" href="#/weather" data-route="weather" data-nav="weather">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.4 18.5h9.3a3.9 3.9 0 0 0 .5-7.77 5.6 5.6 0 0 0-10.8-1.1A3.94 3.94 0 0 0 7.4 18.5Z"></path></svg>
             <span>Weather</span>
@@ -81,44 +103,13 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18.5h5M4 14h9M4 9.5h7"></path><path d="M14.5 5.5a4 4 0 0 1 3.9 3.1 3 3 0 0 1-.4 5.9"></path></svg>
             <span>Forecast</span>
           </a>
-          <a class="nav-link" href="#/clocks" data-route="clocks" data-nav="clocks">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M3.9 9h16.2M3.9 15h16.2M12 3.75c2.15 2.25 3.22 4.99 3.22 8.25S14.15 18 12 20.25C9.85 18 8.78 15.26 8.78 12S9.85 5.99 12 3.75Z"></path></svg>
-            <span>World clocks</span>
-          </a>
-          <a class="nav-link" href="#/timer" data-route="timer" data-nav="timer">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3.75h8M12 3.75v3.1M18.15 8.55l1.8-1.8M12 7.1a7.15 7.15 0 1 1-7.15 7.15A7.15 7.15 0 0 1 12 7.1Z"></path><path d="M12 10.35v4.2l2.75 1.7"></path></svg>
-            <span>Timer &amp; alarm</span>
-          </a>
-          <a class="nav-link" href="#/clock" data-route="clock" data-nav="clock">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.5" r="7.75"></circle><path d="M12 8.25v4.5l3 1.85M9.4 3.6h5.2M12 3.6V5.5M6.6 20.4h10.8"></path></svg>
-            <span>Old clock</span>
-          </a>
-          <a class="nav-link" href="#/focus" data-route="focus" data-nav="focus">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><circle cx="12" cy="12" r="3.4"></circle><path d="M12 3.75V6M12 18v2.25M3.75 12H6M18 12h2.25"></path></svg>
-            <span>Focus</span>
-          </a>
-          <a class="nav-link" href="#/calculator" data-route="calculator" data-nav="calculator">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2.25"></rect><path d="M8 7.5h8M8.25 11.5h.01M12 11.5h.01M15.75 11.5h.01M8.25 15.25h.01M12 15.25h.01M15.75 15.25h.01M8.25 18h.01M12 18h3.75"></path></svg>
-            <span>Time calculator</span>
+          <a class="nav-link" href="#/about" data-route="about" data-nav="about">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M12 10.6v5.4M12 7.8h.01"></path></svg>
+            <span>About</span>
           </a>
         </nav>
 
         <div class="sidebar-bottom">
-          <div class="text-size-block">
-            <p class="eyebrow">TEXT SIZE</p>
-            <div class="text-size-switch" id="text-size-switch" role="radiogroup" aria-label="Text size">
-              <button type="button" role="radio" aria-checked="false" data-text-size="1" title="Normal text" aria-label="Normal text">
-                <span aria-hidden="true">A</span>
-              </button>
-              <button type="button" role="radio" aria-checked="true" data-text-size="1.15" title="Large text (default)" aria-label="Large text">
-                <span aria-hidden="true">A</span>
-              </button>
-              <button type="button" role="radio" aria-checked="false" data-text-size="1.32" title="Extra large text" aria-label="Extra large text">
-                <span aria-hidden="true">A</span>
-              </button>
-            </div>
-          </div>
-
           <div class="theme-block">
             <p class="eyebrow">LOOK</p>
             <div class="theme-switch" id="theme-switch" role="radiogroup" aria-label="Colour theme">
@@ -161,7 +152,7 @@
           </div>
         </header>
 
-        <!-- ========================================================= SECTION: RIGHT NOW -->
+        <!-- ============================================================= SECTION: RIGHT NOW -->
         <section class="page" id="page-now" data-page="now" aria-labelledby="now-title">
           <div class="hero-section">
             <div class="now-card">
@@ -181,8 +172,25 @@
                   <h2 id="now-title" class="digital-time"><span id="local-hours">--</span><b>:</b><span id="local-minutes">--</span><small id="local-seconds">--</small></h2>
                   <p class="local-date" id="local-date">Loading today...</p>
                   <p class="zone-name" id="local-zone-name">Finding your time zone</p>
+                  <p class="section-phrase" id="now-phrase"></p>
                 </div>
                 <div class="analog-clock" id="home-analog" aria-label="Current analog time"></div>
+
+                <!--
+                  The glance: the same snapshot the Weather section renders,
+                  at first-look size. It is a *view*, not a second fetch — the
+                  two can never disagree, and the page still makes one request.
+                -->
+                <aside class="now-weather" id="now-weather" data-state="idle" aria-labelledby="now-weather-title">
+                  <p class="eyebrow" id="now-weather-title">THE SKY HERE</p>
+                  <div class="now-weather-main">
+                    <span class="now-weather-symbol" id="now-weather-symbol" aria-hidden="true">☂</span>
+                    <span class="now-weather-temp"><span id="now-weather-temp">--</span><small id="now-weather-unit">°</small></span>
+                  </div>
+                  <p class="now-weather-condition" id="now-weather-condition">Weather not loaded</p>
+                  <p class="now-weather-meta" id="now-weather-meta"></p>
+                  <a class="text-button now-weather-link" href="#/weather">Full weather below <span>↓</span></a>
+                </aside>
               </div>
 
               <div class="now-card-bottom">
@@ -224,171 +232,110 @@
             </article>
           </div>
         </section>
-
-        <!-- =========================================================== SECTION: WEATHER -->
-        <section class="page" id="page-weather" data-page="weather" aria-labelledby="weather-section-title">
+        <!-- ============================================================= SECTION: ALARMS -->
+        <section class="page" id="page-alarms" data-page="alarms" aria-labelledby="alarms-title">
           <div class="page-intro">
             <div>
-              <p class="eyebrow">RIGHT NOW, OUTSIDE</p>
-              <h2 id="weather-section-title">Weather</h2>
+              <p class="eyebrow">RING AT A WALL-CLOCK TIME</p>
+              <h2 id="alarms-title">Alarms</h2>
+              <p class="section-phrase" id="alarms-phrase"></p>
               <p class="section-intro">
-                Measured at a point, not a country — live from Open-Meteo, refreshed while you watch.
-                <span class="section-count" id="weather-live-note"></span>
+                The timer counts <em>down</em>; these ring <em>at a time</em>. A date if it is once, weekdays if it
+                repeats, a label and notes for the half-asleep version of you — and any of the sixteen sounds.
+                They run on your clock, walk calendar days (a Friday alarm jumps the weekend), survive DST, and
+                still ring if a throttled tab wakes up to ninety seconds late.
               </p>
             </div>
-            <div class="page-actions">
-              <button class="outline-button" id="weather-use-location-top" type="button">
-                <span class="button-plus" aria-hidden="true">⌖</span> Use my location
-              </button>
-              <button class="outline-button" id="weather-set-location-top" type="button">
-                <span class="button-plus" aria-hidden="true">◎</span> Choose a place
-              </button>
-            </div>
+            <span class="tool-status neutral" id="alarms-status">NO ALARMS YET</span>
           </div>
 
-          <div class="weather-layout">
-            <article class="quick-card weather-card" id="weather-card" data-state="idle" aria-labelledby="weather-title">
-              <span class="card-stars" aria-hidden="true"></span>
-              <div class="card-topline">
-                <span class="small-icon icon-sky" id="weather-symbol" aria-hidden="true">☂</span>
-                <span id="weather-title">RIGHT NOW, OUTSIDE</span>
-                <span class="weather-actions">
-                  <button class="weather-mini" type="button" id="weather-units" title="Switch temperature units">°F</button>
-                  <button class="weather-mini" type="button" id="weather-retry" title="Check the weather again" aria-label="Check the weather again">↻</button>
-                </span>
+          <div class="ringing-bar" id="alarms-ringing" hidden role="alert">
+            <span class="ringing-pulse" aria-hidden="true"></span>
+            <div class="ringing-copy">
+              <strong id="alarms-ringing-label">It's time</strong>
+              <span id="alarms-ringing-note">Your alarm is ringing.</span>
+            </div>
+            <button class="primary-button" type="button" id="alarms-dismiss">Stop the alarm</button>
+          </div>
+
+          <div class="tool-page">
+            <article class="tool-card alarm-editor-card" aria-labelledby="alarms-editor-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label" id="alarms-editor-eyebrow">NEW</p>
+                  <h3 id="alarms-editor-title">New alarm</h3>
+                </div>
               </div>
 
-              <div class="weather-body">
-                <div class="weather-main">
-                  <p class="weather-temp"><span id="weather-temp">--</span><small id="weather-unit">°</small></p>
-                  <div class="weather-summary">
-                    <p class="weather-place" id="weather-place">Your part of the world</p>
-                    <p class="weather-condition" id="weather-condition" aria-live="polite">Weather not loaded</p>
-                    <p class="weather-coords" id="weather-coords"></p>
+              <div class="alarm-form">
+                <div class="alarm-form-row">
+                  <label class="alarm-field alarm-field-time"><span>TIME</span>
+                    <input id="alarms-time" type="time" value="07:00" required aria-label="Alarm time" />
+                  </label>
+                  <label class="alarm-field alarm-field-date"><span>ONE DAY ONLY (OPTIONAL)</span>
+                    <input id="alarms-date" type="date" aria-label="Alarm date, for a one-time alarm" />
+                  </label>
+                </div>
+
+                <div class="alarm-field">
+                  <p class="eyebrow">REPEAT (OPTIONAL)</p>
+                  <div class="repeat-row" id="alarms-repeat" role="group" aria-label="Repeat on weekdays">
+                    <button type="button" class="repeat-chip" data-repeat-day="0" aria-pressed="false">Sun</button>
+                    <button type="button" class="repeat-chip" data-repeat-day="1" aria-pressed="false">Mon</button>
+                    <button type="button" class="repeat-chip" data-repeat-day="2" aria-pressed="false">Tue</button>
+                    <button type="button" class="repeat-chip" data-repeat-day="3" aria-pressed="false">Wed</button>
+                    <button type="button" class="repeat-chip" data-repeat-day="4" aria-pressed="false">Thu</button>
+                    <button type="button" class="repeat-chip" data-repeat-day="5" aria-pressed="false">Fri</button>
+                    <button type="button" class="repeat-chip" data-repeat-day="6" aria-pressed="false">Sat</button>
                   </div>
                 </div>
 
-                <div class="weather-sun-row">
-                  <div class="sun-arc" aria-hidden="true"><span id="sun-arc-dot"></span></div>
-                  <dl class="weather-sun">
-                    <div><dt>Sunrise</dt><dd id="weather-sunrise">--:--</dd></div>
-                    <div><dt>Sunset</dt><dd id="weather-sunset">--:--</dd></div>
-                  </dl>
-                </div>
+                <label class="alarm-field"><span>LABEL</span>
+                  <input id="alarms-label" type="text" maxlength="80" placeholder="Wake up" aria-label="Alarm label" />
+                </label>
 
-                <div class="weather-extra">
-                  <p class="weather-details" id="weather-details"></p>
-                  <p class="weather-foot"><span id="weather-daylight"></span><span id="weather-updated">one moment…</span></p>
-                  <p class="weather-source" id="weather-source">Live weather from Open-Meteo — no account, no key.</p>
-                </div>
+                <label class="alarm-field"><span>NOTES FOR THIS ALARM</span>
+                  <textarea id="alarms-notes" rows="2" maxlength="500" placeholder="Kettle first, then the news." aria-label="Notes attached to this alarm"></textarea>
+                </label>
 
-                <div class="weather-location-row">
-                  <button class="text-button weather-location" type="button" id="weather-use-location">Use my location</button>
-                  <button class="text-button weather-location" type="button" id="weather-set-location">Choose a place…</button>
+                <label class="alarm-field"><span>SOUND</span>
+                  <select id="alarms-sound" aria-label="Alarm sound"></select>
+                </label>
+
+                <div class="alarm-form-actions">
+                  <button class="primary-button" type="button" id="alarms-save">Add alarm</button>
+                  <button class="secondary-button" type="button" id="alarms-cancel" hidden>Cancel</button>
                 </div>
+                <p class="note-copy small muted">
+                  Times are read on the clock of your home place, and the alarm rings while a Tempo tab is open —
+                  a web page cannot wake a sleeping phone.
+                </p>
               </div>
             </article>
 
-            <article class="note-card location-card" id="location-card" data-precision="unknown" aria-labelledby="location-card-title">
-              <div class="card-topline">
-                <span class="small-icon icon-mint" aria-hidden="true">⌖</span>
-                <span id="location-card-title">WHERE WE THINK YOU ARE</span>
+            <article class="tool-card alarm-list-card" aria-labelledby="alarms-list-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">SET</p>
+                  <h3 id="alarms-list-title">Your alarms</h3>
+                </div>
               </div>
-              <p class="location-name" id="location-name">Not located yet</p>
-              <p class="location-detail" id="location-detail">
-                Tempo never reads your location until you ask it to.
-              </p>
-              <dl class="location-facts">
-                <div><dt>Accuracy</dt><dd id="location-accuracy">—</dd></div>
-                <div><dt>Coordinates</dt><dd id="location-coords">—</dd></div>
-                <div><dt>Time zone</dt><dd id="location-zone">—</dd></div>
-              </dl>
-              <p class="location-warning" id="location-warning" hidden></p>
-              <button class="pill-button wide" type="button" id="location-locate">
-                <span class="pill-icon" aria-hidden="true">⌖</span> Locate me precisely
-              </button>
-              <p class="location-foot">
-                Uses your device's GPS, then names the spot with a real gazetteer — not the nearest big city.
-              </p>
+              <p class="empty-state" id="alarms-empty">No alarms yet — the one you set above will live here.</p>
+              <ol class="alarm-list" id="alarms-list" aria-live="polite"></ol>
             </article>
           </div>
         </section>
-
-        <!-- ========================================================== SECTION: FORECAST -->
-        <section class="page" id="page-forecast" data-page="forecast" data-state="idle" aria-labelledby="forecast-title">
-          <div class="page-intro">
-            <div>
-              <p class="eyebrow">THE WEEK AHEAD</p>
-              <h2 id="forecast-title">Forecast</h2>
-              <p class="section-intro" id="forecast-summary">Loading the week…</p>
-            </div>
-            <div class="page-actions">
-              <span class="forecast-place" id="forecast-place"></span>
-              <button class="icon-button" id="forecast-refresh" type="button" aria-label="Reload the forecast" title="Reload the forecast">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.4 8.5V4.75M4.4 4.75h3.75M4.7 12a7.3 7.3 0 1 0 2.14-5.17L4.4 8.5"></path></svg>
-              </button>
-            </div>
-          </div>
-
-          <article class="tool-card forecast-card">
-            <div class="calculator-card-heading">
-              <div>
-                <p class="card-label">NEXT 24 HOURS</p>
-                <h3>Hour by hour</h3>
-              </div>
-              <span class="forecast-zone" id="forecast-zone"></span>
-            </div>
-            <ol class="hour-strip" id="forecast-hours" aria-label="Hourly forecast"></ol>
-          </article>
-
-          <article class="tool-card forecast-card">
-            <div class="calculator-card-heading">
-              <div>
-                <p class="card-label">NEXT 7 DAYS</p>
-                <h3>Day by day</h3>
-              </div>
-            </div>
-            <ol class="day-list" id="forecast-days" aria-label="Daily forecast"></ol>
-          </article>
-        </section>
-
-        <!-- ====================================================== SECTION: WORLD CLOCKS -->
-        <section class="page" id="page-clocks" data-page="clocks" aria-labelledby="world-title">
-          <div class="page-intro">
-            <div>
-              <p class="eyebrow">STAY IN SYNC</p>
-              <h2 id="world-title">Around the world</h2>
-              <p class="section-intro">
-                Every clock shows its real country and city, spelled the way the place spells itself today —
-                with its own coordinates, so the sun line underneath is honest.
-                <span class="section-count" id="world-count"></span>
-              </p>
-            </div>
-            <div class="page-actions">
-              <button class="outline-button" id="use-location-clock" type="button">
-                <span class="button-plus" aria-hidden="true">⌖</span> Add my location
-              </button>
-              <button class="outline-button" id="add-city-button" type="button">
-                <span class="button-plus" aria-hidden="true">+</span> Add a city
-              </button>
-            </div>
-          </div>
-
-          <div class="chip-row" id="popular-cities" aria-label="Add a popular city"></div>
-
-          <div class="world-grid" id="world-grid" aria-live="polite"></div>
-          <p class="empty-state" id="world-empty" hidden>No clocks yet — add a city, or drop in your own location.</p>
-        </section>
-
-        <!-- =========================================================== SECTION: TIMER -->
+        <!-- ============================================================= SECTION: TIMER -->
         <section class="page" id="page-timer" data-page="timer" aria-labelledby="timer-title">
           <div class="page-intro">
             <div>
               <p class="eyebrow">COUNTDOWN</p>
-              <h2 id="timer-title">Timer &amp; alarm</h2>
+              <h2 id="timer-title">Timer</h2>
+              <p class="section-phrase" id="timer-phrase"></p>
               <p class="section-intro">
                 Set a length, start it, and get on with the thing you were avoiding. When it ends the alarm
-                <em>keeps going</em> until you stop it — sixteen sounds, your own music, or a link.
+                <em>keeps going</em> until you stop it — sixteen sounds, your own music, or a link. Need it to
+                ring <em>at a time</em> instead? That is the Alarms section just above.
               </p>
             </div>
             <span class="tool-status" id="timer-status">READY</span>
@@ -505,67 +452,13 @@
             </article>
           </div>
         </section>
-
-        <!-- ========================================================= SECTION: OLD CLOCK -->
-        <section class="page" id="page-clock" data-page="clock" aria-labelledby="old-clock-title">
-          <div class="page-intro">
-            <div>
-              <p class="eyebrow">A SLOWER KIND OF CLOCK</p>
-              <h2 id="old-clock-title">Old clock</h2>
-              <p class="section-intro">A full-face clock with hands, for when watching time pass is the point.</p>
-            </div>
-            <div class="page-actions">
-              <button class="outline-button" id="old-clock-place" type="button">
-                <span class="button-plus" aria-hidden="true">⌖</span> <span id="old-clock-place-label">Choose a place</span>
-              </button>
-              <button class="outline-button" id="old-clock-fullscreen" type="button">
-                <span class="button-plus" aria-hidden="true">⤢</span> Full screen
-              </button>
-            </div>
-          </div>
-
-          <div class="old-clock-wrap" id="old-clock-wrap">
-            <div class="old-clock" id="old-clock" data-numerals="roman" data-seconds="true"></div>
-            <div class="old-clock-side">
-              <p class="eyebrow" id="old-clock-eyebrow">SHOWING</p>
-              <h3 id="old-clock-place-name">Your place</h3>
-              <p class="old-clock-digital" id="old-clock-digital">--:--:--</p>
-              <p class="old-clock-meta" id="old-clock-meta"></p>
-              <p class="old-clock-meta" id="old-clock-sun"></p>
-
-              <div class="old-clock-controls">
-                <div class="control-group" role="group" aria-label="Clock face numerals">
-                  <p class="eyebrow">NUMERALS</p>
-                  <div class="segmented" id="old-clock-numerals">
-                    <button type="button" class="seg-button active" data-numerals="roman" aria-pressed="true">XII</button>
-                    <button type="button" class="seg-button" data-numerals="arabic" aria-pressed="false">12</button>
-                    <button type="button" class="seg-button" data-numerals="none" aria-pressed="false">—</button>
-                  </div>
-                </div>
-                <div class="control-group" role="group" aria-label="Second hand movement">
-                  <p class="eyebrow">SECOND HAND</p>
-                  <div class="segmented" id="old-clock-motion">
-                    <button type="button" class="seg-button" data-motion="tick" aria-pressed="false">Tick</button>
-                    <button type="button" class="seg-button active" data-motion="sweep" aria-pressed="true">Sweep</button>
-                  </div>
-                </div>
-                <div class="control-group">
-                  <p class="eyebrow">CHIME</p>
-                  <button type="button" class="pill-button wide" id="old-clock-chime" aria-pressed="false">
-                    <span class="pill-icon" aria-hidden="true">🔔</span> Chime on the hour
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============================================================= SECTION: FOCUS -->
-        <section class="page" id="page-focus" data-page="focus" aria-labelledby="stopwatch-title">
+        <!-- ============================================================= SECTION: STOPWATCH -->
+        <section class="page" id="page-stopwatch" data-page="stopwatch" aria-labelledby="stopwatch-title">
           <div class="page-intro">
             <div>
               <p class="eyebrow">TRACK ELAPSED TIME</p>
-              <h2 id="stopwatch-title">Focus</h2>
+              <h2 id="stopwatch-title">Stopwatch</h2>
+              <p class="section-phrase" id="stopwatch-phrase"></p>
               <p class="section-intro">Start it when you begin. Lap it when you finish a piece. Nothing else competes for your attention here.</p>
             </div>
             <span class="tool-status neutral" id="stopwatch-status">STOPPED</span>
@@ -608,13 +501,108 @@
             </article>
           </div>
         </section>
+        <!-- ============================================================= SECTION: WORLD CLOCKS -->
+        <section class="page" id="page-clocks" data-page="clocks" aria-labelledby="world-title">
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">STAY IN SYNC</p>
+              <h2 id="world-title">Around the world</h2>
+              <p class="section-phrase" id="clocks-phrase"></p>
+              <p class="section-intro">
+                Every clock shows its real country and city, spelled the way the place spells itself today —
+                with its own coordinates, so the sun line underneath is honest.
+                <span class="section-count" id="world-count"></span>
+              </p>
+            </div>
+            <div class="page-actions">
+              <button class="outline-button" id="use-location-clock" type="button">
+                <span class="button-plus" aria-hidden="true">⌖</span> Add my location
+              </button>
+              <button class="outline-button" id="add-city-button" type="button">
+                <span class="button-plus" aria-hidden="true">+</span> Add a city
+              </button>
+            </div>
+          </div>
 
-        <!-- ======================================================== SECTION: CALCULATOR -->
+          <div class="chip-row" id="popular-cities" aria-label="Add a popular city"></div>
+
+          <div class="world-grid" id="world-grid" aria-live="polite"></div>
+          <p class="empty-state" id="world-empty" hidden>No clocks yet — add a city, or drop in your own location.</p>
+        </section>
+        <!-- ============================================================= SECTION: OLD CLOCK -->
+        <section class="page" id="page-clock" data-page="clock" aria-labelledby="old-clock-title">
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">A SLOWER KIND OF CLOCK</p>
+              <h2 id="old-clock-title">Old clock</h2>
+              <p class="section-phrase" id="clock-phrase"></p>
+              <p class="section-intro">
+                A full-face clock with hands, for when watching time pass is the point. Eight faces to wear, and
+                behind the dial the live sky — thunder, drifting clouds, snow, stars and the moon in its real
+                phase — chosen from the weather, never from a menu.
+              </p>
+            </div>
+            <div class="page-actions">
+              <button class="outline-button" id="old-clock-place" type="button">
+                <span class="button-plus" aria-hidden="true">⌖</span> <span id="old-clock-place-label">Choose a place</span>
+              </button>
+              <button class="outline-button" id="old-clock-fullscreen" type="button">
+                <span class="button-plus" aria-hidden="true">⤢</span> Full screen
+              </button>
+            </div>
+          </div>
+
+          <div class="old-clock-wrap" id="old-clock-wrap">
+            <div class="old-clock-stage" id="old-clock-stage" data-scene="none">
+              <div class="scene" aria-hidden="true"></div>
+              <div class="old-clock" id="old-clock" data-seconds="true"></div>
+            </div>
+            <div class="old-clock-side">
+              <p class="eyebrow" id="old-clock-eyebrow">SHOWING</p>
+              <h3 id="old-clock-place-name">Your place</h3>
+              <p class="old-clock-digital" id="old-clock-digital">--:--:--</p>
+              <p class="old-clock-meta" id="old-clock-meta"></p>
+              <p class="old-clock-meta" id="old-clock-sun"></p>
+              <p class="old-clock-meta scene-note" id="old-clock-scene-note" hidden></p>
+
+              <div class="old-clock-controls">
+                <div class="control-group" role="group" aria-label="Clock face">
+                  <p class="eyebrow">FACE</p>
+                  <div class="segmented wrap" id="old-clock-faces">
+                    <button type="button" class="seg-button active" data-clock-face="roman" aria-pressed="true">Roman</button>
+                    <button type="button" class="seg-button" data-clock-face="modern" aria-pressed="false">Modern</button>
+                    <button type="button" class="seg-button" data-clock-face="minimal" aria-pressed="false">Minimal</button>
+                    <button type="button" class="seg-button" data-clock-face="railway" aria-pressed="false">Railway</button>
+                    <button type="button" class="seg-button" data-clock-face="pocket" aria-pressed="false">Pocket</button>
+                    <button type="button" class="seg-button" data-clock-face="neon" aria-pressed="false">Neon</button>
+                    <button type="button" class="seg-button" data-clock-face="brutalist" aria-pressed="false">Brutalist</button>
+                    <button type="button" class="seg-button" data-clock-face="botanical" aria-pressed="false">Botanical</button>
+                  </div>
+                </div>
+                <div class="control-group" role="group" aria-label="Second hand movement">
+                  <p class="eyebrow">SECOND HAND</p>
+                  <div class="segmented" id="old-clock-motion">
+                    <button type="button" class="seg-button" data-motion="tick" aria-pressed="false">Tick</button>
+                    <button type="button" class="seg-button active" data-motion="sweep" aria-pressed="true">Sweep</button>
+                  </div>
+                </div>
+                <div class="control-group">
+                  <p class="eyebrow">CHIME</p>
+                  <button type="button" class="pill-button wide" id="old-clock-chime" aria-pressed="false">
+                    <span class="pill-icon" aria-hidden="true">🔔</span> Chime on the hour
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <!-- ============================================================= SECTION: CALCULATOR -->
         <section class="page" id="page-calculator" data-page="calculator" aria-labelledby="calculator-title">
           <div class="page-intro">
             <div>
               <p class="eyebrow">NO MENTAL MATH REQUIRED</p>
               <h2 id="calculator-title">Time calculator</h2>
+              <p class="section-phrase" id="calculator-phrase"></p>
               <p class="section-intro">Get the distance between two moments, or turn any unit into another.</p>
             </div>
             <div class="calculator-zone-note"><span class="status-dot"></span><span id="calculator-zone">Using your local time zone</span></div>
@@ -669,6 +657,217 @@
             <div class="saved-list" id="saved-list"><p class="empty-saved">Your useful answers can live here for later.</p></div>
           </div>
         </section>
+        <!-- ============================================================= SECTION: WEATHER -->
+        <section class="page" id="page-weather" data-page="weather" aria-labelledby="weather-section-title">
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">RIGHT NOW, OUTSIDE</p>
+              <h2 id="weather-section-title">Weather</h2>
+              <p class="section-phrase" id="weather-phrase"></p>
+              <p class="section-intro">
+                Measured at a point, not a country — live from Open-Meteo, refreshed while you watch.
+                <span class="section-count" id="weather-live-note"></span>
+              </p>
+            </div>
+            <div class="page-actions">
+              <button class="outline-button" id="weather-use-location-top" type="button">
+                <span class="button-plus" aria-hidden="true">⌖</span> Use my location
+              </button>
+              <button class="outline-button" id="weather-set-location-top" type="button">
+                <span class="button-plus" aria-hidden="true">◎</span> Choose a place
+              </button>
+            </div>
+          </div>
+
+          <div class="weather-layout">
+            <article class="quick-card weather-card" id="weather-card" data-state="idle" aria-labelledby="weather-title">
+              <span class="card-stars" aria-hidden="true"></span>
+              <div class="card-topline">
+                <span class="small-icon icon-sky" id="weather-symbol" aria-hidden="true">☂</span>
+                <span id="weather-title">RIGHT NOW, OUTSIDE</span>
+                <span class="weather-actions">
+                  <button class="weather-mini" type="button" id="weather-units" title="Switch temperature units">°F</button>
+                  <button class="weather-mini" type="button" id="weather-retry" title="Check the weather again" aria-label="Check the weather again">↻</button>
+                </span>
+              </div>
+
+              <div class="weather-body">
+                <div class="weather-main">
+                  <p class="weather-temp"><span id="weather-temp">--</span><small id="weather-unit">°</small></p>
+                  <div class="weather-summary">
+                    <p class="weather-place" id="weather-place">Your part of the world</p>
+                    <p class="weather-condition" id="weather-condition" aria-live="polite">Weather not loaded</p>
+                    <p class="weather-coords" id="weather-coords"></p>
+                  </div>
+                </div>
+
+                <div class="weather-sun-row">
+                  <div class="sun-arc" aria-hidden="true"><span id="sun-arc-dot"></span></div>
+                  <dl class="weather-sun">
+                    <div><dt>Sunrise</dt><dd id="weather-sunrise">--:--</dd></div>
+                    <div><dt>Sunset</dt><dd id="weather-sunset">--:--</dd></div>
+                  </dl>
+                </div>
+
+                <div class="weather-extra">
+                  <p class="weather-details" id="weather-details"></p>
+                  <p class="weather-foot"><span id="weather-daylight"></span><span id="weather-updated">one moment…</span></p>
+                  <p class="weather-source" id="weather-source">Live weather from Open-Meteo — no account, no key.</p>
+                </div>
+
+                <div class="weather-location-row">
+                  <button class="text-button weather-location" type="button" id="weather-use-location">Use my location</button>
+                  <button class="text-button weather-location" type="button" id="weather-set-location">Choose a place…</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="note-card location-card" id="location-card" data-precision="unknown" aria-labelledby="location-card-title">
+              <div class="card-topline">
+                <span class="small-icon icon-mint" aria-hidden="true">⌖</span>
+                <span id="location-card-title">WHERE WE THINK YOU ARE</span>
+              </div>
+              <p class="location-name" id="location-name">Not located yet</p>
+              <p class="location-detail" id="location-detail">
+                Tempo never reads your location until you ask it to.
+              </p>
+              <dl class="location-facts">
+                <div><dt>Accuracy</dt><dd id="location-accuracy">—</dd></div>
+                <div><dt>Coordinates</dt><dd id="location-coords">—</dd></div>
+                <div><dt>Time zone</dt><dd id="location-zone">—</dd></div>
+              </dl>
+              <p class="location-warning" id="location-warning" hidden></p>
+              <button class="pill-button wide" type="button" id="location-locate">
+                <span class="pill-icon" aria-hidden="true">⌖</span> Locate me precisely
+              </button>
+              <p class="location-foot">
+                Uses your device's GPS, then names the spot with a real gazetteer — not the nearest big city.
+              </p>
+            </article>
+          </div>
+        </section>
+        <!-- ============================================================= SECTION: FORECAST -->
+        <section class="page" id="page-forecast" data-page="forecast" data-state="idle" aria-labelledby="forecast-title">
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">THE WEEK AHEAD</p>
+              <h2 id="forecast-title">Forecast</h2>
+              <p class="section-phrase" id="forecast-phrase"></p>
+              <p class="section-intro" id="forecast-summary">Loading the week…</p>
+            </div>
+            <div class="page-actions">
+              <span class="forecast-place" id="forecast-place"></span>
+              <button class="icon-button" id="forecast-refresh" type="button" aria-label="Reload the forecast" title="Reload the forecast">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.4 8.5V4.75M4.4 4.75h3.75M4.7 12a7.3 7.3 0 1 0 2.14-5.17L4.4 8.5"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          <article class="tool-card forecast-card">
+            <div class="calculator-card-heading">
+              <div>
+                <p class="card-label">NEXT 24 HOURS</p>
+                <h3>Hour by hour</h3>
+              </div>
+              <span class="forecast-zone" id="forecast-zone"></span>
+            </div>
+            <ol class="hour-strip" id="forecast-hours" aria-label="Hourly forecast"></ol>
+          </article>
+
+          <article class="tool-card forecast-card">
+            <div class="calculator-card-heading">
+              <div>
+                <p class="card-label">NEXT 7 DAYS</p>
+                <h3>Day by day</h3>
+              </div>
+            </div>
+            <ol class="day-list" id="forecast-days" aria-label="Daily forecast"></ol>
+          </article>
+        </section>
+        <!-- ============================================================= SECTION: ABOUT -->
+        <section class="page" id="page-about" data-page="about" aria-labelledby="about-title">
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">WHAT THIS IS</p>
+              <h2 id="about-title">About</h2>
+              <p class="section-phrase" id="about-phrase"></p>
+              <p class="section-intro">
+                A clock, honestly made. Here is what Tempo is, where its numbers come from, and where it stops.
+              </p>
+            </div>
+          </div>
+
+          <div class="about-grid">
+            <article class="note-card about-card">
+              <p class="eyebrow">WHAT TEMPO IS</p>
+              <h3>One page, ten sections</h3>
+              <p class="note-copy">
+                Tempo is a single-scroll dashboard for your time and your sky: the clock you live on, alarms that
+                ring at a wall-clock time, a timer, a stopwatch, the world's clocks, an old clock with a live sky
+                behind it, time arithmetic, weather and a seven-day forecast. There is no account, no backend and
+                no key to manage — it is a static page that runs entirely in your browser.
+              </p>
+            </article>
+
+            <article class="note-card about-card">
+              <p class="eyebrow">WHERE THE NUMBERS COME FROM</p>
+              <h3>Public data, named sources</h3>
+              <p class="note-copy">
+                Time zones come from the IANA time zone database, vendored into the page so it works offline.
+                Weather and forecasts are measured by <strong>Open-Meteo</strong> at a point, not a country. Your
+                device's GPS fix, when you ask for it, is named by BigDataCloud's free gazetteer. Sun time is
+                computed from longitude and the equation of time; the moon behind the old clock from the mean
+                synodic cycle; everything else — timers, alarms, the calculator — is plain arithmetic on your
+                device's clock.
+              </p>
+            </article>
+
+            <article class="note-card about-card">
+              <p class="eyebrow">HONEST LIMITS</p>
+              <h3>What a web page cannot do</h3>
+              <p class="note-copy">
+                A web page cannot wake a sleeping phone: alarms and timers ring while a Tempo tab is open, and
+                background tabs are throttled — a 90-second grace window catches the ones that wake up late.
+                Sound may need one click first, because browsers silence pages that were never touched. Without
+                a network there is no weather, though every clock keeps perfect time. And nothing you do here is
+                synced anywhere: your places, alarms and remarks live in this browser's storage and nowhere else.
+              </p>
+            </article>
+
+            <article class="tool-card remarks-card" aria-labelledby="remarks-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">REMARKS &amp; FEEDBACK</p>
+                  <h3 id="remarks-title">Say it, save it, send it yourself</h3>
+                </div>
+                <span class="lap-count-pill" id="remarks-count"></span>
+              </div>
+              <p class="note-copy">
+                Write a remark, tag it, and it is kept <strong>in this browser only</strong> — no account, no
+                contact record, nothing sent anywhere until you say so.
+              </p>
+              <div class="remark-tag-row" id="remark-tags" role="group" aria-label="Tag the remark">
+                <button type="button" class="repeat-chip" data-remark-tag="idea" aria-pressed="true">✦ Idea</button>
+                <button type="button" class="repeat-chip" data-remark-tag="bug" aria-pressed="false">✗ Bug</button>
+                <button type="button" class="repeat-chip" data-remark-tag="question" aria-pressed="false">? Question</button>
+                <button type="button" class="repeat-chip" data-remark-tag="praise" aria-pressed="false">❤ Praise</button>
+              </div>
+              <div class="remark-composer">
+                <textarea id="remark-input" rows="3" maxlength="1000" placeholder="The Friday alarm changed my mornings…" aria-label="Write a remark"></textarea>
+                <div class="remark-actions">
+                  <button class="primary-button" type="button" id="remark-add">Save remark</button>
+                  <a class="secondary-button remark-mailto" id="remark-mailto" href="#">✉ Send by email</a>
+                  <button class="text-button" type="button" id="remarks-clear" hidden>Clear all</button>
+                </div>
+              </div>
+              <ol class="remarks-list" id="remarks-list"></ol>
+              <p class="note-copy small muted">
+                "Send by email" hands your remarks to your own mail client, addressed by you — deliberately, we
+                keep no contact records.
+              </p>
+            </article>
+          </div>
+        </section>
 
         <footer class="footer">
           <p><span class="footer-mark">tempo.</span> A quieter way to keep up.</p>
@@ -680,13 +879,15 @@
     <div class="mobile-nav-backdrop" id="mobile-nav-backdrop"></div>
     <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
       <a href="#/now" data-route="now" data-nav="now">Right now</a>
+      <a href="#/alarms" data-route="alarms" data-nav="alarms">Alarms</a>
+      <a href="#/timer" data-route="timer" data-nav="timer">Timer</a>
+      <a href="#/stopwatch" data-route="stopwatch" data-nav="stopwatch">Stopwatch</a>
+      <a href="#/clocks" data-route="clocks" data-nav="clocks">World clocks</a>
+      <a href="#/clock" data-route="clock" data-nav="clock">Old clock</a>
+      <a href="#/calculator" data-route="calculator" data-nav="calculator">Time calculator</a>
       <a href="#/weather" data-route="weather" data-nav="weather">Weather</a>
       <a href="#/forecast" data-route="forecast" data-nav="forecast">Forecast</a>
-      <a href="#/clocks" data-route="clocks" data-nav="clocks">World clocks</a>
-      <a href="#/timer" data-route="timer" data-nav="timer">Timer &amp; alarm</a>
-      <a href="#/clock" data-route="clock" data-nav="clock">Old clock</a>
-      <a href="#/focus" data-route="focus" data-nav="focus">Focus</a>
-      <a href="#/calculator" data-route="calculator" data-nav="calculator">Time calculator</a>
+      <a href="#/about" data-route="about" data-nav="about">About</a>
     </nav>
 
     <!--

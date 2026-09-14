@@ -1,19 +1,22 @@
 /**
  * Tempo — the dashboard shell.
  *
- * **One page, eight sections.** Tempo used to be six routed pages behind a
- * sidebar: everything worked, but reading two facts took two clicks and a
- * repaint. Now the whole dashboard is a single scroll — Right now, Weather,
- * Forecast, World clocks, Timer & alarm, Old clock, Focus and Time calculator
- * — and the sidebar reports where you are instead of deciding what you may
- * see (see src/router.js). Old `#/timer` links still work: they scroll.
+ * **One page, ten sections, time first.** Tempo used to be six routed pages
+ * behind a sidebar, then a single scroll with weather sitting above the
+ * clocks. Now the order follows the reader: Right now, Alarms, Timer,
+ * Stopwatch, World clocks, Old clock, Time calculator — the things you do
+ * with time — and only then Weather, Forecast and About (see src/router.js).
+ * Old links still work: they scroll, and renamed sections keep their old
+ * hashes as aliases (`#/focus` still finds the Stopwatch).
  *
- * Underneath, six ideas do the work:
+ * Underneath, eight ideas do the work:
  *   • places      src/places.js        one model for zones, cities and GPS fixes
  *   • location    src/location.js      a real fix, named by a real gazetteer
  *   • weather     src/weather.js       Open-Meteo, key-less and failure-tolerant
  *   • forecast    src/forecast.js      the next 24 hours and the next 7 days
- *   • alarms      src/alarm-sounds.js  16 synthesised sounds + your own music
+ *   • alarms      src/alarms.js        wall-clock alarms, DST-safe, 90 s grace
+ *   • sounds      src/alarm-sounds.js  16 synthesised sounds + your own music
+ *   • faces       src/clock-themes.js + src/sky-scenes.js  eight dials, a live sky
  *   • theme       src/theme.js         Auto / Light / Dark, keyed to the live sky
  */
 
@@ -27,6 +30,9 @@ import { createCalculator } from "./src/calculator.js";
 import { createWeatherCard } from "./src/weather-card.js";
 import { createForecast } from "./src/forecast.js";
 import { createScrollNav } from "./src/router.js";
+import { createAlarms } from "./src/alarms.js";
+import { createRemarks } from "./src/remarks.js";
+import { phraseFor } from "./src/phrases.js";
 import { createToaster, $, $$, escapeHTML, flatten, pad } from "./src/ui.js";
 import { APPEARANCES, applyAppearance, readMode, resolveAppearance, themeCaption, writeMode } from "./src/theme.js";
 import { effectiveMood } from "./src/weather.js";
@@ -63,7 +69,6 @@ import {
   const keys = {
     homePlace: "tempo-home-zone",
     worldPlaces: "tempo-world-zones",
-    textScale: "tempo-text-scale",
   };
 
   /**
@@ -72,24 +77,28 @@ import {
    */
   const PAGE_TITLES = {
     now: "Make every moment count.",
+    alarms: "Rings when the clock says so.",
+    timer: "A timer that will not be missed.",
+    stopwatch: "One thing at a time.",
+    clocks: "Around the world.",
+    clock: "A slower kind of clock.",
+    calculator: "Time, without the mental maths.",
     weather: "The sky, where you actually are.",
     forecast: "What the week is planning.",
-    clocks: "Around the world.",
-    timer: "A timer that will not be missed.",
-    clock: "A slower kind of clock.",
-    focus: "One thing at a time.",
-    calculator: "Time, without the mental maths.",
+    about: "What Tempo is, and what it is not.",
   };
 
   const SECTION_EYEBROWS = {
     now: "YOUR TIME, RIGHT NOW",
+    alarms: "RING AT A WALL-CLOCK TIME",
+    timer: "COUNTDOWN",
+    stopwatch: "TRACK ELAPSED TIME",
+    clocks: "STAY IN SYNC",
+    clock: "A SLOWER KIND OF CLOCK",
+    calculator: "NO MENTAL MATH REQUIRED",
     weather: "RIGHT NOW, OUTSIDE",
     forecast: "THE WEEK AHEAD",
-    clocks: "STAY IN SYNC",
-    timer: "COUNTDOWN",
-    clock: "A SLOWER KIND OF CLOCK",
-    focus: "ONE THING AT A TIME",
-    calculator: "NO MENTAL MATH REQUIRED",
+    about: "WHAT THIS IS",
   };
 
   /* ---------------------------------------------------------------- storage */
@@ -160,10 +169,8 @@ import {
     lastFix: null,
     localHour: null,
     localMinute: 0,
-    textScale: Number(localStorage.getItem(keys.textScale)) || 1.15,
+    phraseDay: null,
   };
-
-  if (!Number.isFinite(state.textScale) || state.textScale < 1 || state.textScale > 1.6) state.textScale = 1.15;
 
   /* --------------------------------------------------------------- elements */
 
@@ -199,6 +206,13 @@ import {
     solarNote: $("#solar-note"),
     daylightNote: $("#daylight-note"),
 
+    nowWeather: $("#now-weather"),
+    nowWeatherTemp: $("#now-weather-temp"),
+    nowWeatherUnit: $("#now-weather-unit"),
+    nowWeatherSymbol: $("#now-weather-symbol"),
+    nowWeatherCondition: $("#now-weather-condition"),
+    nowWeatherMeta: $("#now-weather-meta"),
+
     popularCities: $("#popular-cities"),
     addCityButton: $("#add-city-button"),
     useLocationClock: $("#use-location-clock"),
@@ -218,7 +232,6 @@ import {
 
     themeSwitch: $("#theme-switch"),
     themeCaption: $("#theme-caption"),
-    textSizeSwitch: $("#text-size-switch"),
 
     footerYear: $("#footer-year"),
   };
@@ -303,6 +316,10 @@ import {
 
     document.title = `${pad(parts.hour)}:${pad(parts.minute)} · ${place.city} — Tempo`;
 
+    // Cheap (guarded by the day key) but it makes the heading lines turn
+    // over at midnight rather than at the next place change.
+    renderPhrases();
+
     board.update(now);
     oldClockTick(now);
 
@@ -371,23 +388,70 @@ import {
     );
   }
 
-  /* -------------------------------------------------------------- text size */
+  /* ------------------------------------------------------------- phrases */
 
-  function applyTextScale(scale, { persist = true } = {}) {
-    state.textScale = Number(scale) || 1;
-    document.documentElement.style.setProperty("--type-scale", String(state.textScale));
-    if (persist) {
-      try {
-        localStorage.setItem(keys.textScale, String(state.textScale));
-      } catch (_) {
-        /* the size lasts for this visit only */
-      }
+  /**
+   * A line under every heading: time for the clock sections, sky for the
+   * weather ones, a seasonal line for the forecast that flips hemisphere with
+   * your latitude. Rotation is by day number, so a phrase is stable all day
+   * and moves on at midnight — re-rendered when the day (or the home place,
+   * which carries the latitude) changes.
+   */
+  function renderPhrases() {
+    const now = new Date();
+    const dayKey = now.toDateString();
+    if (dayKey === state.phraseDay) return;
+    state.phraseDay = dayKey;
+
+    const place = homePlace();
+    const latitude = Number.isFinite(place.lat) ? place.lat : null;
+    for (const section of document.querySelectorAll(".page[data-page]")) {
+      const host = section.querySelector(".section-phrase");
+      if (!host) continue;
+      host.textContent = phraseFor(section.dataset.page, { date: now, latitude });
     }
-    $$("[data-text-size]", elements.textSizeSwitch || document).forEach((button) => {
-      const active = Math.abs(Number(button.dataset.textSize) - state.textScale) < 0.001;
-      button.classList.toggle("active", active);
-      button.setAttribute("aria-checked", String(active));
-    });
+  }
+
+  /* ---------------------------------------------------------- now weather */
+
+  /**
+   * The glance beside the clock: the *same snapshot* the Weather section
+   * renders, at first-look size. It only reads `state.weather` — it never
+   * fetches — so the two views can never disagree and the page still makes
+   * exactly one weather request.
+   */
+  function renderNowWeather() {
+    const card = elements.nowWeather;
+    if (!card) return;
+    const snapshot = state.weather;
+    const place = homePlace();
+
+    if (!snapshot || !snapshot.ok) {
+      card.dataset.state = snapshot ? "error" : "idle";
+      setText(elements.nowWeatherTemp, "--");
+      setText(elements.nowWeatherUnit, "°");
+      setText(elements.nowWeatherSymbol, snapshot ? "!" : "☂");
+      setText(elements.nowWeatherCondition, snapshot ? snapshot.message || "Weather unavailable" : "Weather not loaded");
+      setText(elements.nowWeatherMeta, "The full story loads in the Weather section below.");
+      return;
+    }
+
+    card.dataset.state = "ready";
+    setText(elements.nowWeatherSymbol, snapshot.symbol || "☂");
+    setText(elements.nowWeatherTemp, String(Math.round(snapshot.temperature)));
+    setText(elements.nowWeatherUnit, snapshot.temperatureUnit || "°C");
+    setText(elements.nowWeatherCondition, snapshot.condition);
+    const meta = [];
+    if (Number.isFinite(snapshot.feelsLike)) meta.push(`feels ${Math.round(snapshot.feelsLike)}${snapshot.temperatureUnit}`);
+    if (Number.isFinite(snapshot.humidity)) meta.push(`${Math.round(snapshot.humidity)}% humidity`);
+    setText(
+      elements.nowWeatherMeta,
+      `${snapshot.label || place.label}${meta.length ? " · " + meta.join(" · ") : ""}`
+    );
+  }
+
+  function setText(node, value) {
+    if (node && node.textContent !== value) node.textContent = value;
   }
 
   /* --------------------------------------------------------------- weather */
@@ -420,6 +484,10 @@ import {
       applyTheme();
       updateNotes();
       updateLiveTime();
+      renderNowWeather();
+      // The old clock's sky is painted from this same snapshot — one request,
+      // one truth, and a scene that can never contradict the weather card.
+      if (oldClock) oldClock.updateScene();
       if (elements.weatherLiveNote) {
         elements.weatherLiveNote.textContent =
           snapshot && snapshot.ok ? `Updated for ${snapshot.label || homePlace().city}.` : "";
@@ -689,6 +757,11 @@ import {
     applyTheme();
     calculator.refreshZone();
     updateNotes();
+    // The phrases follow the place: the forecast's seasonal line flips with
+    // latitude, and the glance names the place it is describing.
+    state.phraseDay = null;
+    renderPhrases();
+    renderNowWeather();
     if (weather) weatherCard.followHomeZone();
     if (oldClock && (!oldClock.placeId || oldClock.placeId === record.id)) oldClock.setPlace(record.id);
     if (!silent) notify(`${record.label} is now your home place.`);
@@ -796,6 +869,37 @@ import {
     },
   });
 
+  /* ---------------------------------------------------------------- alarms */
+
+  /**
+   * Wall-clock alarms — the sibling the timer never had. Times are read on
+   * the home place's clock; the engine runs on the device clock, walks
+   * calendar days (so a Friday alarm jumps the weekend and DST is survived),
+   * and grants a 90-second grace window for throttled tabs.
+   */
+  const alarms = createAlarms({
+    elements: {
+      editorTitle: $("#alarms-editor-title"),
+      time: $("#alarms-time"),
+      date: $("#alarms-date"),
+      repeatRow: $("#alarms-repeat"),
+      label: $("#alarms-label"),
+      notes: $("#alarms-notes"),
+      sound: $("#alarms-sound"),
+      save: $("#alarms-save"),
+      cancel: $("#alarms-cancel"),
+      list: $("#alarms-list"),
+      empty: $("#alarms-empty"),
+      status: $("#alarms-status"),
+      ringingBar: $("#alarms-ringing"),
+      ringingLabel: $("#alarms-ringing-label"),
+      ringingNote: $("#alarms-ringing-note"),
+      dismiss: $("#alarms-dismiss"),
+    },
+    getZone: () => homeZone(),
+    notify,
+  });
+
   const calculator = createCalculator({
     elements: {
       durationForm: $("#duration-form"),
@@ -819,6 +923,26 @@ import {
     notify,
   });
 
+  /* --------------------------------------------------------------- remarks */
+
+  /**
+   * The About section's remarks & feedback card: tagged, saved in this
+   * browser only, and handed to the reader's own mail client on request —
+   * no contact records, deliberately.
+   */
+  const remarks = createRemarks({
+    elements: {
+      tagRow: $("#remark-tags"),
+      input: $("#remark-input"),
+      add: $("#remark-add"),
+      list: $("#remarks-list"),
+      count: $("#remarks-count"),
+      mailto: $("#remark-mailto"),
+      clearAll: $("#remarks-clear"),
+    },
+    notify,
+  });
+
   /* ---------------------------------------------------------------- router */
 
   /**
@@ -833,14 +957,19 @@ import {
   const nav = createScrollNav({
     sections: [
       { id: "now", page: $("#page-now"), title: "Right now" },
+      { id: "alarms", page: $("#page-alarms"), title: "Alarms" },
+      { id: "timer", page: $("#page-timer"), title: "Timer" },
+      { id: "stopwatch", page: $("#page-stopwatch"), title: "Stopwatch" },
+      { id: "clocks", page: $("#page-clocks"), title: "World clocks" },
+      { id: "clock", page: $("#page-clock"), title: "Old clock" },
+      { id: "calculator", page: $("#page-calculator"), title: "Time calculator" },
       { id: "weather", page: $("#page-weather"), title: "Weather" },
       { id: "forecast", page: $("#page-forecast"), title: "Forecast" },
-      { id: "clocks", page: $("#page-clocks"), title: "World clocks" },
-      { id: "timer", page: $("#page-timer"), title: "Timer & alarm" },
-      { id: "clock", page: $("#page-clock"), title: "Old clock" },
-      { id: "focus", page: $("#page-focus"), title: "Focus" },
-      { id: "calculator", page: $("#page-calculator"), title: "Time calculator" },
+      { id: "about", page: $("#page-about"), title: "About" },
     ],
+    // The Focus section grew up and became the Stopwatch; anyone who
+    // bookmarked `#/focus` (a real URL in the routed era) still lands there.
+    aliases: { focus: "stopwatch" },
     onChange: (section) => {
       if (elements.pageTitle) elements.pageTitle.textContent = PAGE_TITLES[section.id] || PAGE_TITLES.now;
       if (elements.todayLabel && SECTION_EYEBROWS[section.id]) {
@@ -852,8 +981,9 @@ import {
       if (oldClockVisible) oldClock.start();
       else if (oldClock) oldClock.stop();
 
+      if (section.id === "alarms") alarms.sync();
       if (section.id === "timer") timer.sync();
-      if (section.id === "focus") stopwatch.sync();
+      if (section.id === "stopwatch") stopwatch.sync();
       if (section.id === "clocks") board.render();
       if (section.id === "forecast") forecast.activate();
     },
@@ -924,15 +1054,6 @@ import {
         event.preventDefault();
         buttons[next].focus();
         buttons[next].click();
-      });
-    }
-
-    if (elements.textSizeSwitch) {
-      elements.textSizeSwitch.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-text-size]");
-        if (!button) return;
-        applyTextScale(Number(button.dataset.textSize));
-        notify("Text size updated.");
       });
     }
 
@@ -1012,6 +1133,8 @@ import {
       elements: {
         face: $("#old-clock"),
         wrap: $("#old-clock-wrap"),
+        stage: $("#old-clock-stage"),
+        sceneNote: $("#old-clock-scene-note"),
         digital: $("#old-clock-digital"),
         meta: $("#old-clock-meta"),
         sun: $("#old-clock-sun"),
@@ -1020,11 +1143,12 @@ import {
         eyebrow: $("#old-clock-eyebrow"),
         placeButton: $("#old-clock-place"),
         fullscreen: $("#old-clock-fullscreen"),
-        numeralsGroup: $("#old-clock-numerals"),
+        facesGroup: $("#old-clock-faces"),
         motionGroup: $("#old-clock-motion"),
         chime: $("#old-clock-chime"),
       },
       getPlaceId: () => state.homeId,
+      getWeather: () => state.weather,
       notify,
       onPickPlace: () => openPicker("clock"),
     });
@@ -1051,7 +1175,6 @@ import {
 
     if (elements.footerYear) elements.footerYear.textContent = `© ${new Date().getFullYear()} Tempo`;
 
-    applyTextScale(state.textScale, { persist: false });
     board.setPlaces(state.board);
     board.bindEvents();
     renderPopularCities();
@@ -1060,12 +1183,16 @@ import {
     timer.init();
     stopwatch.init();
     calculator.init();
+    alarms.init();
+    remarks.init();
     forecast.init();
     bindEvents();
 
     applyTheme();
     updateLiveTime();
     updateNotes();
+    renderPhrases();
+    renderNowWeather();
     nav.registerLinks("[data-route]");
     nav.start();
 

@@ -8,7 +8,16 @@
  *
  * `update(date)` is cheap enough to call every frame, which is what makes the
  * "sweep" second hand possible.
+ *
+ * Faces: as well as a numeral style, a face can carry a **clock theme** (see
+ * src/clock-themes.js) — Roman, Modern, Minimal, Railway, Pocket watch, Neon,
+ * Brutalist, Botanical. The theme picks the numeral mode and is reported on
+ * the root as `data-clock-theme`, which is all the stylesheet needs to restyle
+ * the whole dial; the mechanism never changes. The small home face sets no
+ * theme and is therefore styled by the base rules only.
  */
+
+import { findClockTheme } from "./clock-themes.js";
 
 export const NUMERAL_STYLES = ["roman", "arabic", "none"];
 const ROMAN = ["XII", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"];
@@ -19,9 +28,10 @@ const ROMAN = ["XII", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X
  *   @param {"roman"|"arabic"|"none"} numerals
  *   @param {boolean} seconds  draw (and move) a second hand
  *   @param {boolean} smooth   move the second hand continuously
+ *   @param {string} [theme]   a clock theme id (src/clock-themes.js)
  */
-export function createClockFace(root, { numerals = "arabic", seconds = true, smooth = false, showTicks = true } = {}) {
-  if (!root) return { update() {}, setNumerals() {}, setSeconds() {}, setSmooth() {} };
+export function createClockFace(root, { numerals = "arabic", seconds = true, smooth = false, showTicks = true, theme = null } = {}) {
+  if (!root) return { update() {}, setNumerals() {}, setSeconds() {}, setSmooth() {}, setTheme() {} };
 
   root.classList.add("clock-face");
   root.dataset.numerals = numerals;
@@ -67,7 +77,7 @@ export function createClockFace(root, { numerals = "arabic", seconds = true, smo
 
   root.append(hourHand, minuteHand, secondHand, pin);
 
-  const state = { seconds, smooth, numerals, lastSecond: null };
+  const state = { seconds, smooth, numerals, theme: null, lastSecond: null };
 
   function setNumerals(style) {
     state.numerals = NUMERAL_STYLES.includes(style) ? style : "arabic";
@@ -76,6 +86,17 @@ export function createClockFace(root, { numerals = "arabic", seconds = true, smo
       const glyph = node.querySelector("em");
       if (glyph) glyph.textContent = state.numerals === "roman" ? ROMAN[hour % 12] : String(hour);
     });
+  }
+
+  /**
+   * Swap the whole face: report the theme on the root (the stylesheet does
+   * the painting) and re-spell the dial in the theme's numeral mode.
+   */
+  function setTheme(themeId) {
+    const theme = findClockTheme(themeId);
+    state.theme = theme.id;
+    root.dataset.clockTheme = theme.id;
+    setNumerals(theme.numerals);
   }
 
   function setSeconds(visible) {
@@ -90,6 +111,7 @@ export function createClockFace(root, { numerals = "arabic", seconds = true, smo
 
   setSeconds(seconds);
   setSmooth(smooth);
+  if (theme) setTheme(theme);
 
   /**
    * @param {Date} date
@@ -120,7 +142,7 @@ export function createClockFace(root, { numerals = "arabic", seconds = true, smo
     }
   }
 
-  return { update, setNumerals, setSeconds, setSmooth, root, hourHand, minuteHand, secondHand };
+  return { update, setNumerals, setSeconds, setSmooth, setTheme, root, hourHand, minuteHand, secondHand };
 }
 
 /** Wall-clock parts of `date` in a zone, for `update()`'s fast path. */

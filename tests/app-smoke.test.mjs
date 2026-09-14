@@ -133,7 +133,7 @@ function geocodePayload(url) {
       };
 }
 
-async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload(), hash = "" } = {}) {
+async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload(), hash = "", storage = {} } = {}) {
   const html = readFileSync(resolve(root, "index.html"), "utf8")
     // jsdom does not run ES module scripts or stylesheets; the bundle is
     // imported below and the CSS is checked by build, not by this test.
@@ -157,6 +157,9 @@ async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload
   const { document, localStorage } = dom.window;
   localStorage.clear();
   if (homeZone) localStorage.setItem("tempo-home-zone", homeZone);
+  // Extra keys a test wants in place before the app boots (saved clock
+  // preferences, for instance).
+  for (const [key, value] of Object.entries(storage)) localStorage.setItem(key, value);
 
   const fetchCalls = [];
   const stubFetch = async (url) => {
@@ -276,20 +279,30 @@ describe("tempo in a browser-like DOM", () => {
   test("every section is on one scroll, and the nav follows the reader", async () => {
     app = await boot();
 
-    // The whole dashboard is present at once — that is the upgrade.
+    // The whole dashboard is present at once — ten sections now, time first
+    // and weather after the tools, which is the order this round chose.
     assert.deepEqual(
       app.visiblePages(),
-      ["now", "weather", "forecast", "clocks", "timer", "clock", "focus", "calculator"],
-      "all eight sections share one page"
+      ["now", "alarms", "timer", "stopwatch", "clocks", "clock", "calculator", "weather", "forecast", "about"],
+      "all ten sections share one page, in the time-first order"
     );
     assert.equal(app.activeSection(), "now", "and the reader starts at the top");
     assert.match(app.$("#page-title").textContent, /moment/);
     assert.equal(app.$('.nav-link[data-route="now"]').classList.contains("active"), true);
 
-    // Weather and Forecast are sections of their own now, not a card.
+    // Weather and Forecast kept their own sections; they just moved below
+    // the calculator, where a time app wants them.
     assert.ok(app.$("#page-weather"), "weather has its own section");
     assert.ok(app.$("#page-forecast"), "so does the forecast");
     assert.ok(app.$("#page-weather").contains(app.$("#weather-card")), "the weather card lives in it");
+
+    // A phrase sits under every heading, chosen by the day — stable within
+    // the day, present for every section including the new ones.
+    const phrases = app.$$(".section-phrase");
+    assert.equal(phrases.length, 10, "every section carries a phrase");
+    for (const phrase of phrases) {
+      assert.ok(phrase.textContent.trim().length > 8, `a phrase is written under its heading, got "${phrase.textContent}"`);
+    }
 
     await app.go("clocks");
     assert.equal(app.activeSection(), "clocks");
@@ -297,13 +310,17 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.activeNav(), "clocks");
     assert.equal(app.$('.nav-link[data-route="now"]').hasAttribute("aria-current"), false);
     // Nothing was hidden to get there.
-    assert.equal(app.visiblePages().length, 8, "sections are never torn down");
+    assert.equal(app.visiblePages().length, 10, "sections are never torn down");
 
     for (const [route, heading] of [
+      ["alarms", /clock says so/],
+      ["timer", /timer/i],
+      ["stopwatch", /one thing at a time/i],
+      ["clock", /slower kind of clock/i],
+      ["calculator", /mental maths/],
       ["weather", /sky/i],
       ["forecast", /week/i],
-      ["timer", /timer/i],
-      ["calculator", /mental maths/],
+      ["about", /what tempo is/i],
     ]) {
       await app.go(route);
       assert.equal(app.activeSection(), route, `#/${route} selects its section`);
@@ -324,6 +341,11 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.activeSection(), "timer", "a deep link lands on its section");
     assert.equal(app.activeNav(), "timer");
     assert.ok(app.$("#page-timer"), "and the section is present");
+
+    // The Focus section was renamed Stopwatch; its old URL is an alias now.
+    await app.go("focus");
+    assert.equal(app.activeSection(), "stopwatch", "#/focus still finds the stopwatch");
+    assert.equal(app.activeNav(), "stopwatch");
   });
 
   test("world clocks show country · city, cities have their own sun line", async () => {
@@ -541,20 +563,27 @@ describe("tempo in a browser-like DOM", () => {
     app = await boot();
   });
 
-  test("text size is a control, and it is remembered", async () => {
+  test("the text-size switch is gone, and the sizes are a fixed ramp", async () => {
     app = await boot();
-    assert.equal(app.document.documentElement.style.getPropertyValue("--type-scale"), "1.15");
-    app.click('#text-size-switch [data-text-size="1.32"]');
-    await wait(20);
-    assert.equal(app.document.documentElement.style.getPropertyValue("--type-scale"), "1.32");
-    assert.equal(app.localStorage.getItem("tempo-text-scale"), "1.32");
-    assert.equal(
-      app.$('#text-size-switch [data-text-size="1.32"]').getAttribute("aria-checked"),
-      "true"
-    );
-    app.click('#text-size-switch [data-text-size="1"]');
-    await wait(20);
-    assert.equal(app.document.documentElement.style.getPropertyValue("--type-scale"), "1");
+
+    // The three-button switch was the wrong fix: body copy was too small at
+    // every setting. The sizes now live on a fixed ramp in styles.css, so
+    // the control — and the variable it drove — are gone entirely.
+    assert.equal(app.$("#text-size-switch"), null, "the text-size control no longer exists");
+    assert.equal(app.document.documentElement.style.getPropertyValue("--type-scale"), "");
+    app.click("#page-now"); // any interaction must not resurrect it
+    assert.equal(app.document.documentElement.style.getPropertyValue("--type-scale"), "", "--type-scale is never written");
+    assert.equal(app.localStorage.getItem("tempo-text-scale"), null, "and the old key is not written either");
+
+    // The ramp itself: no --type-scale anywhere, and no text below 11.5px.
+    const css = readFileSync(resolve(root, "styles.css"), "utf8");
+    assert.equal(css.includes("--type-scale"), false, "the variable is gone from the stylesheet");
+    const sizes = [...css.matchAll(/font-size:\s*([\d.]+)px/g)].map((match) => Number(match[1]));
+    assert.ok(sizes.length > 150, `expected a full ramp of sizes, found ${sizes.length}`);
+    assert.equal(Math.min(...sizes), 11.5, "the smallest text on the page is 11.5px, not 7.5px");
+    // Body copy: the section-intro and note-copy rules sit at 14–15px.
+    assert.match(css, /\.section-intro \{[^}]*font-size: 15px/);
+    assert.match(css, /\.note-copy \{[^}]*font-size: 1[45](?:\.5)?px/);
   });
 
   test("a remembered manual theme is applied before the clocks start", async () => {
@@ -584,16 +613,23 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.activeSection(), "clock");
     assert.ok(app.$$("#old-clock .face-tick").length === 60, "sixty ticks");
     assert.equal(app.$$("#old-clock .face-number").length, 12);
-    assert.equal(app.$("#old-clock").dataset.numerals, "roman");
+    assert.equal(app.$("#old-clock").dataset.clockTheme, "roman");
     assert.equal(app.$("#old-clock .face-number em").textContent, "I");
     assert.match(app.$("#old-clock-digital").textContent, /^\d{2}:\d{2}:\d{2}$/);
     assert.match(app.$("#old-clock-meta").textContent, /UTC[+-]\d{2}:\d{2}/);
     assert.match(app.$("#old-clock-place-name").textContent, /Kathmandu/);
 
-    app.click('#old-clock-numerals [data-numerals="arabic"]');
+    // The three numeral styles are eight faces now; switching one re-spells
+    // the dial and reports itself on the root.
+    app.click('#old-clock-faces [data-clock-face="brutalist"]');
     await wait(20);
+    assert.equal(app.$("#old-clock").dataset.clockTheme, "brutalist");
     assert.equal(app.$("#old-clock").dataset.numerals, "arabic");
     assert.equal(app.$("#old-clock .face-number em").textContent, "1");
+    assert.equal(
+      app.localStorage.getItem("tempo-old-clock"),
+      JSON.stringify({ theme: "brutalist", motion: "sweep", chime: false, placeId: "zone:Asia/Kathmandu" })
+    );
 
     app.click("#old-clock-place");
     await wait(60);
@@ -627,7 +663,7 @@ describe("tempo in a browser-like DOM", () => {
     app.click("#timer-reset");
     assert.equal(app.$("#timer-display").textContent, "01:00");
 
-    await app.go("focus");
+    await app.go("stopwatch");
     app.click("#stopwatch-start");
     await wait(80);
     assert.match(app.$("#stopwatch-display").textContent, /^\d{2}:\d{2}\.\d{2}$/);
@@ -864,10 +900,250 @@ describe("tempo in a browser-like DOM", () => {
     assert.match(app.$("#forecast-summary").textContent, /\w/);
   });
 
+  test("a wall-clock alarm rings when the clock reaches it, and the page scrolls to it", async () => {
+    app = await boot();
+    await app.go("alarms");
+
+    // Watch for the page scrolling itself to the ringing alarm.
+    const scrolled = [];
+    const realScroll = app.window.Element.prototype.scrollIntoView;
+    app.window.Element.prototype.scrollIntoView = function scrollSpy() {
+      scrolled.push(this);
+      return realScroll.apply(this, arguments);
+    };
+
+    // An alarm one minute out. The time is written on the home zone's clock
+    // (Asia/Katmandu), because that is the clock the alarm runs on.
+    const zone = "Asia/Katmandu";
+    const wall = new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    app.$("#alarms-time").value = wall.format(new Date(Date.now() + 60_000));
+    app.$("#alarms-label").value = "Stand up";
+    app.$("#alarms-notes").value = "Look out of the window.";
+    app.click("#alarms-save");
+    await wait(30);
+
+    const saved = JSON.parse(app.localStorage.getItem("tempo-alarms"));
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].label, "Stand up");
+
+    // Fast-forward the wall clock past the alarm, the way a throttled
+    // background tab would experience it, and let a tick notice.
+    const realNow = Date.now;
+    try {
+      Date.now = () => realNow() + 75_000;
+      await wait(1400);
+    } finally {
+      Date.now = realNow;
+    }
+
+    assert.equal(app.$("#alarms-ringing").hidden, false, "the ringing bar is showing");
+    assert.match(app.$("#alarms-ringing-label").textContent, /Stand up/);
+    const ringingCard = app.$(".alarm-item.is-ringing");
+    assert.ok(ringingCard, "the alarm card itself is flagged");
+    assert.ok(
+      scrolled.some((node) => node.classList && node.classList.contains("alarm-item")),
+      "the page scrolled itself to the ringing alarm"
+    );
+
+    // A one-time alarm switches itself off once it has had its moment.
+    const after = JSON.parse(app.localStorage.getItem("tempo-alarms"));
+    assert.equal(after[0].enabled, false);
+    assert.ok(after[0].lastRang > 0, "the ring is remembered so it does not repeat");
+
+    app.click("#alarms-dismiss");
+    await wait(30);
+    assert.equal(app.$("#alarms-ringing").hidden, true, "and it stops when told to");
+  });
+
+  test("an alarm can carry a date, repeat, notes and any of the sixteen sounds", async () => {
+    app = await boot();
+    await app.go("alarms");
+
+    // Sixteen sounds, grouped by mood, in the editor's picker.
+    assert.equal(app.$$("#alarms-sound option").length, 16, "every catalogue sound is offered");
+    assert.ok(app.$$('#alarms-sound optgroup[label="Rock & band"]').length === 1, "grouped by mood");
+
+    app.$("#alarms-time").value = "06:30";
+    app.$("#alarms-label").value = "Bread out of the freezer";
+    app.$("#alarms-notes").value = "Then go back to bed.";
+    app.$("#alarms-sound").value = "siren";
+    app.click('[data-repeat-day="1"]');
+    app.click('[data-repeat-day="5"]');
+    app.click("#alarms-save");
+    await wait(30);
+
+    const stored = JSON.parse(app.localStorage.getItem("tempo-alarms"));
+    assert.equal(stored.length, 1);
+    assert.deepEqual(
+      { time: stored[0].time, repeat: stored[0].repeat, label: stored[0].label, notes: stored[0].notes, sound: stored[0].sound },
+      { time: "06:30", repeat: [1, 5], label: "Bread out of the freezer", notes: "Then go back to bed.", sound: "siren" }
+    );
+
+    const item = app.$(".alarm-item");
+    assert.match(item.querySelector(".alarm-time").textContent, /06:30/);
+    assert.match(item.querySelector(".alarm-repeat").textContent, /Mon, Fri/);
+    assert.match(item.querySelector(".alarm-label").textContent, /freezer/);
+    assert.match(item.querySelector(".alarm-notes").textContent, /back to bed/);
+    assert.match(item.querySelector(".alarm-sound").textContent, /Siren sweep/);
+    assert.match(item.querySelector(".alarm-next").textContent, /in \d+ (min|h|day)/, "the next ring is described");
+
+    // Off and on again is one click, and it persists.
+    app.click(".alarm-toggle");
+    await wait(20);
+    assert.equal(JSON.parse(app.localStorage.getItem("tempo-alarms"))[0].enabled, false);
+    app.click(".alarm-toggle");
+    await wait(20);
+    assert.equal(JSON.parse(app.localStorage.getItem("tempo-alarms"))[0].enabled, true);
+
+    // Editing loads the alarm back into the form.
+    app.click(".alarm-edit");
+    await wait(20);
+    assert.equal(app.$("#alarms-time").value, "06:30");
+    assert.equal(app.$("#alarms-label").value, "Bread out of the freezer");
+    assert.equal(app.$("#alarms-save").textContent, "Save changes");
+    app.$("#alarms-label").value = "Friday bread";
+    app.click("#alarms-save");
+    await wait(30);
+    assert.equal(JSON.parse(app.localStorage.getItem("tempo-alarms"))[0].label, "Friday bread");
+    assert.equal(app.$("#alarms-save").textContent, "Add alarm", "the editor resets after saving");
+
+    // And removing it clears the list and the store.
+    app.click(".alarm-remove");
+    await wait(20);
+    assert.equal(app.$$(".alarm-item").length, 0);
+    assert.deepEqual(JSON.parse(app.localStorage.getItem("tempo-alarms")), []);
+  });
+
+  test("Right now shows the weather beside the clock, from the same single request", async () => {
+    app = await boot();
+    await wait(80);
+
+    // The glance is a view of the snapshot the Weather section renders, so
+    // the two agree exactly — and no second request was made to get it.
+    assert.equal(app.$("#now-weather").dataset.state, "ready");
+    assert.equal(app.$("#now-weather-temp").textContent, app.$("#weather-temp").textContent);
+    assert.equal(app.$("#now-weather-unit").textContent, app.$("#weather-unit").textContent);
+    assert.equal(app.$("#now-weather-condition").textContent, app.$("#weather-condition").textContent);
+    assert.match(app.$("#now-weather-meta").textContent, /Kathmandu/);
+    assert.equal(app.fetchCalls.length, 1, "one request on boot, not two");
+
+    // When the sky changes, both views move together.
+    app.click("#weather-units");
+    await wait(120);
+    assert.equal(app.$("#now-weather-unit").textContent, app.$("#weather-unit").textContent);
+  });
+
+  test("the old clock wears eight faces, and an old numeral preference upgrades", async () => {
+    // A save from the numeral-styles era upgrades to the matching face:
+    // "arabic" becomes the Modern face.
+    const legacy = JSON.stringify({ numerals: "arabic", motion: "tick", chime: false, placeId: "" });
+    app = await boot({ storage: { "tempo-old-clock": legacy } });
+    await app.go("clock");
+
+    const buttons = app.$$("#old-clock-faces [data-clock-face]");
+    assert.equal(buttons.length, 8, "eight faces, not three numeral styles");
+    assert.deepEqual(
+      buttons.map((button) => button.dataset.clockFace),
+      ["roman", "modern", "minimal", "railway", "pocket", "neon", "brutalist", "botanical"]
+    );
+    assert.equal(app.$("#old-clock").dataset.clockTheme, "modern", "the legacy save upgraded to a face");
+    assert.equal(app.$("#old-clock").dataset.numerals, "arabic");
+
+    for (const face of ["railway", "pocket", "neon", "botanical", "roman"]) {
+      app.click(`#old-clock-faces [data-clock-face="${face}"]`);
+      await wait(10);
+      assert.equal(app.$("#old-clock").dataset.clockTheme, face);
+    }
+    assert.equal(
+      JSON.parse(app.localStorage.getItem("tempo-old-clock")).theme,
+      "roman",
+      "the face is remembered"
+    );
+    // Roman and pocket spell the dial in Roman numerals; railway does not.
+    app.click('#old-clock-faces [data-clock-face="pocket"]');
+    await wait(10);
+    assert.equal(app.$("#old-clock .face-number em").textContent, "I");
+    app.click('#old-clock-faces [data-clock-face="minimal"]');
+    await wait(10);
+    assert.equal(app.$("#old-clock").dataset.numerals, "none", "minimal drops the numerals");
+  });
+
+  test("the scene behind the old clock is chosen from the live sky, never from a menu", async () => {
+    app = await boot({ weather: () => weatherPayload({ code: 95 }) });
+    await wait(80);
+    await app.go("clock");
+
+    assert.equal(app.$("#old-clock-stage").dataset.scene, "thunderstorm", "a storm sky is a thunderstorm scene");
+    const particles = app.$$("#old-clock-stage .scene i");
+    assert.ok(particles.length >= 20, `the storm is drawn with particles, got ${particles.length}`);
+    assert.ok(particles.some((node) => node.classList.contains("p-lightning")), "including lightning");
+    assert.equal(app.$$("#page-clock button[data-scene]").length, 0, "there is no scene menu — the sky decides");
+    assert.equal(app.$("#old-clock-scene-note").hidden, false);
+    assert.match(app.$("#old-clock-scene-note").textContent, /thunderstorm/i);
+
+    // A clear night gets stars — and the moon only if it is actually up.
+    const night = await boot({ weather: () => weatherPayload({ code: 0, isDay: 0 }) });
+    await wait(80);
+    await night.go("clock");
+    assert.match(night.$("#old-clock-stage").dataset.scene, /^(starry|moonless)-night$/);
+    const { moonIllumination, moonPhase } = await import(
+      pathToFileURL(resolve(root, "src/sky-scenes.js")).href
+    );
+    const expected = moonIllumination(moonPhase()) < 0.05 ? "moonless-night" : "starry-night";
+    assert.equal(night.$("#old-clock-stage").dataset.scene, expected, "the moon phase decides");
+    if (expected === "starry-night") {
+      assert.ok(night.$("#old-clock-stage .p-moon"), "the moon is in the scene");
+    }
+    night.cleanup();
+
+    // No weather at all: the clock stands on its own dial, honestly.
+    const none = await boot({ weather: () => ({ not: "weather" }) });
+    await wait(80);
+    await none.go("clock");
+    assert.equal(none.$("#old-clock-stage").dataset.scene, "none", "no weather means no scene");
+    none.cleanup();
+
+    // Hand the afterEach a clean slate rather than a second live DOM.
+    app.cleanup();
+    app = null;
+  });
+
+  test("remarks are tagged, kept in the browser, and handed to your own mail client", async () => {
+    app = await boot();
+    await app.go("about");
+
+    app.$("#remark-input").value = "The Friday alarm changed my mornings.";
+    app.click('[data-remark-tag="praise"]');
+    app.click("#remark-add");
+    await wait(30);
+
+    const stored = JSON.parse(app.localStorage.getItem("tempo-remarks"));
+    assert.equal(stored.length, 1);
+    assert.equal(stored[0].tag, "praise");
+    assert.equal(stored[0].text, "The Friday alarm changed my mornings.");
+
+    const item = app.$(".remark-item");
+    assert.match(item.querySelector(".remark-tag").textContent, /Praise/);
+    assert.match(item.querySelector(".remark-text").textContent, /Friday alarm/);
+    assert.equal(app.$("#remarks-count").textContent, "1 saved");
+
+    // "Send by email" hands the remarks to the reader's own mail client —
+    // a mailto with everything in the body, and no address of ours baked in.
+    const mailto = app.$("#remark-mailto");
+    assert.match(mailto.href, /^mailto:\?subject=/);
+    assert.ok(mailto.href.includes(encodeURIComponent("The Friday alarm changed my mornings.")));
+    assert.ok(mailto.href.includes(encodeURIComponent("Praise")));
+
+    app.click(".remark-remove");
+    await wait(20);
+    assert.deepEqual(JSON.parse(app.localStorage.getItem("tempo-remarks")), []);
+    assert.equal(app.$("#remarks-count").textContent, "");
+  });
+
   test("booting produces no console errors", async () => {
     app = await boot();
     await wait(200);
-    for (const route of ["clocks", "timer", "clock", "focus", "calculator", "now"]) {
+    for (const route of ["alarms", "clocks", "timer", "stopwatch", "clock", "calculator", "weather", "forecast", "about", "now"]) {
       await app.go(route);
     }
     assert.deepEqual(app.errors, [], `console output: ${app.errors.join(" | ")}`);

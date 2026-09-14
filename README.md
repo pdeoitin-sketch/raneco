@@ -1,54 +1,70 @@
 # raneco
 
-**Tempo** — a single-scroll browser dashboard for your local time, world clocks,
-live weather and forecast, an old-style clock, a timer with real alarms, a
-stopwatch, and time calculations. Built with
-[Vite](https://vite.dev/), deployed as a static site: there is no backend and no
-API key to manage.
+**Tempo** — a single-scroll browser dashboard for your local time, **alarms
+that ring at a wall-clock time**, world clocks, live weather and forecast, an
+old-style clock, a timer with real alarms, a stopwatch, and time calculations.
+Built with [Vite](https://vite.dev/), deployed as a static site: there is no
+backend and no API key to manage.
 
 Live site: https://pdeoitin-sketch.github.io/raneco/
 
-## One page, eight sections
+## One page, ten sections
 
-Tempo used to be six routed pages behind a sidebar. Everything worked, but
-reading two facts meant two clicks and a repaint, and the dashboard felt like
-a filing cabinet. **It is now a single scroll.** The sidebar is still there,
-but it *reports where you are* instead of deciding what you may see: as you
-scroll, the current section lights up and the URL quietly follows.
+Tempo used to be six routed pages behind a sidebar, then a single scroll with
+the weather sitting above the clocks. **The order now follows the reader: time
+first, sky after.** The things you *do* with time — alarms, timer, stopwatch,
+the clocks, the arithmetic — come before the weather and the forecast, and an
+About section closes the page. The sidebar still *reports where you are*
+instead of deciding what you may see: as you scroll, the current section lights
+up and the URL quietly follows.
 
 | Section | Anchor | What it does |
 | --- | --- | --- |
-| **Right now** | `#/now` | Home clock (analog + digital), live sky, day progress, sun note |
+| **Right now** | `#/now` | Home clock (analog + digital) with the weather glance **beside it** — one snapshot, one request |
+| **Alarms** | `#/alarms` | Wall-clock alarms: time, optional date or weekday repeat, label and **notes per alarm**, any of the 16 sounds |
+| **Timer** | `#/timer` | Countdown with presets and a **16-sound alarm that keeps ringing** |
+| **Stopwatch** | `#/stopwatch` | Centisecond stopwatch with laps, goals and splits |
+| **World clocks** | `#/clocks` | Add up to 12 places, compare them against home, reorder and remove |
+| **Old clock** | `#/clock` | Full-face clock with **eight faces**, a **live sky behind the dial**, sweep/tick hand and an hourly chime |
+| **Time calculator** | `#/calculator` | Difference between two moments, unit conversion, saved results |
 | **Weather** | `#/weather` | Live conditions for a point, plus a panel saying *where it thinks you are and how sure it is* |
 | **Forecast** | `#/forecast` | Next 24 hours hour-by-hour, next 7 days with highs, lows and rain chance |
-| **World clocks** | `#/clocks` | Add up to 12 places, compare them against home, reorder and remove |
-| **Timer & alarm** | `#/timer` | Countdown with presets and a **16-sound alarm that keeps ringing** |
-| **Old clock** | `#/clock` | Full-face retro clock with numerals, sweep/tick hand and an hourly chime |
-| **Focus** | `#/focus` | Centisecond stopwatch with laps, goals and splits |
-| **Time calculator** | `#/calculator` | Difference between two moments, unit conversion, saved results |
+| **About** | `#/about` | What Tempo is, where the numbers come from, honest limits, and tagged remarks kept in your browser |
+
+A **phrase sits under every heading** — time for the clock sections, sky for
+the weather ones, and a seasonal line for the forecast that flips hemisphere
+with your latitude (September is autumn in Kathmandu and spring in Sydney).
+Phrases rotate by day number, never randomly, so a line is stable all day.
 
 **Old links still work.** `#/timer` was a real routed URL; anyone who
 bookmarked it lands on the timer section with a smooth scroll rather than a
-404. Clicking a sidebar entry jumps; scrolling updates the highlight; the hash
-is rewritten with `replaceState`, so one flick of the wheel does not push eight
-entries into the back button.
+404. Renamed sections keep their old hashes as aliases — `#/focus`, the
+section that grew up and became the Stopwatch, still finds it. Clicking a
+sidebar entry jumps; scrolling updates the highlight; the hash is rewritten
+with `replaceState`, so one flick of the wheel does not push ten entries into
+the back button.
 
-Everything persists in `localStorage`: home place, board, timer settings,
-**alarm sound, volume and ring duration**, stopwatch laps, saved calculations,
-theme, unit system and text size.
+Everything persists in `localStorage`: home place, board, **wall-clock
+alarms**, timer settings, **alarm sound, volume and ring duration**, stopwatch
+laps, saved calculations, old-clock face, theme, unit system and remarks.
 
 ## What is in the box
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| Scroll-spy nav | `src/router.js`, `app.js` | `IntersectionObserver` with a positional fallback; old `#/page` links still resolve |
+| Scroll-spy nav | `src/router.js`, `app.js` | `IntersectionObserver` with a positional fallback; old `#/page` links still resolve, via aliases where sections were renamed |
 | Place model | `src/places.js` | 419 IANA zones + 328 curated cities = 747 searchable places |
 | City gazetteer | `src/cities.js` | Country, region, coordinates and UTC offset for every city |
 | Legacy zone ids | `src/tz-places.js` | `Asia/Calcutta` → `Asia/Kolkata` and friends, so saved boards survive |
 | Searchable picker | `src/city-picker.js` | Grouped Country → City, diacritic-free search, keyboard navigation |
 | Live weather | `src/weather.js`, `src/weather-card.js` | [Open-Meteo](https://open-meteo.com/) (free, key-less): temperature, wind, snow, sunrise/sunset |
 | **Forecast** | `src/forecast.js` | 24 hourly + 7 daily, lazily loaded when the section is reached |
+| **Wall-clock alarms** | `src/alarms.js` | Calendar-day walking, DST-safe zone arithmetic, a 90 s grace window |
 | **Alarm sounds** | `src/alarm-sounds.js` | 16 Web-Audio sounds, looping playback, YouTube/Spotify/file input |
+| **Clock faces** | `src/clock-themes.js` | Roman · Modern · Minimal · Railway · Pocket watch · Neon · Brutalist · Botanical |
+| **Weather scenes** | `src/sky-scenes.js` | Eleven scenes behind the old clock, chosen from the live sky; mean-synodic moon phase |
+| **Heading phrases** | `src/phrases.js` | Day-number rotation; seasonal lines that flip with latitude |
+| **Remarks & feedback** | `src/remarks.js` | Tagged, kept in `localStorage`, handed to your own mail client |
 | **Reverse geocoding** | `src/geocode.js` | Names a fix from a real gazetteer, and grades how much to trust it |
 | Device location | `src/location.js` | High-accuracy `navigator.geolocation` + zone confirmation + a real place name |
 | Solar time | `src/places.js` | Longitude-based sun time, so a wide country stops being one flat clock |
@@ -107,6 +123,38 @@ message, so you are not told you blocked a permission you actually granted.
 The result is still a `geo:` place keeping its real latitude and longitude, so
 the clock, the sun-time line, the weather and the forecast are all computed for
 the spot where you actually are.
+
+### Alarms that ring at a wall-clock time
+
+The timer counts *down*; an alarm rings *at a time*. "Wake me at 06:30" and
+"remind me in forty minutes" are different sentences, and for a long time
+Tempo could only hear the second one. The **Alarms** section (`src/alarms.js`)
+fixes that:
+
+* an alarm is a **time** on your home clock, an optional **date** (one time
+  only), an optional **weekday repeat**, a **label**, and **notes attached to
+  that particular alarm** ("take the bread out of the freezer"), set to any of
+  the **sixteen sounds** below;
+* occurrences are found by **walking calendar days** in the alarm's zone, so a
+  Friday-only alarm jumps clean over the weekend, and a date-pinned repeat
+  skips the days before its date;
+* the arithmetic is **DST-safe**: a daily 07:00 stays at 07:00 wall clock
+  across the spring-forward night (the epoch distance shrinks to 23 hours) and
+  the fall-back night (25 hours), and a wall time that does not exist — 02:30
+  on the jump night — rings once the clock has moved past it;
+* the engine runs on the **device clock** with a **90-second grace window**:
+  a background tab whose timers were throttled still rings when it wakes up
+  less than 90 s late; anything later is rescheduled, not rung;
+* when one rings, **the page scrolls itself to it**, the card throbs, and a
+  dismiss bar appears at the top of the section;
+* one-time alarms switch themselves off after ringing; repeating ones keep
+  their schedule. Everything is stored in `localStorage` under
+  `tempo-alarms`.
+
+The honest limit is stated in the About section: **a web page cannot wake a
+sleeping phone.** Alarms ring while a Tempo tab is open — which is exactly as
+far as a static page can go, and further than it sounds, thanks to the grace
+window.
 
 ### Alarms that do not stop after one "ting"
 
@@ -179,12 +227,45 @@ custom properties (`@property`) and `prefers-reduced-motion` is respected.
 **Light** and **Dark** fix the look instead. The choice is remembered in
 `localStorage`.
 
-### Bigger text
+### Bigger text, fixed
 
-Every font size is a multiple of a single `--type-scale` custom property, so the
-whole interface scales together. The default scale is **15 % larger** than the
-original design, and the sidebar switch offers **A · A⁺ · A⁺⁺** (100 %, 115 %,
-132 %); the choice is remembered across visits.
+The three-button text-size switch (**A · A⁺ · A⁺⁺**) was the wrong fix: it
+scaled everything *proportionally*, so a 7.5px caption stayed a caption and
+body copy was too small at every setting. It is gone. All 222 sizes now sit on
+a **fixed ramp** in `styles.css`: the smallest text on the page is **11.5px**
+(up from 7.5px), body copy sits at **14–15px**, and headings were already fine
+and keep the size they always rendered at. The `--type-scale` custom property
+and the `tempo-text-scale` storage key are both gone entirely.
+
+### Eight faces, one live sky
+
+The old clock's three numeral styles grew up into **eight faces** —
+Roman · Modern · Minimal · Railway · Pocket watch · Neon · Brutalist ·
+Botanical (`src/clock-themes.js`). A face is a coat of paint, not a second
+mechanism: the renderer reports `data-clock-theme` on the dial and the
+stylesheet does the rest. A saved `numerals` preference from an earlier Tempo
+upgrades to the matching face, so nobody's clock changes on them.
+
+Behind the dial, the stage shows the **live sky** (`src/sky-scenes.js`): a
+thunderstorm with lightning, windstorm, rain, a rainbow (the one sky that
+earns one: a sunlit light shower), snowfall, fog, a dark cloud at noon,
+drifting clouds, a breeze, a starry night with the moon — and a moonless
+night, decided by a **mean-synodic moon-phase calculation** anchored to the
+new moon of 6 January 2000. The scene is **chosen from the weather snapshot
+the page already loaded, never from a menu** — a sky you pick is a
+screensaver; a sky you are told about is weather. Everything is CSS and
+positioned particles, no images and no canvas, and every animation stops
+under `prefers-reduced-motion`.
+
+### Remarks & feedback, kept honestly
+
+The About section ends the page with what Tempo is, where its numbers come
+from (IANA `tzdata`, Open-Meteo, BigDataCloud's gazetteer, longitude-based sun
+time, the mean-synodic moon), and its honest limits. Its remarks card takes a
+tagged remark (Idea · Bug · Question · Praise), keeps it **in the browser
+only**, and offers **send by email** — which does not send anything: it builds
+a `mailto:` with the remarks in the body and hands it to your own mail client.
+No contact records, deliberately.
 
 ## Time zone data
 
@@ -207,26 +288,40 @@ drift apart, so the data can never be edited by hand.
 npm test
 ```
 
-**128 tests, no network.** `node --test` covers the pure logic in Node — place
+**169 tests, no network.** `node --test` covers the pure logic in Node — place
 naming and search, the city gazetteer, the tzdb data pipeline, the Open-Meteo
-client, the theme decision table, the scroll spy, the reverse geocoder and the
-geolocation service (with the permission prompt and `fetch` both stubbed) —
-and boots the real `app.js` in a jsdom document to drive the whole dashboard.
+client, the theme decision table, the scroll spy, the reverse geocoder, the
+geolocation service (with the permission prompt and `fetch` both stubbed), the
+wall-clock alarm engine, the clock faces and the sky behind them, and the
+heading phrases — and boots the real `app.js` in a jsdom document to drive the
+whole dashboard.
 
 New suites added with this upgrade:
 
 | Suite | What it pins down |
 | --- | --- |
-| `tests/alarm-sounds.test.mjs` | All 16 sounds render real audio into a recording fake `AudioContext`, schedule nothing in the past, and finish inside their own loop; every mood is covered; YouTube/Spotify/audio/blob links parse and rubbish is refused; a browser with no audio is silence, not a crash |
-| `tests/geocode.test.mjs` | A Bhaktapur fix is named *Bhaktapur*, not Kathmandu; a name is never repeated in the detail line; an IP fallback admits what it is; accuracy is graded honestly; every failure is a value |
-| `tests/forecast.test.mjs` | The hourly strip starts at the current hour and is hour-aligned; seven days parse with highs, lows and rain chance; the range bar never overflows; the week is summarised in a sentence |
-| `tests/router.test.mjs` | The spy picks the last section to cross the reading line, refuses to guess with no layout, never hides a section, and still resolves old `#/page` bookmarks |
+| `tests/alarms.test.mjs` | A missing repeat is no repeat, not Sunday (`Number(null) === 0` is a trap); a dead sound id is reset by catalogue membership, because `findSound()` never returns null; occurrences walk calendar days (a Friday alarm jumps the weekend) and survive both DST corners (23 h and 25 h across the boundary, nonexistent wall times shift forward, ambiguous ones take the first); the 90 s grace window rings late but not too late; the wording is compact |
+| `tests/clock-themes.test.mjs` | Exactly eight faces, ordered and drawable, with a legacy-numerals upgrade and a safe fallback; the renderer re-spells the dial per face; the stylesheet paints all eight faces and all eleven scenes; the mean-synodic moon anchors to a real new moon and reads real full/new moons correctly; `sceneFor()` maps the whole decision table — storms, snow, fog, the rainbow rule, moonlit vs moonless nights, the dark cloud at noon, breeze vs windstorm, and *no weather, no scene* |
+| `tests/phrases.test.mjs` | Day numbers are stable within a local day; every section's line comes from its own pool (time for clocks, sky for weather); the forecast's seasonal line flips with latitude; `seasonFor()` knows both hemispheres; rotation is by day, sections differ, and an unknown section still gets a line |
 
-The smoke test additionally checks that all eight sections share one page, that
-the alarm picker lists and persists every choice, that a pasted Spotify link
-becomes the alarm, that a finished timer keeps ringing until dismissed, that
-the forecast is *not* fetched until its section is reached, and that
-"use my location" asks with `enableHighAccuracy: true` and a ≤ 60 s cache.
+The earlier suites (alarm sounds, geocode, forecast, router, and friends) are
+still in place; the alarm-sounds suite renders all 16 sounds into a recording
+fake `AudioContext`, and the geocode suite still checks that a Bhaktapur fix is
+named *Bhaktapur*, not Kathmandu.
+
+The smoke test additionally checks that all ten sections share one page in the
+time-first order, that a phrase sits under every heading, that the text-size
+switch is gone and `--type-scale` is never written (and that the smallest size
+in the stylesheet is 11.5px), that a wall-clock alarm rings when the clock
+reaches it and the page scrolls to it, that the Right-now glance and the
+Weather section render the same snapshot from one request, that the old clock
+wears all eight faces and upgrades an old numeral save, that the scene behind
+it follows the live sky, that remarks are tagged, kept and handed to your own
+mail client, and — as before — that the alarm picker lists and persists every
+choice, that a pasted Spotify link becomes the alarm, that a finished timer
+keeps ringing until dismissed, that the forecast is *not* fetched until its
+section is reached, and that "use my location" asks with
+`enableHighAccuracy: true` and a ≤ 60 s cache.
 
 ## Local development
 

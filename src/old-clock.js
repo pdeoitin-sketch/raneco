@@ -1,6 +1,19 @@
 /**
- * The Old clock page: one big clock with hands, a place of its own, and a few
- * honest controls (numerals, tick vs sweep, an hourly chime).
+ * The Old clock: one big clock with hands, a place of its own, a sky behind
+ * it, and a few honest controls (face, tick vs sweep, an hourly chime).
+ *
+ * Two things grew in this section:
+ *
+ *   • the three numeral styles became **eight faces** — Roman, Modern,
+ *     Minimal, Railway, Pocket watch, Neon, Brutalist, Botanical
+ *     (src/clock-themes.js). A saved `numerals` preference from an older
+ *     Tempo is upgraded to the matching face, so nobody's clock changes.
+ *
+ *   • the dial now sits on a **stage** that shows the live sky behind the
+ *     hands — a thunderstorm with lightning, drifting clouds, snow, a starry
+ *     night with the moon in its real phase (src/sky-scenes.js). The scene
+ *     is *chosen from the weather snapshot the page already has*, never from
+ *     a menu: it is the sky, not a screensaver. No scene without weather.
  *
  * It keeps its own animation loop rather than riding the app's one-second
  * tick, because a sweep second hand wants a frame callback — and because the
@@ -10,25 +23,49 @@
 import { createClockFace } from "./clock-face.js";
 import { placeRecord, sunNote, zoneOffsetLabel } from "./places.js";
 import { beep, pad } from "./ui.js";
+import { CLOCK_THEME_IDS, DEFAULT_CLOCK_THEME, findClockTheme, themeFromLegacyNumerals } from "./clock-themes.js";
+import { moonPhase, moonShadowShift, sceneFor, sceneParticles } from "./sky-scenes.js";
 
 const STORE_KEY = "tempo-old-clock";
 
-const defaults = { numerals: "roman", motion: "sweep", chime: false, placeId: "" };
+const defaults = { theme: DEFAULT_CLOCK_THEME, motion: "sweep", chime: false, placeId: "" };
+
+/** One honest line per scene, for the note beside the clock. */
+const SCENE_NOTES = {
+  thunderstorm: "a thunderstorm, lightning and all",
+  windstorm: "a windstorm, streaks and all",
+  rain: "steady rain",
+  rainbow: "a sunlit shower with a rainbow",
+  snowfall: "falling snow",
+  fog: "fog thick enough to lose a hand in",
+  "dark-cloud-noon": "a dark cloud at noon",
+  cloudy: "drifting clouds",
+  breeze: "a gentle breeze",
+  "starry-night": "a starry night with the moon",
+  "moonless-night": "a moonless night",
+};
 
 function readStored() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORE_KEY));
-    if (parsed && typeof parsed === "object") return { ...defaults, ...parsed };
+    if (parsed && typeof parsed === "object") {
+      const prefs = { ...defaults, ...parsed };
+      // A save from the numeral-styles era: upgrade it to a face.
+      const upgraded = themeFromLegacyNumerals(parsed.numerals);
+      if (upgraded) prefs.theme = upgraded;
+      if (!CLOCK_THEME_IDS.includes(prefs.theme)) prefs.theme = DEFAULT_CLOCK_THEME;
+      return prefs;
+    }
   } catch (_) {
     /* first visit, or storage blocked */
   }
   return { ...defaults };
 }
 
-export function createOldClock({ elements = {}, getPlaceId, notify, onPickPlace } = {}) {
+export function createOldClock({ elements = {}, getPlaceId, getWeather, notify, onPickPlace } = {}) {
   const prefs = readStored();
   const face = createClockFace(elements.face, {
-    numerals: prefs.numerals,
+    theme: prefs.theme,
     seconds: true,
     smooth: prefs.motion === "sweep",
   });
@@ -37,6 +74,7 @@ export function createOldClock({ elements = {}, getPlaceId, notify, onPickPlace 
   let frame = 0;
   let running = false;
   let lastHour = null;
+  let sceneId = null;
 
   function persist() {
     try {
@@ -100,11 +138,52 @@ export function createOldClock({ elements = {}, getPlaceId, notify, onPickPlace 
     }
   }
 
+  /* --------------------------------------------------------------- scene */
+
+  /**
+   * Repaint the sky behind the dial from the live weather snapshot. Called
+   * whenever the app has a new one; with no weather the stage goes quiet,
+   * because a made-up sky is worse than none.
+   */
+  function updateScene() {
+    const stage = elements.stage;
+    if (!stage) return;
+    const weather = typeof getWeather === "function" ? getWeather() : null;
+    const next = sceneFor(weather, { now: new Date() });
+
+    if (next === sceneId) return;
+    sceneId = next;
+    stage.dataset.scene = next || "none";
+
+    if (elements.sceneNote) {
+      if (next) {
+        elements.sceneNote.hidden = false;
+        elements.sceneNote.textContent = `Behind the dial: ${SCENE_NOTES[next] || "the live sky"}.`;
+      } else {
+        elements.sceneNote.hidden = true;
+      }
+    }
+
+    const layer = stage.querySelector(".scene");
+    if (layer) {
+      layer.innerHTML = "";
+      if (!next) return;
+      const phase = moonPhase();
+      for (const particle of sceneParticles(next)) {
+        const node = document.createElement("i");
+        node.className = particle.className;
+        for (const [name, value] of Object.entries(particle.style)) node.style.setProperty(name, value);
+        if (particle.className.includes("p-moon")) node.style.setProperty("--moon-shift", `${moonShadowShift(phase)}%`);
+        layer.appendChild(node);
+      }
+    }
+  }
+
   /* ------------------------------------------------------------- controls */
 
-  function setNumerals(style) {
-    prefs.numerals = style;
-    face.setNumerals(style);
+  function setTheme(themeId) {
+    prefs.theme = findClockTheme(themeId).id;
+    face.setTheme(prefs.theme);
     syncSegments();
     persist();
   }
@@ -127,9 +206,9 @@ export function createOldClock({ elements = {}, getPlaceId, notify, onPickPlace 
   }
 
   function syncSegments() {
-    if (elements.numeralsGroup) {
-      for (const button of elements.numeralsGroup.querySelectorAll("[data-numerals]")) {
-        const active = button.dataset.numerals === prefs.numerals;
+    if (elements.facesGroup) {
+      for (const button of elements.facesGroup.querySelectorAll("[data-clock-face]")) {
+        const active = button.dataset.clockFace === prefs.theme;
         button.classList.toggle("active", active);
         button.setAttribute("aria-pressed", String(active));
       }
@@ -144,10 +223,10 @@ export function createOldClock({ elements = {}, getPlaceId, notify, onPickPlace 
   }
 
   function bindEvents() {
-    if (elements.numeralsGroup) {
-      elements.numeralsGroup.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-numerals]");
-        if (button) setNumerals(button.dataset.numerals);
+    if (elements.facesGroup) {
+      elements.facesGroup.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-clock-face]");
+        if (button) setTheme(button.dataset.clockFace);
       });
     }
     if (elements.motionGroup) {
@@ -186,6 +265,7 @@ export function createOldClock({ elements = {}, getPlaceId, notify, onPickPlace 
       syncSegments();
       setChime(prefs.chime);
       renderPlace();
+      updateScene();
       render();
     },
     /** Called by the router when the page is shown / hidden. */
@@ -206,8 +286,16 @@ export function createOldClock({ elements = {}, getPlaceId, notify, onPickPlace 
       renderPlace();
       render();
     },
+    /** Called by the app whenever the weather snapshot changes. */
+    updateScene,
     get placeId() {
       return placeId;
+    },
+    get themeId() {
+      return prefs.theme;
+    },
+    get sceneId() {
+      return sceneId;
     },
     renderPlace,
   };
