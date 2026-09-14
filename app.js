@@ -1,16 +1,20 @@
 /**
  * Tempo — the dashboard shell.
  *
- * The app is a set of pages (see src/router.js) rather than one long scroll:
- * Right now, World clocks, Timer, Old clock, Focus and Time calculator. Each
- * page owns one job, and every page keeps its state while you are away — the
- * timer keeps counting, the stopwatch keeps running.
+ * **One page, eight sections.** Tempo used to be six routed pages behind a
+ * sidebar: everything worked, but reading two facts took two clicks and a
+ * repaint. Now the whole dashboard is a single scroll — Right now, Weather,
+ * Forecast, World clocks, Timer & alarm, Old clock, Focus and Time calculator
+ * — and the sidebar reports where you are instead of deciding what you may
+ * see (see src/router.js). Old `#/timer` links still work: they scroll.
  *
- * Underneath, four ideas do the work:
- *   • places      src/places.js      one model for zones, cities and GPS fixes
- *   • weather     src/weather.js     Open-Meteo, key-less and failure-tolerant
- *   • theme       src/theme.js       Auto / Light / Dark, keyed to the live sky
- *   • clock maths src/time-math.js   zone-aware date and duration arithmetic
+ * Underneath, six ideas do the work:
+ *   • places      src/places.js        one model for zones, cities and GPS fixes
+ *   • location    src/location.js      a real fix, named by a real gazetteer
+ *   • weather     src/weather.js       Open-Meteo, key-less and failure-tolerant
+ *   • forecast    src/forecast.js      the next 24 hours and the next 7 days
+ *   • alarms      src/alarm-sounds.js  16 synthesised sounds + your own music
+ *   • theme       src/theme.js         Auto / Light / Dark, keyed to the live sky
  */
 
 import { createCityPicker } from "./src/city-picker.js";
@@ -21,11 +25,19 @@ import { createTimer } from "./src/timer.js";
 import { createStopwatch } from "./src/stopwatch.js";
 import { createCalculator } from "./src/calculator.js";
 import { createWeatherCard } from "./src/weather-card.js";
-import { createRouter } from "./src/router.js";
+import { createForecast } from "./src/forecast.js";
+import { createScrollNav } from "./src/router.js";
 import { createToaster, $, $$, escapeHTML, flatten, pad } from "./src/ui.js";
 import { APPEARANCES, applyAppearance, readMode, resolveAppearance, themeCaption, writeMode } from "./src/theme.js";
 import { effectiveMood } from "./src/weather.js";
-import { currentLocation, locationErrorMessage, placeFromCoords } from "./src/location.js";
+import {
+  currentLocation,
+  describeAccuracy,
+  locationErrorMessage,
+  locationSuccessMessage,
+  placeFromCoords,
+} from "./src/location.js";
+import { ALARM_SOUNDS, findSound, soundsByMood } from "./src/alarm-sounds.js";
 import {
   DEFAULT_BOARD,
   POPULAR_PLACES,
@@ -54,13 +66,30 @@ import {
     textScale: "tempo-text-scale",
   };
 
+  /**
+   * The headline above the scroll changes with the section you are reading,
+   * which is what makes one long page still feel like it has chapters.
+   */
   const PAGE_TITLES = {
     now: "Make every moment count.",
+    weather: "The sky, where you actually are.",
+    forecast: "What the week is planning.",
     clocks: "Around the world.",
-    timer: "A timer that waits politely.",
+    timer: "A timer that will not be missed.",
     clock: "A slower kind of clock.",
     focus: "One thing at a time.",
     calculator: "Time, without the mental maths.",
+  };
+
+  const SECTION_EYEBROWS = {
+    now: "YOUR TIME, RIGHT NOW",
+    weather: "RIGHT NOW, OUTSIDE",
+    forecast: "THE WEEK AHEAD",
+    clocks: "STAY IN SYNC",
+    timer: "COUNTDOWN",
+    clock: "A SLOWER KIND OF CLOCK",
+    focus: "ONE THING AT A TIME",
+    calculator: "NO MENTAL MATH REQUIRED",
   };
 
   /* ---------------------------------------------------------------- storage */
@@ -128,6 +157,7 @@ import {
     themeMode: readMode(),
     appearance: "light",
     weather: null,
+    lastFix: null,
     localHour: null,
     localMinute: 0,
     textScale: Number(localStorage.getItem(keys.textScale)) || 1.15,
@@ -172,6 +202,19 @@ import {
     popularCities: $("#popular-cities"),
     addCityButton: $("#add-city-button"),
     useLocationClock: $("#use-location-clock"),
+
+    weatherUseLocationTop: $("#weather-use-location-top"),
+    weatherSetLocationTop: $("#weather-set-location-top"),
+    weatherLiveNote: $("#weather-live-note"),
+
+    locationCard: $("#location-card"),
+    locationName: $("#location-name"),
+    locationDetail: $("#location-detail"),
+    locationAccuracy: $("#location-accuracy"),
+    locationCoords: $("#location-coords"),
+    locationZone: $("#location-zone"),
+    locationWarning: $("#location-warning"),
+    locationLocate: $("#location-locate"),
 
     themeSwitch: $("#theme-switch"),
     themeCaption: $("#theme-caption"),
@@ -377,8 +420,93 @@ import {
       applyTheme();
       updateNotes();
       updateLiveTime();
+      if (elements.weatherLiveNote) {
+        elements.weatherLiveNote.textContent =
+          snapshot && snapshot.ok ? `Updated for ${snapshot.label || homePlace().city}.` : "";
+      }
+      // The forecast follows the card, so the two can never disagree.
+      forecast.refresh();
     },
   });
+
+  /* --------------------------------------------------------------- forecast */
+
+  const forecast = createForecast({
+    elements: {
+      section: $("#page-forecast"),
+      summary: $("#forecast-summary"),
+      hours: $("#forecast-hours"),
+      days: $("#forecast-days"),
+      place: $("#forecast-place"),
+      zone: $("#forecast-zone"),
+      refresh: $("#forecast-refresh"),
+    },
+    // One source of truth: whatever the weather card is pointed at.
+    getSource: () => {
+      const source = weatherCard.source;
+      if (!source) return null;
+      return {
+        lat: source.lat,
+        lon: source.lon,
+        label: source.label,
+        units: state.weather && state.weather.temperatureUnit === "°F" ? "imperial" : "metric",
+      };
+    },
+    notify,
+  });
+
+  /* ------------------------------------------------------- location card */
+
+  /**
+   * The "where we think you are" panel.
+   *
+   * It exists because the honest answer to "where am I" has a confidence
+   * attached, and hiding that confidence is what made the old feature feel
+   * random. A 20 m GPS fix and a 40 km network guess look identical on a map;
+   * here they do not.
+   */
+  function renderLocationCard(result) {
+    if (!elements.locationCard) return;
+    const card = elements.locationCard;
+
+    if (!result) {
+      card.dataset.precision = "unknown";
+      return;
+    }
+    if (!result.ok) {
+      card.dataset.precision = "error";
+      if (elements.locationName) elements.locationName.textContent = "Could not locate you";
+      if (elements.locationDetail) elements.locationDetail.textContent = locationErrorMessage(result);
+      if (elements.locationWarning) elements.locationWarning.hidden = true;
+      return;
+    }
+
+    const place = result.place;
+    const precision = result.precision || describeAccuracy(result.accuracy);
+    card.dataset.precision = precision.level;
+
+    if (elements.locationName) elements.locationName.textContent = place.city || "Your location";
+    if (elements.locationDetail) {
+      elements.locationDetail.textContent =
+        place.detail || [place.region, place.country].filter(Boolean).join(", ") || "Located from your device.";
+    }
+    if (elements.locationAccuracy) elements.locationAccuracy.textContent = precision.label;
+    if (elements.locationCoords) elements.locationCoords.textContent = placeCoords2(place);
+    if (elements.locationZone) elements.locationZone.textContent = place.zone || "—";
+    if (elements.locationWarning) {
+      if (result.coarse) {
+        elements.locationWarning.hidden = false;
+        elements.locationWarning.textContent =
+          "This is a network estimate, not a GPS fix — it can be tens of kilometres out, and on a VPN it can be the wrong country. Allow precise location, or pick your city by hand.";
+      } else if (!result.geocoded) {
+        elements.locationWarning.hidden = false;
+        elements.locationWarning.textContent =
+          "Named from Tempo's own city list because the gazetteer was unreachable — the nearest known city may not be the one you are in.";
+      } else {
+        elements.locationWarning.hidden = true;
+      }
+    }
+  }
 
   function updateNotes() {
     const place = homePlace();
@@ -505,28 +633,41 @@ import {
 
   /* -------------------------------------------------------------- location */
 
+  /**
+   * "Use my location", everywhere it appears.
+   *
+   * Three things are different from the old flow, and all three were the bug
+   * report: the fix is taken at **high accuracy** with a short cache window
+   * (a stale, coarse fix is what produced "a random thing"), the name comes
+   * from a **real gazetteer** rather than the nearest of our 328 cities, and
+   * the result carries its own **confidence**, which the toast and the
+   * location card both report instead of quietly pretending to be certain.
+   */
   async function useMyLocation({ setHome = true, addClock = false, alsoWeather = true } = {}) {
-    if (elements.useLocationButton) elements.useLocationButton.disabled = true;
-    notify("Looking for your location…", "⌖", 8000);
+    const buttons = [elements.useLocationButton, elements.locationLocate, elements.weatherUseLocationTop].filter(
+      Boolean
+    );
+    for (const button of buttons) button.disabled = true;
+    if (elements.locationCard) elements.locationCard.dataset.precision = "locating";
+    notify("Reading your device's position…", "⌖", 12000);
     try {
-      const result = await currentLocation({ lookup: true });
+      const result = await currentLocation({ lookup: true, geocode: true });
       if (!result.ok) {
         notify(locationErrorMessage(result), "!");
+        renderLocationCard(result);
         return null;
       }
       const place = result.place;
+      state.lastFix = result;
+      renderLocationCard(result);
+
       if (setHome) setHomePlace(place.id, { silent: true, weather: alsoWeather });
       if (addClock) addClockFor(place.id);
-      const where = place.country ? `${place.city}, ${place.country}` : place.city;
-      notify(
-        result.zoneConfirmed
-          ? `Found you near ${where} — ${place.zone}.`
-          : `Found you near ${where}.`,
-        "⌖"
-      );
+
+      notify(locationSuccessMessage(result), result.coarse ? "!" : "⌖", result.coarse ? 7000 : 5000);
       return place;
     } finally {
-      if (elements.useLocationButton) elements.useLocationButton.disabled = false;
+      for (const button of buttons) button.disabled = false;
     }
   }
 
@@ -573,9 +714,72 @@ import {
       start: $("#timer-start"),
       reset: $("#timer-reset"),
       presets: $$("#page-timer .preset-button"),
+      // The alarm: its picker, its settings, and the bar that appears when
+      // the countdown is over and the sound is still going.
+      ringingBar: $("#timer-ringing"),
+      dismiss: $("#timer-dismiss"),
+      soundList: $("#alarm-sounds"),
+      durationButtons: $$("#alarm-durations [data-alarm-duration]"),
+      volume: $("#alarm-volume"),
+      volumeLabel: $("#alarm-volume-label"),
+      notifyToggle: $("#alarm-notify"),
+      testAlarm: $("#alarm-test"),
+      customInput: $("#alarm-custom"),
+      customApply: $("#alarm-custom-apply"),
+      customFile: $("#alarm-file"),
+      currentSound: $("#alarm-current"),
     },
     notify,
   });
+
+  /**
+   * The sound picker, built from the catalogue rather than written out by
+   * hand, so adding a sound to `src/alarm-sounds.js` is the only step needed
+   * to make it appear here.
+   */
+  function renderSoundList() {
+    const host = $("#alarm-sounds");
+    if (!host) return;
+    const groups = soundsByMood()
+      .map((group) => {
+        const options = group.sounds
+          .map(
+            (sound) => `<div class="sound-option" role="radio" aria-checked="false" tabindex="0"
+              data-sound="${escapeHTML(sound.id)}" title="${escapeHTML(sound.note)}">
+              <span class="sound-name">${escapeHTML(sound.name)}</span>
+              <span class="sound-note">${escapeHTML(sound.note)}</span>
+              <button class="sound-play" type="button" data-preview="${escapeHTML(sound.id)}"
+                aria-label="Preview ${escapeHTML(sound.name)}">▶</button>
+            </div>`
+          )
+          .join("");
+        return `<div class="sound-group">
+          <p class="sound-group-label">${escapeHTML(group.label)}</p>
+          <div class="sound-options">${options}</div>
+        </div>`;
+      })
+      .join("");
+
+    host.innerHTML = `${groups}
+      <div class="sound-group">
+        <p class="sound-group-label">Your own</p>
+        <div class="sound-options">
+          <div class="sound-option sound-option-custom" role="radio" aria-checked="false" tabindex="0" data-sound="custom">
+            <span class="sound-name">Custom music</span>
+            <span class="sound-note">A file, a direct audio link, or YouTube / YouTube Music / Spotify.</span>
+          </div>
+        </div>
+      </div>`;
+
+    // Space and Enter pick a sound, the way a radio group should.
+    host.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const option = event.target.closest("[data-sound]");
+      if (!option) return;
+      event.preventDefault();
+      timer.setSound(option.dataset.sound);
+    });
+  }
 
   const stopwatch = createStopwatch({
     elements: {
@@ -617,24 +821,41 @@ import {
 
   /* ---------------------------------------------------------------- router */
 
-  const router = createRouter({
-    routes: [
+  /**
+   * The scroll spy.
+   *
+   * Every section is in the DOM all the time now, so `onChange` is about
+   * *waking things up* rather than swapping pages: the old clock's animation
+   * loop only runs while its section is on screen (it is a rAF loop, and
+   * burning frames on a clock nobody is looking at is rude), and the forecast
+   * loads the first time you reach it rather than on boot.
+   */
+  const nav = createScrollNav({
+    sections: [
       { id: "now", page: $("#page-now"), title: "Right now" },
+      { id: "weather", page: $("#page-weather"), title: "Weather" },
+      { id: "forecast", page: $("#page-forecast"), title: "Forecast" },
       { id: "clocks", page: $("#page-clocks"), title: "World clocks" },
-      { id: "timer", page: $("#page-timer"), title: "Timer" },
+      { id: "timer", page: $("#page-timer"), title: "Timer & alarm" },
       { id: "clock", page: $("#page-clock"), title: "Old clock" },
       { id: "focus", page: $("#page-focus"), title: "Focus" },
       { id: "calculator", page: $("#page-calculator"), title: "Time calculator" },
     ],
-    onChange: (route) => {
-      if (elements.pageTitle) elements.pageTitle.textContent = PAGE_TITLES[route.id] || PAGE_TITLES.now;
+    onChange: (section) => {
+      if (elements.pageTitle) elements.pageTitle.textContent = PAGE_TITLES[section.id] || PAGE_TITLES.now;
+      if (elements.todayLabel && SECTION_EYEBROWS[section.id]) {
+        elements.todayLabel.dataset.section = section.id;
+      }
       closeMobileNav();
-      oldClockVisible = route.id === "clock";
+
+      oldClockVisible = section.id === "clock";
       if (oldClockVisible) oldClock.start();
       else if (oldClock) oldClock.stop();
-      if (route.id === "timer") timer.sync();
-      if (route.id === "focus") stopwatch.sync();
-      if (route.id === "clocks") board.render();
+
+      if (section.id === "timer") timer.sync();
+      if (section.id === "focus") stopwatch.sync();
+      if (section.id === "clocks") board.render();
+      if (section.id === "forecast") forecast.activate();
     },
   });
 
@@ -665,6 +886,15 @@ import {
       elements.useLocationClock.addEventListener("click", () =>
         useMyLocation({ setHome: false, addClock: true, alsoWeather: false })
       );
+    }
+    if (elements.locationLocate) {
+      elements.locationLocate.addEventListener("click", () => useMyLocation({ setHome: true, addClock: false }));
+    }
+    if (elements.weatherUseLocationTop) {
+      elements.weatherUseLocationTop.addEventListener("click", () => weatherCard.useMyLocation());
+    }
+    if (elements.weatherSetLocationTop) {
+      elements.weatherSetLocationTop.addEventListener("click", () => openPicker("weather"));
     }
     if (elements.popularCities) {
       elements.popularCities.addEventListener("click", (event) => {
@@ -826,16 +1056,18 @@ import {
     board.bindEvents();
     renderPopularCities();
 
+    renderSoundList();
     timer.init();
     stopwatch.init();
     calculator.init();
+    forecast.init();
     bindEvents();
 
     applyTheme();
     updateLiveTime();
     updateNotes();
-    router.registerLinks("[data-route]");
-    router.start();
+    nav.registerLinks("[data-route]");
+    nav.start();
 
     window.setInterval(updateLiveTime, 1000);
     weatherCard.init();

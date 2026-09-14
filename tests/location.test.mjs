@@ -95,13 +95,18 @@ test("a refused permission is a message, not an exception", async () => {
   assert.equal(denied.reason, "denied");
   assert.match(locationErrorMessage(denied), /declined/);
 
+  // Code 2 is POSITION_UNAVAILABLE, not a refusal: the radio simply has no
+  // fix. Reporting it as "denied" used to tell people they had blocked a
+  // permission they had actually granted.
   withGeolocation(null, { code: 2 });
-  assert.equal((await currentLocation({ fetchImpl: ok(zonePayload) })).reason, "denied");
+  const noFix = await currentLocation({ fetchImpl: ok(zonePayload) });
+  assert.equal(noFix.reason, "unavailable");
+  assert.match(locationErrorMessage(noFix), /No position fix/);
 
   withGeolocation(null, { code: 3 });
-  const unavailable = await currentLocation({ fetchImpl: ok(zonePayload) });
-  assert.equal(unavailable.reason, "unavailable");
-  assert.match(locationErrorMessage(unavailable), /No position fix/);
+  const timedOut = await currentLocation({ fetchImpl: ok(zonePayload) });
+  assert.equal(timedOut.reason, "timeout");
+  assert.match(locationErrorMessage(timedOut), /timed out/);
 
   assert.equal(locationErrorMessage({ ok: true }), "");
   assert.equal(locationErrorMessage(null), "");
