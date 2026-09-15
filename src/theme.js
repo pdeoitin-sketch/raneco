@@ -31,8 +31,14 @@ export const APPEARANCES = {
   rain: { label: "Rainy", icon: "☂", dark: false, canvas: "#e3ecf6", kind: "rain" },
   snow: { label: "Snowy", icon: "❄", dark: false, canvas: "#edf4fa", kind: "snow" },
   dusk: { label: "Sunset", icon: "🌇", dark: false, canvas: "#ffd97a", kind: "sunset" },
-  storm: { label: "Stormy", icon: "⛈", dark: true, canvas: "#14161f", kind: "storm" },
-  night: { label: "Night sky", icon: "✦", dark: true, canvas: "#0d1020", kind: "night" },
+  storm: { label: "Day storm", icon: "⛈", dark: true, canvas: "#14161f", kind: "storm" },
+  night: { label: "Clear night", icon: "✦", dark: true, canvas: "#0d1020", kind: "night" },
+  "night-cloud": { label: "Cloudy night", icon: "☁", dark: true, canvas: "#11182a", kind: "cloud" },
+  "night-fog": { label: "Foggy night", icon: "🌫", dark: true, canvas: "#151c2a", kind: "fog" },
+  "night-rain": { label: "Rainy night", icon: "☂", dark: true, canvas: "#0c1528", kind: "rain" },
+  "night-snow": { label: "Snowy night", icon: "❄", dark: true, canvas: "#111b30", kind: "snow" },
+  "night-wind": { label: "Windy night", icon: "🍃", dark: true, canvas: "#0d1c29", kind: "wind" },
+  "night-storm": { label: "Night storm", icon: "⛈", dark: true, canvas: "#090d19", kind: "storm" },
 };
 
 /** Wind speeds (km/h) at which a plain sky is better described as "windy". */
@@ -88,9 +94,27 @@ export function resolveAppearance({ mode = "auto", hour = 12, weather = null, no
   const toSunrise = minutesUntilEpoch(code.sunrise, now);
   const toSunset = minutesUntilEpoch(code.sunset, now);
 
-  // A thunderstorm owns the page, day or night.
-  if (mood === "storm") return { appearance: "storm", reason: `${code.condition || "Thunderstorm"} overhead`, weather: code, clock };
-  if (!isDay) return { appearance: "night", reason: "Sun is down", weather: code, clock };
+  // Night does not erase the weather. Rain beneath moonlight, a cloudy night,
+  // and a night thunderstorm each keep both parts of the story.
+  if (!isDay) {
+    const nightMood = isBreezy(code) && ["sunny", "cloud"].includes(mood) ? "wind" : mood;
+    const nightAppearances = {
+      storm: "night-storm",
+      rain: "night-rain",
+      snow: "night-snow",
+      cloud: "night-cloud",
+      fog: "night-fog",
+      wind: "night-wind",
+    };
+    const appearance = nightAppearances[nightMood] || "night";
+    return {
+      appearance,
+      reason: `${code.condition || "Night sky"} · nighttime`,
+      weather: code,
+      clock,
+    };
+  }
+  if (mood === "storm") return { appearance: "storm", reason: `${code.condition || "Thunderstorm"} overhead · daytime`, weather: code, clock };
   if (toSunrise !== null && toSunrise >= -SUNRISE_WINDOW.before && toSunrise <= SUNRISE_WINDOW.after) {
     return { appearance: "dawn", reason: `Sunrise at ${wallClock(code.sunrise, code.utcOffsetSeconds)}`, weather: code, clock };
   }

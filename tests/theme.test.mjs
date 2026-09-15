@@ -40,6 +40,7 @@ test("Auto follows the sun: sunrise, day, sunset, night", () => {
     "sunset brings the amber sunset palette"
   );
   assert.equal(resolveAppearance({ mode: "auto", hour: 22, now: NOW, weather: sky({ isDay: false }) }).appearance, "night");
+  assert.equal(resolveAppearance({ mode: "auto", hour: 22, now: NOW, weather: sky({ mood: "cloud", isDay: false }) }).appearance, "night-cloud");
 });
 
 test("Auto follows the sky: cloud, rain, snow, fog, storms", () => {
@@ -108,7 +109,15 @@ test("a thunderstorm wins over everything, and night wins over drizzle", () => {
     now: NOW,
     weather: sky({ mood: "rain", isDay: false }),
   });
-  assert.equal(rainyNight.appearance, "night");
+  assert.equal(rainyNight.appearance, "night-rain");
+
+  const stormyNight = resolveAppearance({
+    mode: "auto",
+    hour: 2,
+    now: NOW,
+    weather: sky({ mood: "storm", condition: "Thunderstorm", isDay: false }),
+  });
+  assert.equal(stormyNight.appearance, "night-storm");
 });
 
 test("without weather the clock alone picks a readable look", () => {
@@ -140,7 +149,7 @@ test("Light and Dark are honoured over the live conditions", () => {
 
 test("only the dark palettes flip the dark UI flag", () => {
   // Sunset stays a *light*, amber palette — the sky is yellow, not black.
-  const dark = ["storm", "night", "dark"];
+  const dark = ["storm", "night", "night-cloud", "night-fog", "night-rain", "night-snow", "night-wind", "night-storm", "dark"];
   const light = Object.keys(APPEARANCES).filter((name) => !dark.includes(name));
   for (const name of dark) assert.equal(isDarkAppearance(name), true, `${name} is dark`);
   for (const name of light) assert.equal(isDarkAppearance(name), false, `${name} is light`);
@@ -168,7 +177,7 @@ test("captions explain what Auto is doing", () => {
     themeCaption({ mode: "auto", appearance: "dusk", place: "Delhi", reason: "Sunset at 19:04" }),
     "Auto · Sunset in Delhi — Sunset at 19:04"
   );
-  assert.equal(themeCaption({ mode: "auto", appearance: "night", place: "Kathmandu" }), "Auto · Night sky in Kathmandu");
+  assert.equal(themeCaption({ mode: "auto", appearance: "night", place: "Kathmandu" }), "Auto · Clear night in Kathmandu");
   assert.equal(themeCaption({ mode: "light", appearance: "light", place: "Kathmandu" }), "Light theme · fixed");
   assert.equal(themeCaption({ mode: "dark", appearance: "dark" }), "Dark theme · fixed");
 });

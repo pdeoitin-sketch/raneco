@@ -33,6 +33,8 @@ export function createWeatherCard({ elements = {}, getHomeId, notify, onSnapshot
   let snapshot = null;
   let source = null;
   let busy = false;
+  let queuedRefresh = false;
+  let sourceRevision = 0;
   let refreshTimer = 0;
 
   const show = (id, value) => {
@@ -252,10 +254,16 @@ export function createWeatherCard({ elements = {}, getHomeId, notify, onSnapshot
 
   async function refresh({ force = false } = {}) {
     if (!card) return null;
-    if (busy) return snapshot;
+    if (busy) {
+      // A place can change while the previous city's request is in flight.
+      // Never let that old request swallow the new one.
+      queuedRefresh = queuedRefresh || force;
+      return snapshot;
+    }
     if (snapshot && snapshot.ok && !force && Date.now() - snapshot.observedAt < REFRESH_MS) return snapshot;
 
     busy = true;
+    const revision = sourceRevision;
     render();
     const resolved = await resolveSource(force);
     if (!resolved) {
@@ -282,11 +290,20 @@ export function createWeatherCard({ elements = {}, getHomeId, notify, onSnapshot
       timezone: "auto",
     });
     busy = false;
-    snapshot = next;
-    if (next && next.ok) show("place", next.label || source.label);
-    render();
-    emit();
-    return next;
+    // If the user moved home while this request was travelling, its daylight
+    // flag belongs to the old city. Discard it instead of briefly repainting
+    // the new city's night as a sunny day.
+    if (revision === sourceRevision) {
+      snapshot = next;
+      if (next && next.ok) show("place", next.label || source.label);
+      render();
+      emit();
+    }
+    if (queuedRefresh || revision !== sourceRevision) {
+      queuedRefresh = false;
+      void refresh({ force: true });
+    }
+    return revision === sourceRevision ? next : null;
   }
 
   function emit() {
@@ -298,6 +315,7 @@ export function createWeatherCard({ elements = {}, getHomeId, notify, onSnapshot
   async function useMyLocation() {
     if (source && source.kind === "gps") {
       const fallback = homeSource();
+      sourceRevision += 1;
       source = fallback;
       if (fallback) persistSource({ ...fallback, followHome: true });
       await refresh({ force: true });
@@ -306,6 +324,7 @@ export function createWeatherCard({ elements = {}, getHomeId, notify, onSnapshot
     }
     try {
       const position = await requestPosition();
+      sourceRevision += 1;
       source = { kind: "gps", lat: position.lat, lon: position.lon, label: "Your location" };
       persistSource(source);
       await refresh({ force: true });
@@ -326,6 +345,7 @@ export function createWeatherCard({ elements = {}, getHomeId, notify, onSnapshot
       if (notify) notify(`${record.city} has no coordinates we can look up.`, "!");
       return false;
     }
+    sourceRevision += 1;
     source = { kind: "place", placeId: record.id, lat: coords.lat, lon: coords.lon, label: record.label };
     persistSource(source);
     await refresh({ force: true });
@@ -377,8 +397,14 @@ export function createWeatherCard({ elements = {}, getHomeId, notify, onSnapshot
     followHomeZone() {
       const stored = readStoredSource();
       if (!stored || stored.kind !== "gps") {
+        sourceRevision += 1;
         source = homeSource();
+        snapshot = null;
         if (source) persistSource({ ...source, followHome: true });
+        // Immediately fall back to the new place's wall clock while its live
+        // sky loads. This prevents even one frame of old-city weather.
+        render();
+        emit();
       }
       return refresh({ force: true });
     },
