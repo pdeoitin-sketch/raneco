@@ -511,6 +511,10 @@ export function createTimer({ elements = {}, notify, player } = {}) {
           return;
         }
         sounds.play(activeSource(), { volume: alarm.volume, durationMs: 6000, repeat: true });
+        // "Test the alarm" should test the whole alarm, notification and
+        // all — otherwise the only way to find out a system notification is
+        // silently blocked is to wait for a real timer to end.
+        systemNotify("Testing the alarm", `This is what ${describeActiveSound()} sounds — and looks — like.`);
         if (notify) notify(`Playing ${describeActiveSound()}.`);
       });
     }
