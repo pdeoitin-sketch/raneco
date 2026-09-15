@@ -1035,11 +1035,18 @@ body[data-ui="dark"] .world-sun { color: var(--ink-3); }
 
 /* --------------------------------------------------------- clock face */
 
-.clock-face { position: relative; border-radius: 50%; color: var(--ink); }
+.clock-face {
+  /* Numerals and hour batons share this dial geometry. Keep the label just
+     inside the end of a major baton so the two read as one hour marker. */
+  --tick-inset: 5%;
+  --major-tick-length: 8%;
+  --numeral-inset: 15%;
+  position: relative; border-radius: 50%; color: var(--ink);
+}
 .clock-face .face-ticks, .clock-face .face-numbers { position: absolute; inset: 0; }
 .clock-face .face-tick { position: absolute; left: calc(50% - .5px); top: 0; width: 1px; height: 100%; transform: rotate(var(--angle)); }
-.clock-face .face-tick:before { content: ""; position: absolute; top: 5%; left: 0; width: 1px; height: 4.5%; background: currentColor; opacity: .3; }
-.clock-face .face-tick.major:before { width: 2px; left: -.5px; height: 8%; opacity: .72; }
+.clock-face .face-tick:before { content: ""; position: absolute; top: var(--tick-inset); left: 0; width: 1px; height: 4.5%; background: currentColor; opacity: .3; }
+.clock-face .face-tick.major:before { width: 2px; left: -.5px; height: var(--major-tick-length); opacity: .72; }
 .clock-face .face-number { position: absolute; inset: 0; display: grid; place-items: start center; transform: rotate(var(--angle)); }
 .clock-face .face-number em {
   font-style: normal;
@@ -1049,10 +1056,11 @@ body[data-ui="dark"] .world-sun { color: var(--ink-3); }
   line-height: 1;
   opacity: .72;
   /* A % margin resolves against the face — which is always square — so this
-     parks every glyph just inside the tick ring at any face size. (A %
-     translate would resolve against the glyph itself and pile all twelve
-     numerals on top of each other at the centre.) */
-  margin-top: 12%;
+     parks every glyph just inside its matching hour baton at any face size.
+     The major baton ends at 13%; the small gap before 15% keeps labels aligned
+     without letting the ink collide with the mark. (A % translate would
+     resolve against the glyph itself and pile all twelve at the centre.) */
+  margin-top: var(--numeral-inset, 15%);
   transform: rotate(calc(-1 * var(--angle)));
 }
 .clock-face[data-numerals="none"] .face-numbers { display: none; }
@@ -1893,8 +1901,9 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
   box-shadow: 10px 12px 0 rgba(32, 33, 45, .9);
 }
 .old-clock[data-clock-theme="brutalist"] .clock-pin { background: #20212d; }
+.old-clock[data-clock-theme="brutalist"] { --major-tick-length: 12%; --numeral-inset: 19%; }
 .old-clock[data-clock-theme="brutalist"] .face-number em { font-family: var(--font-mono); font-weight: 500; font-size: 19.5px; letter-spacing: -1px; opacity: 1; }
-.old-clock[data-clock-theme="brutalist"] .face-tick.major:before { width: 4px; height: 12%; opacity: 1; }
+.old-clock[data-clock-theme="brutalist"] .face-tick.major:before { width: 4px; opacity: 1; }
 .old-clock[data-clock-theme="brutalist"] .face-tick:not(.major):before { opacity: .38; }
 .old-clock[data-clock-theme="brutalist"] .hand-hour { width: 9px; left: calc(50% - 4.5px); border-radius: 0; }
 .old-clock[data-clock-theme="brutalist"] .hand-minute { width: 6px; left: calc(50% - 3px); border-radius: 0; }
@@ -2144,7 +2153,9 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
 .world-time {
   margin-top: 0; min-width: 0;
   font-family: var(--font-mono); color: var(--ink);
-  font-size: clamp(31px, 2.9vw, 42px); font-weight: 700; letter-spacing: -2.2px; line-height: .98;
+  /* Match the visual authority of the main weather reading: a world time is
+     the card's answer, not supporting metadata. */
+  font-size: clamp(40px, 3.35vw, 48px); font-weight: 700; letter-spacing: -2.4px; line-height: .94;
   font-variant-numeric: tabular-nums;
 }
 .world-time .world-period {
@@ -2181,6 +2192,14 @@ body[data-ui="dark"] .world-shift.shift-home { color: #c3b8ff; }
 .world-card-bottom { margin-top: 14px; }
 .world-sun { margin-top: 6px; font-size: 12.5px; }
 .board-weather-note { margin: 16px 0 0; color: var(--ink-3); font-size: 13.5px; }
+
+/* Give the larger answer room on phones instead of squeezing two unreadable
+   cards (and their temperature readings) into a 320px viewport. */
+@media (max-width: 560px) {
+  .world-grid { grid-template-columns: 1fr; }
+  .city-label strong { max-width: none; }
+  .world-time { font-size: clamp(42px, 13vw, 48px); }
+}
 
 /* =====================================================================
    Time standards — the clocks that are named rather than placed
