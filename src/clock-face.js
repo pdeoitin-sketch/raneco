@@ -57,6 +57,10 @@ export function createClockFace(root, { numerals = "arabic", seconds = true, smo
   for (let hour = 1; hour <= 12; hour += 1) {
     const node = document.createElement("span");
     node.className = "face-number";
+    // The hour this glyph stands for, so a face can decorate the *quarters*
+    // (12, 3, 6, 9) instead of guessing with :nth-child — the children are
+    // built 1..12, so nth-child(1) is one o'clock, not twelve.
+    node.dataset.hour = String(hour === 12 ? 12 : hour);
     node.style.setProperty("--angle", `${hour * 30}deg`);
     const glyph = document.createElement("em");
     glyph.textContent = numerals === "roman" ? ROMAN[hour % 12] : String(hour);

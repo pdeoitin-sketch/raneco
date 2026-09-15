@@ -24,6 +24,7 @@ import { createCityPicker } from "./src/city-picker.js";
 import { createClockFace } from "./src/clock-face.js";
 import { createOldClock } from "./src/old-clock.js";
 import { createWorldBoard } from "./src/world-board.js";
+import { createStandardsBoard } from "./src/standards-board.js";
 import { createTimer } from "./src/timer.js";
 import { createStopwatch } from "./src/stopwatch.js";
 import { createCalculator } from "./src/calculator.js";
@@ -36,6 +37,7 @@ import { phraseFor } from "./src/phrases.js";
 import { createToaster, $, $$, escapeHTML, flatten, pad } from "./src/ui.js";
 import { APPEARANCES, applyAppearance, readMode, resolveAppearance, themeCaption, writeMode } from "./src/theme.js";
 import { REFRESH_MS, effectiveMood, fetchWeather, preferImperial } from "./src/weather.js";
+import { BOARD_REFRESH_MS, fetchBoardTemperatures, unitForRecord } from "./src/board-weather.js";
 import {
   currentLocation,
   describeAccuracy,
@@ -52,6 +54,7 @@ import {
   placeZone,
   sunNote,
   zoneOffsetLabel,
+  zoneOffsetMinutes,
   ZONE_PREFIX,
 } from "./src/places.js";
 import {
@@ -82,6 +85,7 @@ import {
     timer: "A timer that will not be missed.",
     stopwatch: "One thing at a time.",
     clocks: "Around the world.",
+    standards: "Every clock has a name.",
     clock: "A slower kind of clock.",
     calculator: "Time, without the mental maths.",
     weather: "The sky, where you actually are.",
@@ -95,6 +99,7 @@ import {
     timer: "COUNTDOWN",
     stopwatch: "TRACK ELAPSED TIME",
     clocks: "STAY IN SYNC",
+    standards: "SHORT FORM, FULL FORM",
     clock: "A SLOWER KIND OF CLOCK",
     calculator: "NO MENTAL MATH REQUIRED",
     weather: "RIGHT NOW, OUTSIDE",
@@ -178,6 +183,10 @@ import {
     localHour: null,
     localMinute: 0,
     phraseDay: null,
+    // Board temperatures, keyed by place id. One batched request keeps the
+    // whole board warm; a card with no reading simply shows no number.
+    boardTemps: {},
+    boardTempsAt: 0,
   };
   let homeWeatherRevision = 0;
 
@@ -223,6 +232,7 @@ import {
     nowWeatherMeta: $("#now-weather-meta"),
 
     popularCities: $("#popular-cities"),
+    worldWeatherNote: $("#world-weather-note"),
     addCityButton: $("#add-city-button"),
     useLocationClock: $("#use-location-clock"),
 
@@ -330,6 +340,7 @@ import {
     renderPhrases();
 
     board.update(now);
+    if (standardsVisible) standards.update(now);
     oldClockTick(now);
 
     // Every half minute is enough for a palette that follows the sun, and it
@@ -696,6 +707,7 @@ import {
       onMakeHome: (id) => setHomePlace(id),
     },
     getHomeId: () => state.homeId,
+    getTemperature: (id) => state.boardTemps[id] || null,
     notify,
     max: MAX_WORLD_CLOCKS,
     onChange: (places) => {
@@ -706,6 +718,71 @@ import {
         /* the board resets next visit when storage is blocked */
       }
     },
+    // A clock added (or removed) changes what the batch should ask for; a
+    // card with no reading would otherwise sit blank until the next refresh.
+    onPlacesChanged: () => refreshBoardTemperatures({ reason: "board-changed" }),
+  });
+
+  /* --------------------------------------------------- board temperatures */
+
+  /**
+   * One request for the whole board.
+   *
+   * Every card wants a temperature beside its hour, and twelve separate calls
+   * for twelve small numbers would be both slow and rude to a free API — so
+   * Open-Meteo's multi-coordinate form does it in one. Failures are silent by
+   * design: the cards keep whatever they had, because a clock must never be
+   * taken down by the weather.
+   */
+  let boardTempsBusy = false;
+  async function refreshBoardTemperatures({ force = false, reason = "" } = {}) {
+    if (boardTempsBusy) return;
+    if (!force && state.boardTempsAt && Date.now() - state.boardTempsAt < 30 * 1000 && reason !== "board-changed") {
+      return;
+    }
+    const points = state.board
+      .map((id) => {
+        const record = placeRecord(id);
+        const coords = placeCoords(id);
+        if (!coords) return null;
+        return { id: record.id, lat: coords.lat, lon: coords.lon, units: unitForRecord(record) };
+      })
+      .filter(Boolean);
+    if (!points.length) return;
+
+    boardTempsBusy = true;
+    try {
+      const result = await fetchBoardTemperatures(points);
+      if (result.ok) {
+        state.boardTemps = { ...state.boardTemps, ...result.readings };
+        state.boardTempsAt = result.observedAt;
+        board.renderTemperatures();
+        if (elements.worldWeatherNote) {
+          elements.worldWeatherNote.textContent =
+            "Each clock shows its own city's temperature, in the unit that city uses.";
+        }
+      } else if (elements.worldWeatherNote && result.message) {
+        elements.worldWeatherNote.textContent = result.message;
+      }
+    } finally {
+      boardTempsBusy = false;
+    }
+  }
+
+  /* ------------------------------------------------------- time standards */
+
+  const standards = createStandardsBoard({
+    elements: {
+      grid: $("#standards-grid"),
+      count: $("#standards-count"),
+      empty: $("#standards-empty"),
+      regions: $("#standards-regions"),
+      clockFormat: $("#standards-format"),
+      search: $("#standards-search"),
+    },
+    getHomeOffsetMinutes: () => zoneOffsetMinutes(homeZone(), new Date()),
+    getHomeCity: () => homePlace().city,
+    notify,
   });
 
   function renderPopularCities() {
@@ -726,6 +803,9 @@ import {
 
   let oldClock = null;
   let oldClockVisible = false;
+  // The standards grid only ticks while it is on screen; off screen it is a
+  // few dozen text nodes nobody is reading.
+  let standardsVisible = false;
 
   function oldClockTick(now) {
     if (!oldClockVisible || !oldClock) return;
@@ -857,6 +937,9 @@ import {
     refreshHomeWeather({ force: true });
     if (weather) weatherCard.followHomeZone();
     if (oldClock && (!oldClock.placeId || oldClock.placeId === record.id)) oldClock.setPlace(record.id);
+    // Every standard's "ahead of / behind you" line is measured from home.
+    standards.refreshShifts();
+    refreshBoardTemperatures({ force: true, reason: "home-changed" });
     if (!silent) notify(`${record.label} is now your home place.`);
   }
 
@@ -1054,6 +1137,7 @@ import {
       { id: "timer", page: $("#page-timer"), title: "Timer" },
       { id: "stopwatch", page: $("#page-stopwatch"), title: "Stopwatch" },
       { id: "clocks", page: $("#page-clocks"), title: "World clocks" },
+      { id: "standards", page: $("#page-standards"), title: "Time standards" },
       { id: "clock", page: $("#page-clock"), title: "Old clock" },
       { id: "calculator", page: $("#page-calculator"), title: "Time calculator" },
       { id: "weather", page: $("#page-weather"), title: "Weather" },
@@ -1077,7 +1161,12 @@ import {
       if (section.id === "alarms") alarms.sync();
       if (section.id === "timer") timer.sync();
       if (section.id === "stopwatch") stopwatch.sync();
-      if (section.id === "clocks") board.render();
+      if (section.id === "clocks") {
+        board.render();
+        refreshBoardTemperatures({ reason: "section" });
+      }
+      standardsVisible = section.id === "standards";
+      if (standardsVisible) standards.render();
       if (section.id === "forecast") forecast.activate();
     },
   });
@@ -1244,6 +1333,7 @@ import {
         placeButton: $("#old-clock-place"),
         fullscreen: $("#old-clock-fullscreen"),
         facesGroup: $("#old-clock-faces"),
+        faceNote: $("#old-clock-face-note"),
         motionGroup: $("#old-clock-motion"),
         chime: $("#old-clock-chime"),
       },
@@ -1279,6 +1369,8 @@ import {
     board.bindEvents();
     renderPopularCities();
 
+    standards.init();
+
     renderSoundList();
     timer.init();
     stopwatch.init();
@@ -1298,6 +1390,11 @@ import {
 
     window.setInterval(updateLiveTime, 1000);
     weatherCard.init();
+
+    // The board's temperatures: once now, then on a slow loop. Weather moves
+    // far slower than a clock, so a quarter of an hour is plenty.
+    refreshBoardTemperatures({ force: true, reason: "boot" });
+    window.setInterval(() => refreshBoardTemperatures({ force: true, reason: "interval" }), BOARD_REFRESH_MS);
 
     // A coordinate-only place (added by an older build, or typed by hand) can
     // still be resolved: ask the network once, quietly, on load.

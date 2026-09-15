@@ -1062,6 +1062,12 @@ body[data-ui="dark"] .world-sun { color: var(--ink-3); }
 .clock-face .hand-minute { height: 38%; }
 .clock-face .hand-second { height: 42%; width: 1.5px; left: calc(50% - .75px); background: var(--coral); transition: transform .16s cubic-bezier(.34, 1.4, .64, 1); }
 .clock-face[data-smooth="true"] .hand-second { transition: transform .06s linear; }
+/* The mechanical tick. src/clock-face.js restamps `.tick` on the second hand
+   on every whole second precisely so this can run; without the keyframes the
+   "Tick" setting was indistinguishable from "Sweep" minus the smoothing. */
+.clock-face[data-smooth="false"] .hand-second.tick { animation: hand-tick .16s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes hand-tick { 0% { transform-origin: bottom center; } 45% { filter: none; } }
+@media (prefers-reduced-motion: reduce) { .clock-face .hand-second { transition: none; animation: none; } }
 .clock-face[data-seconds="false"] .hand-second { display: none; }
 .now-card .clock-face { color: rgba(255, 255, 255, .94); }
 .now-card .clock-face .hand-second { background: #ffb7a9; }
@@ -1773,8 +1779,31 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
 .old-clock-stage { position: relative; width: min(58vh, 460px); aspect-ratio: 1; margin: 0 auto; }
 .old-clock { width: 100%; height: 100%; }
 
-/* Roman — the face Tempo has always worn: serif numerals, classic dial. */
-.old-clock[data-clock-theme="roman"] .face-number em { font-family: var(--font-display); font-weight: 600; font-size: 15px; opacity: .88; }
+/* Roman — the face Tempo has always worn. It used to be a single font rule
+   sitting on the base dial, which made "Roman" and "Modern" the same clock in
+   two typefaces. It is a real face now: a warm ivory dial, a chapter ring the
+   numerals sit inside, and blued-steel hands. */
+.old-clock[data-clock-theme="roman"] {
+  color: #2f2a3d;
+  background:
+    radial-gradient(circle at 38% 30%, #fffdf8 0%, #f6f1e6 76%);
+  border-color: #cdc3ae;
+  box-shadow: inset 0 0 30px rgba(90, 76, 48, .13), inset 0 2px 6px rgba(255, 255, 255, .7), 0 26px 50px rgba(50, 42, 70, .16);
+}
+.old-clock[data-clock-theme="roman"] .face-number em { font-family: var(--font-display); font-weight: 600; font-size: 15px; opacity: .92; }
+.old-clock[data-clock-theme="roman"]:before { border-color: rgba(90, 76, 48, .26); inset: 9%; }
+.old-clock[data-clock-theme="roman"] .face-tick:before { background: #4a4159; opacity: .32; }
+.old-clock[data-clock-theme="roman"] .face-tick.major:before { opacity: .78; }
+/* Blued steel, the way a good mechanical watch does its hands. */
+.old-clock[data-clock-theme="roman"] .hand-hour,
+.old-clock[data-clock-theme="roman"] .hand-minute { background: #2f3a63; }
+.old-clock[data-clock-theme="roman"] .hand-second { background: #9c5a3c; }
+.old-clock[data-clock-theme="roman"] .clock-pin { background: #2f3a63; box-shadow: 0 0 0 3px #f6f1e6; }
+
+/* Modern is the quiet one, so it keeps the page's own surface — but it needs
+   to say so, rather than being "Roman without the serif". */
+.old-clock[data-clock-theme="modern"] .hand-hour,
+.old-clock[data-clock-theme="modern"] .hand-minute { border-radius: 1px; }
 
 /* Modern — plain digits, quiet ticks, a dial that stays out of the way. */
 .old-clock[data-clock-theme="modern"] { border-color: color-mix(in srgb, var(--ink) 8%, transparent); }
@@ -1783,6 +1812,10 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
 
 /* Minimal — no numerals, batons carry the dial. */
 .old-clock[data-clock-theme="minimal"] { border-width: 6px; }
+/* With no numerals the batons *are* the dial, so twelve has to be heavier
+   than the rest — otherwise a glance cannot tell which way up the face is. */
+.old-clock[data-clock-theme="minimal"] .face-tick:nth-child(1):before { width: 5px; left: -1.5px; height: 14%; opacity: 1; }
+.old-clock[data-clock-theme="minimal"]:before { display: none; }
 .old-clock[data-clock-theme="minimal"] .face-tick.major:before { width: 3px; height: 11%; opacity: .85; }
 .old-clock[data-clock-theme="minimal"] .face-tick:not(.major):before { opacity: .12; }
 .old-clock[data-clock-theme="minimal"] .clock-hand { border-radius: 2px; }
@@ -1797,6 +1830,12 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
 .old-clock[data-clock-theme="railway"] .face-number em { font-family: var(--font-mono); font-weight: 500; font-size: 15px; opacity: .92; }
 .old-clock[data-clock-theme="railway"] .face-tick.major:before { background: currentColor; opacity: .95; }
 .old-clock[data-clock-theme="railway"] .hand-second { background: #ff5d4f; }
+.old-clock[data-clock-theme="railway"]:before { border-color: rgba(255, 255, 255, .14); }
+/* The station clock's counterweight — the red disc below the pivot. */
+.old-clock[data-clock-theme="railway"] .hand-second:after {
+  content: ""; position: absolute; bottom: -12%; left: 50%; transform: translateX(-50%);
+  width: 13px; height: 13px; border-radius: 50%; background: #ff5d4f;
+}
 
 /* Pocket watch — cream dial, brass rim, a crown at twelve. */
 .old-clock[data-clock-theme="pocket"] {
@@ -1809,13 +1848,25 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
 .old-clock[data-clock-theme="pocket"] .hand-hour, .old-clock[data-clock-theme="pocket"] .hand-minute { background: #3d2f1e; }
 .old-clock[data-clock-theme="pocket"] .hand-second { background: #a0522d; }
 .old-clock[data-clock-theme="pocket"] .clock-pin { background: #a0522d; box-shadow: 0 0 0 3px #f3e7cd; }
-.old-clock-stage[data-clock-theme="pocket"]:before,
-.old-clock[data-clock-theme="pocket"]:after {
-  content: ""; position: absolute; top: -21px; left: 50%; transform: translateX(-50%);
-  width: 30px; height: 22px; border-radius: 7px 7px 4px 4px;
+.old-clock[data-clock-theme="pocket"]:before { border-color: rgba(122, 94, 45, .3); }
+.old-clock[data-clock-theme="pocket"] .face-tick:before { background: #7a5e2d; opacity: .45; }
+.old-clock[data-clock-theme="pocket"] .face-tick.major:before { opacity: .85; }
+/* The crown at twelve. The bow was previously hung off
+   `.old-clock-stage[data-clock-theme="pocket"]` — an attribute the stage is
+   never given — so only the stem ever drew, and it was clipped by the dial's
+   own overflow. Both parts now hang off the stage, which is the element with
+   room above the dial. */
+.old-clock-stage:has(> .old-clock[data-clock-theme="pocket"]):before,
+.old-clock-stage:has(> .old-clock[data-clock-theme="pocket"]):after {
+  content: ""; position: absolute; left: 50%; transform: translateX(-50%); z-index: 2;
   background: linear-gradient(180deg, #d9b878 0%, #b28f4e 100%); box-shadow: 0 3px 6px rgba(94, 72, 30, .35);
 }
-.old-clock[data-clock-theme="pocket"]:after { width: 12px; height: 10px; top: -10px; border-radius: 4px 4px 2px 2px; }
+.old-clock-stage:has(> .old-clock[data-clock-theme="pocket"]):before {
+  top: -26px; width: 26px; height: 20px; border-radius: 50% 50% 4px 4px / 60% 60% 4px 4px;
+}
+.old-clock-stage:has(> .old-clock[data-clock-theme="pocket"]):after {
+  top: -10px; width: 14px; height: 12px; border-radius: 4px 4px 2px 2px;
+}
 
 /* Neon — digits that glow, for the hour that does not. */
 .old-clock[data-clock-theme="neon"] {
@@ -1829,21 +1880,26 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
 .old-clock[data-clock-theme="neon"] .hand-hour, .old-clock[data-clock-theme="neon"] .hand-minute { background: #c9f2ff; box-shadow: 0 0 9px rgba(62, 208, 255, .8); }
 .old-clock[data-clock-theme="neon"] .hand-second { background: #ff7ac2; box-shadow: 0 0 9px rgba(255, 122, 194, .8); }
 .old-clock[data-clock-theme="neon"] .clock-pin { background: #ff7ac2; box-shadow: 0 0 0 3px #10142e, 0 0 12px rgba(255, 122, 194, .8); }
+.old-clock[data-clock-theme="neon"]:before { border-color: rgba(62, 208, 255, .34); box-shadow: 0 0 14px rgba(62, 208, 255, .22) inset; }
+.old-clock[data-clock-theme="neon"] .face-tick:not(.major):before { background: #6f86e0; opacity: .5; }
 
 /* Brutalist — heavy slabs of type, a border with opinions. */
+/* The dial is hard-coded paper-white, so its ink must be hard-coded too:
+   `var(--ink)` turns near-white in dark mode and the face went blank. */
 .old-clock[data-clock-theme="brutalist"] {
-  color: var(--ink);
+  color: #20212d;
   background: #fdfdf9;
-  border: 9px solid var(--ink);
+  border: 9px solid #20212d;
   box-shadow: 10px 12px 0 rgba(32, 33, 45, .9);
 }
+.old-clock[data-clock-theme="brutalist"] .clock-pin { background: #20212d; }
 .old-clock[data-clock-theme="brutalist"] .face-number em { font-family: var(--font-mono); font-weight: 500; font-size: 19.5px; letter-spacing: -1px; opacity: 1; }
 .old-clock[data-clock-theme="brutalist"] .face-tick.major:before { width: 4px; height: 12%; opacity: 1; }
 .old-clock[data-clock-theme="brutalist"] .face-tick:not(.major):before { opacity: .38; }
 .old-clock[data-clock-theme="brutalist"] .hand-hour { width: 9px; left: calc(50% - 4.5px); border-radius: 0; }
 .old-clock[data-clock-theme="brutalist"] .hand-minute { width: 6px; left: calc(50% - 3px); border-radius: 0; }
 .old-clock[data-clock-theme="brutalist"] .hand-second { width: 3px; left: calc(50% - 1.5px); border-radius: 0; background: #d63324; }
-.old-clock[data-clock-theme="brutalist"] .clock-pin { border-radius: 0; background: var(--ink); box-shadow: none; }
+.old-clock[data-clock-theme="brutalist"] .clock-pin { border-radius: 0; background: #20212d; box-shadow: none; }
 
 /* Botanical — sage dial, serif numerals, leaves at the quarters. */
 .old-clock[data-clock-theme="botanical"] {
@@ -1855,17 +1911,26 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
 .old-clock[data-clock-theme="botanical"] .face-number em { font-family: var(--font-display); font-weight: 600; font-size: 15px; opacity: .92; }
 .old-clock[data-clock-theme="botanical"] .hand-second { background: #5d8a4a; }
 .old-clock[data-clock-theme="botanical"] .clock-pin { background: #5d8a4a; box-shadow: 0 0 0 3px #eaf1e2; }
-.old-clock[data-clock-theme="botanical"] .face-tick.major:before { background: #6f9457; opacity: .55; }
-.old-clock[data-clock-theme="botanical"] .face-number:nth-child(1) em:before,
-.old-clock[data-clock-theme="botanical"] .face-number:nth-child(4) em:before,
-.old-clock[data-clock-theme="botanical"] .face-number:nth-child(7) em:before,
-.old-clock[data-clock-theme="botanical"] .face-number:nth-child(10) em:before {
+.old-clock[data-clock-theme="botanical"] .face-tick.major:before { background: #6f9457; opacity: .8; }
+.old-clock[data-clock-theme="botanical"] .face-tick:not(.major):before { background: #6f9457; opacity: .35; }
+.old-clock[data-clock-theme="botanical"]:before { border-color: rgba(110, 148, 87, .35); }
+/* The leaves belong on the quarters — 12, 3, 6, 9. `:nth-child` counted from
+   one o'clock, so they used to land on I, IV, VII and X; the renderer now
+   reports the hour each glyph stands for. */
+.old-clock[data-clock-theme="botanical"] .face-number[data-hour="12"] em:before,
+.old-clock[data-clock-theme="botanical"] .face-number[data-hour="3"] em:before,
+.old-clock[data-clock-theme="botanical"] .face-number[data-hour="6"] em:before,
+.old-clock[data-clock-theme="botanical"] .face-number[data-hour="9"] em:before {
   content: "❦"; display: block; margin-bottom: 5px; color: #6f9457; font-size: 11.5px; line-height: 1; opacity: .8;
 }
 
 /* The segmented face picker wraps on narrow screens. */
 #old-clock-faces.wrap { flex-wrap: wrap; }
 #old-clock-faces .seg-button { min-width: 0; padding: 0 11px; }
+/* Every face carries a line of copy in src/clock-themes.js that nothing ever
+   rendered. It is the only thing that tells you what you are about to put on
+   the wall before you click. */
+.clock-face-note { margin: 2px 0 0; color: var(--ink-3); font-size: 13px; line-height: 1.45; min-height: 19px; }
 
 /* =====================================================================
    The old clock — the stage and its scenes (CSS + positioned particles,
@@ -1885,6 +1950,17 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
 .old-clock-stage:not([data-scene="none"]) .old-clock[data-clock-theme="botanical"] { color: #33453a; background: rgba(232, 241, 226, .88); }
 .old-clock-stage:not([data-scene="none"]) .old-clock[data-clock-theme="railway"],
 .old-clock-stage:not([data-scene="none"]) .old-clock[data-clock-theme="neon"] { color: #f2f4fb; background: rgba(12, 15, 32, .82); }
+/* Brutalist is defined by its opaque paper and hard shadow; the translucent
+   stage dial erased both and made it a generic face with a thick border. */
+.old-clock-stage:not([data-scene="none"]) .old-clock[data-clock-theme="brutalist"] {
+  color: #20212d; background: #fdfdf9; backdrop-filter: none;
+  box-shadow: 10px 12px 0 rgba(32, 33, 45, .9);
+}
+/* Minimal has no numerals to read, so it needs more contrast against a live
+   sky than the shared 74% dial gives it. */
+.old-clock-stage:not([data-scene="none"]) .old-clock[data-clock-theme="minimal"] {
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
 
 /* Scene backdrops — the sky the particles live in. */
 .scene { background: radial-gradient(circle at 50% 40%, var(--surface-raised) 0%, var(--canvas-soft) 100%); }
@@ -2046,4 +2122,141 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
   .old-clock { border-width: 8px; }
   .remark-item { grid-template-columns: 1fr; }
   .remark-remove { justify-self: end; }
+}
+
+/* =====================================================================
+   The world card, re-read: hour loud, temperature beside it, the rest
+   small underneath
+   =====================================================================
+
+   A world clock is glanced at, not studied. So the card now has one
+   headline row — the hour, set as large and as bold as the card can
+   carry, with that city's own temperature to its right — and everything
+   else (the day, the UTC offset, the shift from your own clock, the sun
+   line) set small below it. `.world-time` keeps its class name so the
+   per-second updater and the existing tests still find the digits. */
+
+.world-card { min-height: 196px; }
+.world-headline {
+  position: relative; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10px; margin-top: 18px;
+}
+.world-time {
+  margin-top: 0; min-width: 0;
+  font-family: var(--font-mono); color: var(--ink);
+  font-size: clamp(31px, 2.9vw, 42px); font-weight: 700; letter-spacing: -2.2px; line-height: .98;
+  font-variant-numeric: tabular-nums;
+}
+.world-time .world-period {
+  margin-left: 5px; color: var(--ink-3); font-family: var(--font-sans);
+  font-size: 12.5px; font-weight: 700; letter-spacing: .6px;
+}
+
+/* The temperature: right of the hour, its unit spelled out, never louder
+   than the time itself. */
+.world-temp-slot { flex: 0 0 auto; padding-top: 2px; }
+.world-temp { display: flex; align-items: baseline; gap: 5px; }
+.world-temp-symbol { font-size: 15px; line-height: 1; opacity: .85; }
+.world-temp-value {
+  color: var(--ink); font-family: var(--font-display); font-size: 22px; font-weight: 700;
+  letter-spacing: -.8px; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.world-temp-value small { margin-left: 1px; color: var(--ink-3); font-size: 12.5px; font-weight: 600; letter-spacing: 0; }
+.world-temp.is-waiting .world-temp-value { color: var(--ink-3); font-weight: 600; }
+
+/* The small line: how far this clock is from the reader's own. */
+.world-shift {
+  position: relative; z-index: 1; margin: 9px 0 0; font-size: 11.5px; font-weight: 700;
+  letter-spacing: .7px; text-transform: uppercase; color: var(--ink-3);
+}
+.world-shift.shift-home { color: var(--violet-dark); }
+.world-shift.shift-ahead { color: #5b79c4; }
+.world-shift.shift-behind { color: #c67568; }
+.world-shift.shift-same { color: #42a889; }
+body[data-ui="dark"] .world-shift.shift-ahead { color: #8fabf0; }
+body[data-ui="dark"] .world-shift.shift-behind { color: #f0a090; }
+body[data-ui="dark"] .world-shift.shift-same { color: #62d4a8; }
+body[data-ui="dark"] .world-shift.shift-home { color: #c3b8ff; }
+
+.world-card-bottom { margin-top: 14px; }
+.world-sun { margin-top: 6px; font-size: 12.5px; }
+.board-weather-note { margin: 16px 0 0; color: var(--ink-3); font-size: 13.5px; }
+
+/* =====================================================================
+   Time standards — the clocks that are named rather than placed
+   ===================================================================== */
+
+.standards-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.standards-controls .chip-row { margin-bottom: 0; flex: 1 1 420px; }
+.standards-search { flex: 0 1 280px; }
+.standards-search input {
+  width: 100%; height: 38px; padding: 0 13px; border: 1px solid var(--line-strong); border-radius: 100px;
+  color: var(--ink); background: var(--surface); font-size: 14.5px; outline: none; transition: .15s ease;
+}
+.standards-search input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(111, 85, 246, .1); }
+.standards-search input::placeholder { color: var(--ink-3); }
+
+#standards-regions .city-chip.active { color: var(--on-violet); border-color: var(--violet); background: var(--violet); }
+
+.standards-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; margin-top: 18px; }
+.standard-card {
+  position: relative; overflow: hidden; padding: 17px 17px 16px; border: 1px solid var(--line);
+  border-radius: 17px; background: var(--surface); box-shadow: 0 5px 13px rgba(30, 30, 55, .025);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.standard-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-small); }
+.standard-card:before {
+  content: ""; position: absolute; right: -24px; bottom: -42px; width: 116px; height: 116px;
+  border-radius: 50%; opacity: .7;
+}
+.standard-card.color-0:before { background: #eeeaff; }
+.standard-card.color-1:before { background: #fff0e9; }
+.standard-card.color-2:before { background: #e7f8f2; }
+.standard-card.color-3:before { background: #eaf1ff; }
+.standard-card.color-4:before { background: #fbf0ff; }
+.standard-card.color-5:before { background: #fff7da; }
+body[data-ui="dark"] .standard-card.color-0:before { background: rgba(136, 119, 241, .14); }
+body[data-ui="dark"] .standard-card.color-1:before { background: rgba(242, 138, 115, .13); }
+body[data-ui="dark"] .standard-card.color-2:before { background: rgba(92, 197, 166, .12); }
+body[data-ui="dark"] .standard-card.color-3:before { background: rgba(108, 164, 236, .13); }
+body[data-ui="dark"] .standard-card.color-4:before { background: rgba(199, 138, 218, .13); }
+body[data-ui="dark"] .standard-card.color-5:before { background: rgba(217, 174, 77, .13); }
+
+.standard-card-top {
+  position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase;
+}
+.standard-region { color: var(--ink-3); }
+.standard-utc { color: var(--violet-dark); font-family: var(--font-mono); letter-spacing: .2px; text-transform: none; }
+
+.standard-headline {
+  position: relative; z-index: 1; display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; margin-top: 16px;
+}
+.standard-time {
+  color: var(--ink); font-family: var(--font-mono); font-size: clamp(30px, 2.8vw, 40px); font-weight: 700;
+  letter-spacing: -2px; line-height: 1; font-variant-numeric: tabular-nums;
+}
+.standard-period { margin-left: 5px; color: var(--ink-3); font-family: var(--font-sans); font-size: 12.5px; font-weight: 700; letter-spacing: .6px; }
+.standard-abbr {
+  flex: 0 0 auto; padding: 4px 10px; border-radius: 100px; color: var(--violet-dark);
+  background: var(--violet-soft); font-size: 14.5px; font-weight: 700; letter-spacing: .6px;
+}
+.standard-name { position: relative; z-index: 1; margin: 10px 0 0; color: var(--ink); font-size: 14.5px; font-weight: 600; }
+.standard-note { position: relative; z-index: 1; margin: 5px 0 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
+.standard-shift {
+  position: relative; z-index: 1; margin: 9px 0 0; color: var(--ink-3); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .5px; text-transform: uppercase;
+}
+.standard-day { color: #5b79c4; }
+body[data-ui="dark"] .standard-day { color: #8fabf0; }
+
+@media (max-width: 1100px) {
+  .standards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .standards-grid { grid-template-columns: 1fr; }
+  .standards-search { flex: 1 1 100%; }
+  .world-headline { flex-wrap: wrap; gap: 4px; }
+  .world-temp-slot { padding-top: 0; }
 }

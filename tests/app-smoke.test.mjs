@@ -58,6 +58,29 @@ function seriesFields(now) {
   return { hourly, daily };
 }
 
+/** A request the world board made: many coordinates in one call. */
+function isBoardCall(url) {
+  try {
+    return String(new URL(String(url)).searchParams.get("latitude") || "").includes(",");
+  } catch (_) {
+    return false;
+  }
+}
+
+/** One current-conditions object per coordinate the board asked about. */
+function boardPayload(url) {
+  const params = new URL(String(url)).searchParams;
+  const lats = String(params.get("latitude") || "").split(",");
+  const lons = String(params.get("longitude") || "").split(",");
+  return lats.map((lat, index) => ({
+    latitude: Number(lat),
+    longitude: Number(lons[index]),
+    utc_offset_seconds: 0,
+    timezone: "UTC",
+    current: { time: new Date().toISOString().slice(0, 16), temperature_2m: 18 + index, weather_code: 1, is_day: 1 },
+  }));
+}
+
 function weatherPayload({ now = Date.now(), code = 61, isDay = 1, wind = 7.3 } = {}) {
   const iso = (epoch) => new Date(epoch).toISOString().slice(0, 16);
   return {
@@ -162,6 +185,10 @@ async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload
   for (const [key, value] of Object.entries(storage)) localStorage.setItem(key, value);
 
   const fetchCalls = [];
+  // The world board asks for every clock's temperature in one request: a
+  // comma-separated coordinate list, answered with one object per location.
+  const boardCalls = () => fetchCalls.filter(isBoardCall);
+  const weatherCalls = () => fetchCalls.filter((url) => !isBoardCall(url));
   const stubFetch = async (url) => {
     const href = String(url);
     fetchCalls.push(href);
@@ -171,6 +198,7 @@ async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload
     //   • Open-Meteo     hourly + daily arrays (the forecast section).
     let body;
     if (href.includes("bigdatacloud")) body = geocodePayload(href);
+    else if (isBoardCall(href)) body = boardPayload(href);
     else if (href.includes("hourly=")) body = { ...weather(href), ...seriesFields(Date.now()) };
     else body = weather(href);
     return { ok: true, status: 200, json: async () => body };
@@ -209,6 +237,8 @@ async function boot({ homeZone = "Asia/Katmandu", weather = () => weatherPayload
     localStorage,
     errors,
     fetchCalls,
+    boardCalls,
+    weatherCalls,
     $: (selector) => document.querySelector(selector),
     $$: (selector) => Array.from(document.querySelectorAll(selector)),
     click: (selector) => document.querySelector(selector).click(),
@@ -283,8 +313,8 @@ describe("tempo in a browser-like DOM", () => {
     // and weather after the tools, which is the order this round chose.
     assert.deepEqual(
       app.visiblePages(),
-      ["now", "alarms", "timer", "stopwatch", "clocks", "clock", "calculator", "weather", "forecast", "about"],
-      "all ten sections share one page, in the time-first order"
+      ["now", "alarms", "timer", "stopwatch", "clocks", "standards", "clock", "calculator", "weather", "forecast", "about"],
+      "all eleven sections share one page, in the time-first order"
     );
     assert.equal(app.activeSection(), "now", "and the reader starts at the top");
     assert.match(app.$("#page-title").textContent, /moment/);
@@ -299,7 +329,7 @@ describe("tempo in a browser-like DOM", () => {
     // A phrase sits under every heading, chosen by the day — stable within
     // the day, present for every section including the new ones.
     const phrases = app.$$(".section-phrase");
-    assert.equal(phrases.length, 10, "every section carries a phrase");
+    assert.equal(phrases.length, 11, "every section carries a phrase");
     for (const phrase of phrases) {
       assert.ok(phrase.textContent.trim().length > 8, `a phrase is written under its heading, got "${phrase.textContent}"`);
     }
@@ -310,7 +340,7 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.activeNav(), "clocks");
     assert.equal(app.$('.nav-link[data-route="now"]').hasAttribute("aria-current"), false);
     // Nothing was hidden to get there.
-    assert.equal(app.visiblePages().length, 10, "sections are never torn down");
+    assert.equal(app.visiblePages().length, 11, "sections are never torn down");
 
     for (const [route, heading] of [
       ["alarms", /clock says so/],
@@ -494,8 +524,8 @@ describe("tempo in a browser-like DOM", () => {
     assert.match(app.$("#theme-caption").textContent, /Rainy/);
     assert.match(app.$("#theme-caption").title, /Auto · Rainy in Kathmandu/);
 
-    assert.equal(app.fetchCalls.length, 1);
-    const requested = new URL(app.fetchCalls[0]);
+    assert.equal(app.weatherCalls().length, 1);
+    const requested = new URL(app.weatherCalls()[0]);
     assert.equal(requested.origin, "https://api.open-meteo.com");
     assert.match(requested.searchParams.get("current"), /wind_gusts_10m/);
     assert.equal(requested.searchParams.get("daily"), "sunrise,sunset");
@@ -518,7 +548,8 @@ describe("tempo in a browser-like DOM", () => {
     assert.match(app.$("#weather-place").textContent, /Ahmedabad/);
     // The home clock did not move with it.
     assert.equal(flatten(app.$("#top-timezone").textContent), "Nepal · Kathmandu");
-    const last = new URL(app.fetchCalls[app.fetchCalls.length - 1]);
+    const weatherOnly = app.weatherCalls();
+    const last = new URL(weatherOnly[weatherOnly.length - 1]);
     assert.equal(last.searchParams.get("latitude"), "23.0225");
     assert.equal(last.searchParams.get("longitude"), "72.5714");
   });
@@ -892,7 +923,7 @@ describe("tempo in a browser-like DOM", () => {
     const requested = new URL(forecastCalls[0]);
     assert.match(requested.searchParams.get("daily"), /temperature_2m_max/);
     // Same coordinates as the weather card: the two can never disagree.
-    const current = app.fetchCalls.find((url) => url.includes("current=") && !url.includes("hourly="));
+    const current = app.weatherCalls().find((url) => url.includes("current=") && !url.includes("hourly="));
     assert.equal(requested.searchParams.get("latitude"), new URL(current).searchParams.get("latitude"));
 
     assert.ok(app.$$("#forecast-hours .hour-cell").length > 0, "hours are drawn");
@@ -1025,12 +1056,193 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.$("#now-weather-unit").textContent, app.$("#weather-unit").textContent);
     assert.equal(app.$("#now-weather-condition").textContent, app.$("#weather-condition").textContent);
     assert.match(app.$("#now-weather-meta").textContent, /Kathmandu/);
-    assert.equal(app.fetchCalls.length, 1, "one request on boot, not two");
+    assert.equal(app.weatherCalls().length, 1, "one weather request on boot, not two");
 
     // When the sky changes, both views move together.
     app.click("#weather-units");
     await wait(120);
     assert.equal(app.$("#now-weather-unit").textContent, app.$("#weather-unit").textContent);
+  });
+
+  test("every world card leads with the hour and carries its own temperature", async () => {
+    app = await boot();
+    await app.go("clocks");
+    await wait(160); // the batched temperature request
+
+    const cards = app.$$(".world-card");
+    assert.ok(cards.length >= 4);
+
+    // One request covered the whole board, not one per card.
+    const board = app.boardCalls();
+    assert.equal(board.length >= 1, true, "the board asked for its temperatures");
+    const asked = new URL(board[board.length - 1]);
+    assert.equal(
+      asked.searchParams.get("latitude").split(",").length,
+      cards.length,
+      "one request, every clock in it"
+    );
+
+    for (const card of cards) {
+      // The hour is the headline, and it sits beside the temperature.
+      const headline = card.querySelector(".world-headline");
+      assert.ok(headline, `${card.dataset.place} has a headline row`);
+      assert.match(headline.querySelector(".world-clock-value").textContent, /^\d{1,2}:\d{2}$/);
+      const temperature = headline.querySelector(".world-temp-value");
+      assert.ok(temperature, `${card.dataset.place} shows a temperature`);
+      assert.match(temperature.textContent, /-?\d+°[CF]/, `${card.dataset.place} temperature reads with its unit`);
+      // And the small print underneath.
+      assert.ok(card.querySelector(".world-shift").textContent.trim().length > 3);
+      assert.match(card.querySelector(".world-sun").textContent, /Sun time \d{2}:\d{2}/);
+    }
+  });
+
+  test("a card's unit follows its own country, not a page-wide switch", async () => {
+    app = await boot({ homeZone: "Asia/Kathmandu" });
+    await app.go("clocks");
+    while (app.$$(".world-card").length) {
+      app.click(".world-card .remove-city");
+      await wait(10);
+    }
+    for (const query of ["chicago", "chennai"]) {
+      app.click("#add-city-button");
+      await wait(60);
+      await app.typeIn("#zone-search", query);
+      app.$$("#picker-list .picker-option")[0].click();
+      app.key("#zone-search", "Enter");
+      await wait(40);
+    }
+    await wait(200);
+
+    const units = app.$$(".world-card").map((card) => card.querySelector(".world-temp-value").textContent);
+    assert.ok(units.some((text) => text.includes("°F")), `a US city reads Fahrenheit, got ${units.join(" / ")}`);
+    assert.ok(units.some((text) => text.includes("°C")), `an Indian city reads Celsius, got ${units.join(" / ")}`);
+  });
+
+  test("the shift line measures every clock against home, and moves when home does", async () => {
+    app = await boot({ homeZone: "Asia/Kathmandu" });
+    await app.go("clocks");
+
+    const shiftFor = (place) =>
+      app.$$(".world-card").find((card) => card.dataset.place === place)?.querySelector(".world-shift").textContent;
+
+    const home = app.$$(".world-card").find((card) => card.classList.contains("is-home"));
+    if (home) assert.match(home.querySelector(".world-shift").textContent, /YOUR HOME CLOCK/);
+
+    const tokyo = shiftFor("zone:Asia/Tokyo");
+    if (tokyo) {
+      assert.match(tokyo, /KATHMANDU/, "the line names the home city");
+      assert.match(tokyo, /\+3h 15m/, "Tokyo is 3h 15m ahead of Kathmandu");
+    }
+
+    // Move home to Tokyo: every line is re-measured from there.
+    const card = app.$$(".world-card").find((node) => node.dataset.place === "zone:Asia/Tokyo");
+    if (card) {
+      card.querySelector("[data-make-home]").click();
+      await wait(60);
+      const nowHome = app.$$(".world-card").find((node) => node.dataset.place === "zone:Asia/Tokyo");
+      assert.match(nowHome.querySelector(".world-shift").textContent, /YOUR HOME CLOCK/);
+    }
+  });
+
+  test("time standards is a section of its own, short form and full form", async () => {
+    app = await boot({ homeZone: "Asia/Kathmandu" });
+    await app.go("standards");
+    assert.equal(app.activeSection(), "standards");
+    assert.match(app.$("#page-title").textContent, /name/i);
+
+    const cards = app.$$(".standard-card");
+    assert.ok(cards.length >= 8, `the shortlist renders, got ${cards.length}`);
+    for (const card of cards) {
+      assert.match(card.querySelector(".standard-time").textContent, /^\d{1,2}:\d{2}/, "the hour leads");
+      assert.ok(card.querySelector(".standard-abbr").textContent.trim().length >= 1, "a short form");
+      assert.ok(card.querySelector(".standard-name").textContent.trim().length > 6, "and a full form");
+      assert.match(card.querySelector(".standard-utc").textContent, /^UTC([+−]\d{2}:\d{2})?$/);
+      assert.ok(card.querySelector(".standard-shift").textContent.trim().length > 3);
+    }
+
+    // UTC is there, reading the real UTC hour.
+    const utc = cards.find((card) => card.dataset.standard === "utc");
+    assert.ok(utc, "UTC is on the shortlist");
+    const now = new Date();
+    assert.equal(
+      utc.querySelector(".standard-time").textContent,
+      `${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")}`
+    );
+    // And every line is measured from the home place.
+    assert.match(app.$$(".standard-card").map((card) => card.textContent).join(" "), /Kathmandu/);
+  });
+
+  test("the standards section filters by region, searches, and switches format", async () => {
+    app = await boot();
+    await app.go("standards");
+
+    app.click('#standards-regions [data-region="middle-east"]');
+    await wait(20);
+    const gulf = app.$$(".standard-card").map((card) => card.dataset.standard);
+    assert.ok(gulf.includes("gst"), "the Gulf is in the Middle East tab");
+    assert.ok(!gulf.includes("jst"), "and Japan is not");
+    assert.equal(app.$('#standards-regions [data-region="middle-east"]').getAttribute("aria-pressed"), "true");
+
+    app.click('#standards-regions [data-region="asia"]');
+    await wait(20);
+    assert.ok(app.$$(".standard-card").some((card) => card.dataset.standard === "jst"));
+
+    // Search reaches across every region.
+    await app.typeIn("#standards-search", "nepal");
+    await wait(20);
+    assert.deepEqual(app.$$(".standard-card").map((card) => card.dataset.standard), ["npt"]);
+    assert.match(app.$(".standard-abbr").textContent, /NPT/);
+
+    await app.typeIn("#standards-search", "zzzz");
+    await wait(20);
+    assert.equal(app.$$(".standard-card").length, 0);
+    assert.equal(app.$("#standards-empty").hidden, false, "and it says so");
+
+    await app.typeIn("#standards-search", "");
+    await wait(20);
+    // 12-hour format, remembered.
+    app.click('#standards-format [data-standard-format="12"]');
+    await wait(20);
+    assert.match(app.$(".standard-time").textContent, /(AM|PM)$/);
+    assert.equal(JSON.parse(app.localStorage.getItem("tempo-standards")).hour12, true);
+  });
+
+  test("the old clock's faces are actually distinguishable, and each explains itself", async () => {
+    app = await boot();
+    await app.go("clock");
+
+    // The note under the picker was written in clock-themes.js and never
+    // rendered; it is the only thing that says what you are choosing.
+    assert.match(app.$("#old-clock-face-note").textContent, /XII/, "the Roman face explains itself");
+    app.click('#old-clock-faces [data-clock-face="railway"]');
+    await wait(20);
+    assert.match(app.$("#old-clock-face-note").textContent, /[Ss]tation/);
+
+    // Every glyph reports the hour it stands for, so a face can decorate the
+    // real quarters rather than guessing with :nth-child.
+    app.click('#old-clock-faces [data-clock-face="botanical"]');
+    await wait(20);
+    const hours = app.$$("#old-clock .face-number").map((node) => node.dataset.hour);
+    assert.deepEqual(hours, ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]);
+    const twelve = app.$$("#old-clock .face-number").find((node) => node.dataset.hour === "12");
+    assert.equal(twelve.querySelector("em").textContent, "XII", "hour 12 really is XII");
+
+    // The stylesheet paints each face differently rather than sharing one look.
+    const css = readFileSync(resolve(root, "styles.css"), "utf8");
+    for (const face of ["roman", "modern", "minimal", "railway", "pocket", "neon", "brutalist", "botanical"]) {
+      const rules = [...css.matchAll(new RegExp(`\\[data-clock-theme="${face}"\\]`, "g"))];
+      assert.ok(rules.length >= 2, `${face} is more than one declaration, got ${rules.length}`);
+    }
+    // The tick setting must actually tick: the renderer stamps `.tick` on the
+    // second hand every second and nothing used to answer it.
+    assert.match(css, /\.hand-second\.tick \{[^}]*animation/);
+    assert.match(css, /@keyframes hand-tick/);
+    // Brutalist hard-codes a paper dial, so its ink must be hard-coded too —
+    // var(--ink) turns near-white in dark mode and the face went blank.
+    assert.match(css, /\[data-clock-theme="brutalist"\] \{[^}]*color: #20212d/);
+    // The botanical leaves sit on the quarters, by hour and not by position.
+    assert.match(css, /\[data-clock-theme="botanical"\] \.face-number\[data-hour="12"\]/);
+    assert.equal(css.includes('botanical"] .face-number:nth-child(1)'), false, "the off-by-one selector is gone");
   });
 
   test("the old clock wears eight faces, and an old numeral preference upgrades", async () => {
