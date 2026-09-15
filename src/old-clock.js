@@ -249,14 +249,51 @@ export function createOldClock({ elements = {}, getPlaceId, getWeather, notify, 
     if (elements.fullscreen) {
       elements.fullscreen.addEventListener("click", () => toggleFullscreen());
     }
+    if (typeof document !== "undefined") {
+      const handleFullscreenChange = () => {
+        const isFs = isClockFullscreen();
+        if (elements.fullscreen) {
+          elements.fullscreen.classList.toggle("active", isFs);
+          elements.fullscreen.setAttribute("aria-pressed", String(isFs));
+        }
+        if (isFs) {
+          start();
+        }
+      };
+      document.addEventListener("fullscreenchange", handleFullscreenChange);
+      document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    }
+  }
+
+  function isClockFullscreen() {
+    if (typeof document === "undefined") return false;
+    const fsEl =
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement;
+    if (!fsEl) return false;
+    const target = elements.wrap || elements.face;
+    return Boolean(target && (fsEl === target || target.contains(fsEl)));
   }
 
   function toggleFullscreen() {
     const target = elements.wrap || elements.face;
     if (!target) return;
     try {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else if (target.requestFullscreen) target.requestFullscreen();
+      const fsEl =
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement;
+      if (fsEl) {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else {
+        if (target.requestFullscreen) target.requestFullscreen();
+        else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+        start();
+      }
     } catch (_) {
       if (notify) notify("This browser would not go full screen.", "!");
     }
@@ -279,6 +316,7 @@ export function createOldClock({ elements = {}, getPlaceId, getWeather, notify, 
       render();
     },
     stop() {
+      if (isClockFullscreen()) return;
       running = false;
       if (frame && typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame);
       frame = 0;

@@ -670,6 +670,13 @@ describe("tempo in a browser-like DOM", () => {
     await wait(60);
     assert.match(app.$("#old-clock-place-name").textContent, /Delhi/);
     assert.match(app.$("#old-clock-place-label").textContent, /Delhi/);
+
+    // Fullscreen button toggles and does not crash or stop clock
+    const wrap = app.$("#old-clock-wrap");
+    let requested = false;
+    wrap.requestFullscreen = () => { requested = true; };
+    app.click("#old-clock-fullscreen");
+    assert.equal(requested, true, "requestFullscreen was called");
   });
 
   test("timer, stopwatch and calculator still work", async () => {

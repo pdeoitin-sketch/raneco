@@ -808,7 +808,8 @@ import {
   let standardsVisible = false;
 
   function oldClockTick(now) {
-    if (!oldClockVisible || !oldClock) return;
+    const isFs = typeof document !== "undefined" && Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+    if ((!oldClockVisible && !isFs) || !oldClock) return;
     // The old clock runs its own frame loop; this only keeps the digital
     // readout honest when the browser throttles rAF.
     if (!document.hidden) return;
@@ -1154,7 +1155,8 @@ import {
       }
       closeMobileNav();
 
-      oldClockVisible = section.id === "clock";
+      const isFs = typeof document !== "undefined" && Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+      oldClockVisible = section.id === "clock" || isFs;
       if (oldClockVisible) oldClock.start();
       else if (oldClock) oldClock.stop();
 

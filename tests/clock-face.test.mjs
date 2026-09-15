@@ -133,6 +133,13 @@ describe("clock face numerals", () => {
     assert.match(glyph, /margin-top\s*:\s*var\(--numeral-inset/, "glyphs use the shared dial radius");
     assert.doesNotMatch(glyph, /translateY\s*\(\s*-/, "no self-relative % translate");
   });
+
+  test("the stylesheet sets prominent world clock digits and fullscreen old clock", () => {
+    const css = readFileSync(resolve(root, "styles.css"), "utf8");
+    assert.doesNotMatch(css, /\.world-time\s+span\s*\{/, ".world-time span does not crush world-clock-value to 13px");
+    assert.match(css, /\.world-clock-value\s*\{/, "world-clock-value is explicitly styled");
+    assert.match(css, /\.old-clock-wrap:fullscreen/, "fullscreen styles exist for old clock wrap");
+  });
 });
 
 describe("head bar branding", () => {

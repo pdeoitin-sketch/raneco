@@ -171,3 +171,32 @@ test("createRouter is kept as an alias, so old call sites still work", () => {
   router.stop();
   uninstall();
 });
+
+test("fullscreen mode does not allow the spy to change the active route", () => {
+  const dom = documentWith(KNOWN);
+  install(dom);
+
+  const nav = createScrollNav({
+    sections: KNOWN.map((id) => ({ id, page: dom.window.document.querySelector(`[data-page="${id}"]`) })),
+  });
+  nav.registerLinks("[data-route]");
+  nav.start();
+
+  nav.navigate("clock");
+  assert.equal(nav.currentId, "clock");
+
+  // Simulate entering fullscreen
+  const clockPage = dom.window.document.querySelector('[data-page="clock"]');
+  Object.defineProperty(dom.window.document, "fullscreenElement", {
+    value: clockPage,
+    configurable: true,
+    writable: true,
+  });
+
+  // Spy position attempt should be ignored in fullscreen
+  dom.window.dispatchEvent(new dom.window.Event("resize"));
+  assert.equal(nav.currentId, "clock", "still on clock while fullscreen");
+
+  nav.stop();
+  uninstall();
+});
