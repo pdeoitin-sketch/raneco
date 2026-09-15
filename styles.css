@@ -1459,16 +1459,44 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
 .segmented.wrap { flex-wrap: wrap; }
 .alarm-volume { width: 100%; accent-color: var(--violet); cursor: pointer; }
 
-/* The catalogue. A scrolling panel rather than a <select>, because the point
-   of sixteen sounds is being able to hear them before committing. */
+/* The catalogue lives behind a dropdown: a native <details> disclosure, so
+   sixteen sounds do not force the card to be the tallest thing on the page.
+   The currently-chosen sound is always visible in the card header
+   (#alarm-current); this is for browsing and previewing the rest. */
+.sound-dropdown {
+  margin-top: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.sound-dropdown-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 11px 14px;
+  cursor: pointer;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 700;
+  list-style: none;
+  user-select: none;
+}
+.sound-dropdown-summary::-webkit-details-marker { display: none; }
+.sound-dropdown-summary:hover { color: var(--violet); }
+.sound-dropdown-caret { transition: transform .18s ease; color: var(--ink-3); font-size: 12px; }
+.sound-dropdown[open] .sound-dropdown-caret { transform: rotate(180deg); }
+.sound-dropdown[open] .sound-dropdown-summary { border-bottom: 1px solid var(--line); }
+
+/* The catalogue itself. A scrolling panel rather than a <select>, because the
+   point of sixteen sounds is being able to hear them before committing. */
 .sound-list {
   display: grid;
   gap: 16px;
   max-height: 330px;
   padding: 4px 10px 4px 2px;
   overflow-y: auto;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
   padding-top: 16px;
   padding-bottom: 16px;
   scrollbar-width: thin;

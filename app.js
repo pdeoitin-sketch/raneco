@@ -35,7 +35,7 @@ import { createRemarks } from "./src/remarks.js";
 import { phraseFor } from "./src/phrases.js";
 import { createToaster, $, $$, escapeHTML, flatten, pad } from "./src/ui.js";
 import { APPEARANCES, applyAppearance, readMode, resolveAppearance, themeCaption, writeMode } from "./src/theme.js";
-import { effectiveMood } from "./src/weather.js";
+import { REFRESH_MS, effectiveMood, fetchWeather, preferImperial } from "./src/weather.js";
 import {
   currentLocation,
   describeAccuracy,
@@ -47,6 +47,7 @@ import { ALARM_SOUNDS, findSound, soundsByMood } from "./src/alarm-sounds.js";
 import {
   DEFAULT_BOARD,
   POPULAR_PLACES,
+  placeCoords,
   placeRecord,
   placeZone,
   sunNote,
@@ -166,11 +167,19 @@ import {
     themeMode: readMode(),
     appearance: "light",
     weather: null,
+    // The sky the Auto theme paints from. This is tied to the *home place*
+    // specifically — never to wherever the Weather section or Forecast
+    // happens to be pointed at right now. Those two can be looking at
+    // Paris or Beijing on your behalf; the theme only ever answers "what is
+    // it like where my clock says it is", which is the home place's own
+    // time and its own sky.
+    homeWeather: null,
     lastFix: null,
     localHour: null,
     localMinute: 0,
     phraseDay: null,
   };
+  let homeWeatherRevision = 0;
 
   /* --------------------------------------------------------------- elements */
 
@@ -302,7 +311,7 @@ import {
     if (elements.sunsetCopy) elements.sunsetCopy.textContent = `${Math.round(progress)}% through today`;
 
     if (elements.sunIcon) {
-      const live = state.weather && state.weather.ok ? state.weather : null;
+      const live = state.homeWeather && state.homeWeather.ok ? state.homeWeather : null;
       const symbol = live && live.symbol ? live.symbol : parts.hour >= 6 && parts.hour < 19 ? "☀" : "☾";
       elements.sunIcon.textContent = symbol;
       elements.sunIcon.title = live && live.condition ? `${live.condition} in ${place.city}` : "Local sky";
@@ -340,20 +349,20 @@ import {
       mode: state.themeMode,
       hour: state.localHour,
       minute: state.localMinute,
-      weather: state.weather && state.weather.ok ? state.weather : null,
+      weather: state.homeWeather && state.homeWeather.ok ? state.homeWeather : null,
       now: Date.now(),
     });
     const applied = applyAppearance(document, { mode: state.themeMode, appearance: result.appearance });
     state.appearance = applied.appearance;
-    document.body.dataset.weather = state.weather && state.weather.ok ? effectiveMood(state.weather) : "none";
+    document.body.dataset.weather = state.homeWeather && state.homeWeather.ok ? effectiveMood(state.homeWeather) : "none";
 
     if (elements.themeCaption) {
       const info = APPEARANCES[result.appearance] || APPEARANCES.light;
       const place = homePlace();
       const weatherLine =
-        state.weather && state.weather.ok
-          ? `${state.weather.symbol} ${state.weather.condition} ${Math.round(state.weather.temperature)}${
-              state.weather.temperatureUnit || "°C"
+        state.homeWeather && state.homeWeather.ok
+          ? `${state.homeWeather.symbol} ${state.homeWeather.condition} ${Math.round(state.homeWeather.temperature)}${
+              state.homeWeather.temperatureUnit || "°C"
             }`
           : "no live weather";
       const detail = state.themeMode === "auto" ? `Auto · ${place.city}` : "fixed by you";
@@ -415,15 +424,13 @@ import {
   /* ---------------------------------------------------------- now weather */
 
   /**
-   * The glance beside the clock: the *same snapshot* the Weather section
-   * renders, at first-look size. It only reads `state.weather` — it never
-   * fetches — so the two views can never disagree and the page still makes
-   * exactly one weather request.
+   * The glance beside the clock: the home place's own sky, always — even
+   * when the Weather section below has been pointed at somewhere else.
    */
   function renderNowWeather() {
     const card = elements.nowWeather;
     if (!card) return;
-    const snapshot = state.weather;
+    const snapshot = state.homeWeather;
     const place = homePlace();
 
     if (!snapshot || !snapshot.ok) {
@@ -454,6 +461,70 @@ import {
     if (node && node.textContent !== value) node.textContent = value;
   }
 
+  /* ----------------------------------------------------------- home weather */
+
+  /**
+   * The weather behind the Auto theme, the "sky here" glance, the sun icon
+   * and the solar/daylight notes — all of it about the **home place**,
+   * independently of wherever the Weather card or the Forecast section
+   * happen to be pointed at.
+   *
+   * Those two sections can legitimately look at another city ("what's it
+   * like in Paris right now?") without the rest of the page pretending to
+   * live there. Before this existed, `state.weather` was one shared snapshot
+   * that followed whichever place the Weather card's "Choose a place…" or
+   * "Use my location" last landed on — so switching your home place while an
+   * old GPS fix (or an explicitly chosen city) was still pinned to the card
+   * left the Auto theme frozen on a sky from somewhere else, sometimes for
+   * good. `homeCoordsMatchSource` below only skips a redundant fetch when
+   * the two truly agree; the moment they diverge, home weather is fetched
+   * on its own.
+   */
+  function homeCoordsMatchSource(source) {
+    if (!source || !Number.isFinite(Number(source.lat)) || !Number.isFinite(Number(source.lon))) return false;
+    const home = placeCoords(state.homeId);
+    if (!home) return false;
+    return Math.abs(Number(source.lat) - home.lat) < 0.01 && Math.abs(Number(source.lon) - home.lon) < 0.01;
+  }
+
+  function applyHomeWeather(snapshot) {
+    state.homeWeather = snapshot;
+    applyTheme();
+    updateNotes();
+    updateLiveTime();
+    renderNowWeather();
+  }
+
+  async function refreshHomeWeather({ force = false } = {}) {
+    const revision = (homeWeatherRevision += 1);
+    const place = homePlace();
+    const coords = placeCoords(state.homeId);
+    if (!coords) {
+      applyHomeWeather({
+        ok: false,
+        message: "This place has no coordinates — pick a city to see its weather.",
+        attemptedAt: Date.now(),
+      });
+      return null;
+    }
+    if (!force && state.homeWeather && state.homeWeather.ok && Date.now() - state.homeWeather.observedAt < REFRESH_MS) {
+      return state.homeWeather;
+    }
+    const units = preferImperial((place.countries || []).map((entry) => entry.code)) ? "imperial" : "metric";
+    const snapshot = await fetchWeather({ lat: coords.lat, lon: coords.lon, label: place.label, units, timezone: "auto" });
+    if (revision !== homeWeatherRevision) return null; // the home place moved again while this was in flight
+    applyHomeWeather(snapshot);
+    return snapshot;
+  }
+
+  /** Called on a timer: top up home weather only when nothing else already keeps it fresh. */
+  function maybeRefreshHomeWeather() {
+    if (homeCoordsMatchSource(weatherCard.source)) return; // the weather card's own polling covers this case
+    const stale =
+      !state.homeWeather || !state.homeWeather.ok || Date.now() - state.homeWeather.observedAt >= REFRESH_MS;
+    if (stale) refreshHomeWeather();
+  }
+
   /* --------------------------------------------------------------- weather */
 
   const weatherCard = createWeatherCard({
@@ -481,10 +552,18 @@ import {
     notify,
     onSnapshot: (snapshot) => {
       state.weather = snapshot;
-      applyTheme();
-      updateNotes();
-      updateLiveTime();
-      renderNowWeather();
+      // The Auto theme, the sun icon, the "sky here" glance and the
+      // daylight note are about the *home place* — they only adopt this
+      // snapshot when the card genuinely happens to be looking at home
+      // right now. Pointed at another city (Paris while home is Kathmandu),
+      // this snapshot is real, useful weather — just not home's weather.
+      if (homeCoordsMatchSource(weatherCard.source)) {
+        applyHomeWeather(snapshot);
+      } else if (!state.homeWeather) {
+        // First load with an old session's weather pin (or a GPS fix)
+        // already pointed elsewhere: home still needs its own sky, once.
+        refreshHomeWeather();
+      }
       // The old clock's sky is painted from this same snapshot — one request,
       // one truth, and a scene that can never contradict the weather card.
       if (oldClock) oldClock.updateScene();
@@ -586,7 +665,7 @@ import {
         : "Pick a place with coordinates to see how far its clock sits from its own sun.";
     }
     if (elements.daylightNote) {
-      const snapshot = state.weather;
+      const snapshot = state.homeWeather;
       if (snapshot && snapshot.ok && snapshot.sunrise && snapshot.sunset) {
         const hours = ((snapshot.sunset - snapshot.sunrise) / 3600000).toFixed(1);
         elements.daylightNote.textContent = `${place.city} gets about ${hours} hours of daylight today, from ${new Date(
@@ -751,6 +830,13 @@ import {
       /* the home place resets next visit when storage is blocked */
     }
     state.localHour = null;
+    // The old city's sky must not linger for even one tick under the new
+    // city's clock — clear it so Auto falls back to the clock-only palette
+    // instantly, then the fresh fetch below replaces it as soon as it lands.
+    // This is the fix for "I moved to New York and the theme stayed sunny":
+    // the palette used to keep running on whatever place the weather card —
+    // or an old GPS fix — happened to still be pointed at.
+    state.homeWeather = null;
     updateLiveTime();
     board.render();
     renderPopularCities();
@@ -762,6 +848,13 @@ import {
     state.phraseDay = null;
     renderPhrases();
     renderNowWeather();
+    // The Auto theme always gets the new home place's own sky, on its own
+    // request — regardless of whether the Weather card also moves with it.
+    // This is deliberately independent of `weather`/followHomeZone below: a
+    // GPS fix or a city you chose on purpose can keep the *card* looking
+    // elsewhere, but the theme must never be left waiting on, or quietly
+    // borrowing, a sky that belongs to a different place.
+    refreshHomeWeather({ force: true });
     if (weather) weatherCard.followHomeZone();
     if (oldClock && (!oldClock.placeId || oldClock.placeId === record.id)) oldClock.setPlace(record.id);
     if (!silent) notify(`${record.label} is now your home place.`);
@@ -1066,16 +1159,23 @@ import {
     if (elements.mobileNavBackdrop) elements.mobileNavBackdrop.addEventListener("click", closeMobileNav);
     $$(".mobile-nav a").forEach((link) => link.addEventListener("click", closeMobileNav));
 
-    window.addEventListener("online", () => weatherCard.refresh({ force: true }));
+    window.addEventListener("online", () => {
+      weatherCard.refresh({ force: true });
+      refreshHomeWeather({ force: true });
+    });
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
         updateLiveTime();
         weatherCard.refresh();
+        maybeRefreshHomeWeather();
         applyTheme();
       }
     });
     // DST shifts and daylight boundaries both move the palette.
     window.setInterval(applyTheme, 30 * 1000);
+    // Home weather refreshes on its own clock — independent of whatever the
+    // Weather card and Forecast are polling for, per REFRESH_MS.
+    window.setInterval(maybeRefreshHomeWeather, 60 * 1000);
   }
 
   /* ------------------------------------------------------------------- boot */
