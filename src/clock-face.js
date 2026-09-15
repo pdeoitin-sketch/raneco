@@ -43,8 +43,13 @@ export function createClockFace(root, { numerals = "arabic", seconds = true, smo
     ticks.setAttribute("aria-hidden", "true");
     for (let index = 0; index < 60; index += 1) {
       const tick = document.createElement("i");
-      tick.className = index % 5 === 0 ? "face-tick major" : "face-tick";
+      const isHour = index % 5 === 0;
+      tick.className = isHour ? "face-tick major" : "face-tick";
       tick.style.setProperty("--angle", `${index * 6}deg`);
+      // Give each hour baton the same identity as its numeral. Besides making
+      // the geometry testable, this prevents future face styles from having
+      // to infer that the first baton means twelve rather than one.
+      if (isHour) tick.dataset.hour = String(index === 0 ? 12 : index / 5);
       ticks.appendChild(tick);
     }
     root.appendChild(ticks);
@@ -60,8 +65,10 @@ export function createClockFace(root, { numerals = "arabic", seconds = true, smo
     // The hour this glyph stands for, so a face can decorate the *quarters*
     // (12, 3, 6, 9) instead of guessing with :nth-child — the children are
     // built 1..12, so nth-child(1) is one o'clock, not twelve.
-    node.dataset.hour = String(hour === 12 ? 12 : hour);
-    node.style.setProperty("--angle", `${hour * 30}deg`);
+    node.dataset.hour = String(hour);
+    // Normalise twelve to 0deg so every numeral has the exact same angle as
+    // its hour baton (rather than relying on 360deg merely looking like 0deg).
+    node.style.setProperty("--angle", `${(hour % 12) * 30}deg`);
     const glyph = document.createElement("em");
     glyph.textContent = numerals === "roman" ? ROMAN[hour % 12] : String(hour);
     node.appendChild(glyph);

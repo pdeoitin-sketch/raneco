@@ -65,9 +65,21 @@ describe("clock face numerals", () => {
     assert.deepEqual(glyphs(host), ROMAN);
     assert.deepEqual(
       angles(host),
-      Array.from({ length: 12 }, (_, index) => `${(index + 1) * 30}deg`)
+      Array.from({ length: 12 }, (_, index) => `${((index + 1) % 12) * 30}deg`)
     );
     assert.equal(host.querySelectorAll(".face-tick").length, 60);
+
+    const hourBatons = Array.from(host.querySelectorAll(".face-tick.major"));
+    assert.equal(hourBatons.length, 12);
+    for (const numeral of host.querySelectorAll(".face-number")) {
+      const baton = hourBatons.find((node) => node.dataset.hour === numeral.dataset.hour);
+      assert.ok(baton, `hour ${numeral.dataset.hour} has a baton`);
+      assert.equal(
+        numeral.style.getPropertyValue("--angle"),
+        baton.style.getPropertyValue("--angle"),
+        `hour ${numeral.dataset.hour} numeral and baton share an angle`
+      );
+    }
   });
 
   test("arabic is the default, and switching re-spells the dial", () => {
@@ -113,10 +125,12 @@ describe("clock face numerals", () => {
     const css = readFileSync(resolve(root, "styles.css"), "utf8");
     const cell = css.match(/\.clock-face\s+\.face-number\s*\{([^}]*)\}/)?.[1] ?? "";
     assert.match(cell, /place-items\s*:\s*start\s+center/, "glyph cells pin to the top edge");
+    const face = css.match(/\.clock-face\s*\{([^}]*)\}/)?.[1] ?? "";
+    assert.match(face, /--numeral-inset\s*:\s*15%/, "the shared numeral radius clears the hour batons");
     const glyph = css.match(/\.clock-face\s+\.face-number\s+em\s*\{([^}]*)\}/)?.[1] ?? "";
-    // A % margin resolves against the (square) face; a % translate would
-    // resolve against the glyph itself and stack all twelve at the centre.
-    assert.match(glyph, /margin-top\s*:\s*[\d.]+%/, "glyphs sit inside the tick ring");
+    // A % custom property resolves against the (square) face; a % translate
+    // would resolve against the glyph itself and stack all twelve centrally.
+    assert.match(glyph, /margin-top\s*:\s*var\(--numeral-inset/, "glyphs use the shared dial radius");
     assert.doesNotMatch(glyph, /translateY\s*\(\s*-/, "no self-relative % translate");
   });
 });
