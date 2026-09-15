@@ -8,7 +8,7 @@ backend and no API key to manage.
 
 Live site: https://pdeoitin-sketch.github.io/raneco/
 
-## One page, ten sections
+## One page, eleven sections
 
 Tempo used to be six routed pages behind a sidebar, then a single scroll with
 the weather sitting above the clocks. **The order now follows the reader: time
@@ -24,7 +24,8 @@ up and the URL quietly follows.
 | **Alarms** | `#/alarms` | Wall-clock alarms: time, optional date or weekday repeat, label and **notes per alarm**, any of the 16 sounds |
 | **Timer** | `#/timer` | Countdown with presets and a **16-sound alarm that keeps ringing** |
 | **Stopwatch** | `#/stopwatch` | Centisecond stopwatch with laps, goals and splits |
-| **World clocks** | `#/clocks` | Add up to 12 places, compare them against home, reorder and remove |
+| **World clocks** | `#/clocks` | Up to 12 places — **hour large and bold, that city's own temperature beside it**, the shift from home and the sun line small underneath |
+| **Time standards** | `#/standards` | **UTC, GMT, IST, GST, JST, EST…** — the clocks that are named rather than placed, short form and full form, by region |
 | **Old clock** | `#/clock` | Full-face clock with **eight faces**, a **live sky behind the dial**, sweep/tick hand and an hourly chime |
 | **Time calculator** | `#/calculator` | Difference between two moments, unit conversion, saved results |
 | **Weather** | `#/weather` | Live conditions for a point, plus a panel saying *where it thinks you are and how sure it is* |
@@ -61,7 +62,9 @@ laps, saved calculations, old-clock face, theme, unit system and remarks.
 | **Forecast** | `src/forecast.js` | 24 hourly + 7 daily, lazily loaded when the section is reached |
 | **Wall-clock alarms** | `src/alarms.js` | Calendar-day walking, DST-safe zone arithmetic, a 90 s grace window |
 | **Alarm sounds** | `src/alarm-sounds.js` | 16 Web-Audio sounds, looping playback, YouTube/Spotify/file input |
-| **Clock faces** | `src/clock-themes.js` | Roman · Modern · Minimal · Railway · Pocket watch · Neon · Brutalist · Botanical |
+| **Clock faces** | `src/clock-themes.js` | Roman · Modern · Minimal · Railway · Pocket watch · Neon · Brutalist · Botanical — each one a genuinely different dial, and each explains itself in the picker |
+| **Time standards** | `src/time-standards.js` | 50 named clocks as fixed offsets, grouped by region; the ambiguous short forms kept apart |
+| **Board temperatures** | `src/board-weather.js` | Every world clock's temperature in **one** batched Open-Meteo request, each card in its own country's unit |
 | **Weather scenes** | `src/sky-scenes.js` | Eleven scenes behind the old clock, chosen from the live sky; mean-synodic moon phase |
 | **Heading phrases** | `src/phrases.js` | Day-number rotation; seasonal lines that flip with latitude |
 | **Remarks & feedback** | `src/remarks.js` | Tagged, kept in `localStorage`, handed to your own mail client |
@@ -70,6 +73,94 @@ laps, saved calculations, old-clock face, theme, unit system and remarks.
 | Solar time | `src/places.js` | Longitude-based sun time, so a wide country stops being one flat clock |
 | Weather palettes | `src/theme.js` + the palette block in `styles.css` | Twelve palettes keyed on the local clock *and* the live sky |
 | Timer, stopwatch, calculator | `src/timer.js`, `src/stopwatch.js`, `src/calculator.js` | Plain local-time maths; independent of the network |
+
+### The world card, re-read
+
+A world clock is glanced at, not studied, so the card now has an order:
+
+1. **The hour is the headline** — large, bold, tabular, the loudest thing on
+   the card.
+2. **The temperature sits beside it**, on the right, in **that city's own
+   unit**. Chicago reads °F and Chennai reads °C on the same board, because
+   that is what each place's own forecast says — not because of a page-wide
+   switch. Only the United States, Liberia and Myanmar get Fahrenheit; a bare
+   zone or a fix at sea falls back to Celsius.
+3. **Everything else is small**, along the bottom: whether it is already
+   tomorrow there, the UTC offset, **how far that clock is from your own**
+   (`+3H 15M FROM KATHMANDU`), and the solar-time line.
+
+All twelve temperatures come from **one** request. Open-Meteo accepts a
+comma-separated coordinate list and answers with one object per location, so
+a full board is a single call rather than twelve — and it refreshes every
+fifteen minutes, because a temperature is not a second hand. Every failure
+path (offline, rate limited, malformed) resolves to a reason rather than
+throwing: the cards keep the last number they had, and **a clock is never
+taken down by the weather**.
+
+### Time standards — the clocks that are named rather than placed
+
+The world board answers *"what time is it in Tokyo?"*. It cannot answer
+*"what is JST?"* — and people ask that constantly, because invitations, server
+logs, flight bookings and colleagues all speak in abbreviations. So there is a
+section for it, laid out like the world cards on purpose: **hour large, short
+form beside it, full form and the distance from your own clock underneath.**
+
+Fifty standards across seven regions — Universal, Europe, Middle East, Asia,
+Africa, Americas, Oceania — filterable by region and searchable by short form,
+full form, note or zone (`GST`, `gulf`, `japan` and `kathmandu` all find
+something). A 24 h / 12 h switch is remembered.
+
+Two decisions worth stating:
+
+* **A standard is a fixed offset, not a zone.** EST is −05:00 all year; New
+  York in July is EDT, a *different* standard. Nothing here consults a DST
+  table, so what you see is the standard itself rather than a city that may
+  have moved its clocks.
+* **The ambiguous short forms are kept apart.** "IST" is claimed by India
+  (+05:30) and Israel (+02:00); "AST" by Arabia (+03:00) and Atlantic Canada
+  (−04:00); "CST" by China (+08:00) and Chicago (−06:00); "BST" by Britain
+  (+01:00) and Bangladesh (+06:00). Each gets its own id and its own card, and
+  searching `IST` honestly returns both.
+
+### The old clock's faces, fixed
+
+The eight faces existed but several of them were not really faces, and a few
+were broken outright. All of the following were found and fixed:
+
+* **The "Tick" setting did not tick.** `src/clock-face.js` restamps a `.tick`
+  class on the second hand every whole second precisely so CSS can animate the
+  mechanical overshoot — and the stylesheet never had the keyframes. "Tick"
+  was "Sweep" minus the smoothing. There is now a `hand-tick` animation, and
+  it stills under `prefers-reduced-motion`.
+* **Roman was not a face.** It was one `font-family` rule sitting on the base
+  dial, which made Roman and Modern the same clock in two typefaces. It is now
+  a warm ivory dial with a chapter ring and blued-steel hands.
+* **Brutalist went blank in dark mode.** It hard-codes a paper-white dial but
+  painted its numerals in `var(--ink)`, which turns near-white when the page
+  does. Its ink is hard-coded to match its paper.
+* **The botanical leaves were on the wrong hours.** They were placed with
+  `:nth-child(1, 4, 7, 10)`, but the glyphs are built 1…12, so the "quarters"
+  landed on I, IV, VII and X. Every glyph now reports the hour it stands for
+  (`data-hour`), and the leaves sit on 12, 3, 6 and 9.
+* **The pocket watch's crown never drew.** The bow hung off
+  `.old-clock-stage[data-clock-theme="pocket"]` — an attribute the stage is
+  never given — so only a clipped stub of the stem appeared. Both parts now
+  hang off the stage, which is the element with room above the dial.
+* **Minimal had no "up".** With no numerals the batons *are* the dial, and
+  twelve was no heavier than any other; it is now unmistakable.
+* **Railway, Neon, Pocket and Botanical** inherited the base dial's pale
+  decorative inner ring, invisible or wrong on each of their own backgrounds,
+  and their minute ticks vanished into the paper. Each face now tints its own
+  ring and ticks; Railway also gets the counterweight disc a station clock's
+  second hand actually has.
+* **A live sky erased Brutalist and Minimal.** The shared translucent dial
+  behind a weather scene removed Brutalist's opaque paper and hard shadow
+  (leaving a generic face with a thick border) and left Minimal with too
+  little contrast to read. Both are now exempt.
+* **Every face explains itself.** Each one has carried a line of copy in
+  `src/clock-themes.js` since the faces were added, and nothing ever rendered
+  it — the picker was eight unlabelled words. The note now shows under the
+  buttons.
 
 ### Cities and countries
 
@@ -302,6 +393,8 @@ New suites added with this upgrade:
 | --- | --- |
 | `tests/alarms.test.mjs` | A missing repeat is no repeat, not Sunday (`Number(null) === 0` is a trap); a dead sound id is reset by catalogue membership, because `findSound()` never returns null; occurrences walk calendar days (a Friday alarm jumps the weekend) and survive both DST corners (23 h and 25 h across the boundary, nonexistent wall times shift forward, ambiguous ones take the first); the 90 s grace window rings late but not too late; the wording is compact |
 | `tests/clock-themes.test.mjs` | Exactly eight faces, ordered and drawable, with a legacy-numerals upgrade and a safe fallback; the renderer re-spells the dial per face; the stylesheet paints all eight faces and all eleven scenes; the mean-synodic moon anchors to a real new moon and reads real full/new moons correctly; `sceneFor()` maps the whole decision table — storms, snow, fog, the rainbow rule, moonlit vs moonless nights, the dark cloud at noon, breeze vs windstorm, and *no weather, no scene* |
+| `tests/time-standards.test.mjs` | Every record complete with a unique id; the ambiguous short forms (IST ×2, AST ×2, CST ×2, BST ×2) kept apart; the quarter- and half-hour clocks (+05:45, +04:30, +03:30, +06:30, +09:30, −03:30) exact; every daylight standard exactly one hour off its standard; unknown ids return `null` rather than a silent default; region grouping loses nothing; search reads short form, full form, note and zone; the clock is the offset applied to the instant (including the day that has already rolled over), 12-hour reads midnight as 12 AM and noon as 12 PM, and the shift sentence never says "0h ahead" |
+| `tests/board-weather.test.mjs` | One request for the whole board (a comma-separated coordinate list), capped at twelve; the reply keyed back to the places asked about; **each card in its own country's unit in the same request**; a single location's object form read as well as the array form; a location with no reading skipped rather than filled with a confident 0 °C; and every failure path — no places, no coordinates, no `fetch`, HTTP error, empty body, thrown network error — resolving to a reason instead of throwing |
 | `tests/phrases.test.mjs` | Day numbers are stable within a local day; every section's line comes from its own pool (time for clocks, sky for weather); the forecast's seasonal line flips with latitude; `seasonFor()` knows both hemispheres; rotation is by day, sections differ, and an unknown section still gets a line |
 
 The earlier suites (alarm sounds, geocode, forecast, router, and friends) are
@@ -309,14 +402,23 @@ still in place; the alarm-sounds suite renders all 16 sounds into a recording
 fake `AudioContext`, and the geocode suite still checks that a Bhaktapur fix is
 named *Bhaktapur*, not Kathmandu.
 
-The smoke test additionally checks that all ten sections share one page in the
-time-first order, that a phrase sits under every heading, that the text-size
+The smoke test additionally checks that all eleven sections share one page in
+the time-first order, that a phrase sits under every heading, that the text-size
 switch is gone and `--type-scale` is never written (and that the smallest size
 in the stylesheet is 11.5px), that a wall-clock alarm rings when the clock
 reaches it and the page scrolls to it, that the Right-now glance and the
 Weather section render the same snapshot from one request, that the old clock
-wears all eight faces and upgrades an old numeral save, that the scene behind
-it follows the live sky, that remarks are tagged, kept and handed to your own
+wears all eight faces and upgrades an old numeral save, that each face is more
+than one CSS declaration (Roman used to be a single font rule), that the tick
+animation the renderer asks for actually exists, that Brutalist's ink is
+hard-coded to match its hard-coded paper, that the botanical leaves are placed
+by hour rather than by child position, and that each face's note is rendered;
+that every world card leads with its hour and carries a temperature in its own
+country's unit from a single batched request, that the shift line is measured
+from home and re-measured when home moves; that the Time standards section
+renders short form and full form, filters by region, searches, and remembers
+its 24 h / 12 h choice; that the scene behind the old clock follows the live
+sky, that remarks are tagged, kept and handed to your own
 mail client, and — as before — that the alarm picker lists and persists every
 choice, that a pasted Spotify link becomes the alarm, that a finished timer
 keeps ringing until dismissed, that the forecast is *not* fetched until its

@@ -87,6 +87,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M3.9 9h16.2M3.9 15h16.2M12 3.75c2.15 2.25 3.22 4.99 3.22 8.25S14.15 18 12 20.25C9.85 18 8.78 15.26 8.78 12S9.85 5.99 12 3.75Z"></path></svg>
             <span>World clocks</span>
           </a>
+          <a class="nav-link" href="#/standards" data-route="standards" data-nav="standards">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M12 7.4v5.1l3.4 2M3.75 12h2M18.25 12h2"></path></svg>
+            <span>Time standards</span>
+          </a>
           <a class="nav-link" href="#/clock" data-route="clock" data-nav="clock">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.5" r="7.75"></circle><path d="M12 8.25v4.5l3 1.85M9.4 3.6h5.2M12 3.6V5.5M6.6 20.4h10.8"></path></svg>
             <span>Old clock</span>
@@ -534,6 +538,48 @@
 
           <div class="world-grid" id="world-grid" aria-live="polite"></div>
           <p class="empty-state" id="world-empty" hidden>No clocks yet — add a city, or drop in your own location.</p>
+          <p class="board-weather-note" id="world-weather-note">Temperatures load from Open-Meteo, in each city's own unit.</p>
+        </section>
+        <!-- ============================================================= SECTION: TIME STANDARDS -->
+        <section class="page" id="page-standards" data-page="standards" aria-labelledby="standards-title">
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">SHORT FORM, FULL FORM</p>
+              <h2 id="standards-title">Time standards</h2>
+              <p class="section-phrase" id="standards-phrase"></p>
+              <p class="section-intro">
+                UTC, GMT, IST, GST, JST, EST — the clocks that are named rather than placed. Every one is a fixed
+                offset, so what you see here is the standard itself, not a city that may have moved its clocks.
+                <span class="section-count" id="standards-count"></span>
+              </p>
+            </div>
+            <div class="page-actions">
+              <div class="segmented" id="standards-format" role="group" aria-label="Clock format">
+                <button type="button" class="seg-button active" data-standard-format="24" aria-pressed="true">24 h</button>
+                <button type="button" class="seg-button" data-standard-format="12" aria-pressed="false">12 h</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="standards-controls">
+            <div class="chip-row" id="standards-regions" aria-label="Filter by region">
+              <button type="button" class="city-chip active" data-region="all" aria-pressed="true">Popular</button>
+              <button type="button" class="city-chip" data-region="universal" aria-pressed="false">Universal</button>
+              <button type="button" class="city-chip" data-region="europe" aria-pressed="false">Europe</button>
+              <button type="button" class="city-chip" data-region="middle-east" aria-pressed="false">Middle East</button>
+              <button type="button" class="city-chip" data-region="asia" aria-pressed="false">Asia</button>
+              <button type="button" class="city-chip" data-region="africa" aria-pressed="false">Africa</button>
+              <button type="button" class="city-chip" data-region="americas" aria-pressed="false">Americas</button>
+              <button type="button" class="city-chip" data-region="oceania" aria-pressed="false">Oceania</button>
+            </div>
+            <label class="standards-search">
+              <span class="sr-only">Search time standards</span>
+              <input id="standards-search" type="search" placeholder="Search a standard — IST, Gulf, Japan…" autocomplete="off" />
+            </label>
+          </div>
+
+          <div class="standards-grid" id="standards-grid" aria-live="polite"></div>
+          <p class="empty-state" id="standards-empty" hidden>No standard matches that — try the short form, like GST.</p>
         </section>
         <!-- ============================================================= SECTION: OLD CLOCK -->
         <section class="page" id="page-clock" data-page="clock" aria-labelledby="old-clock-title">
@@ -584,6 +630,7 @@
                     <button type="button" class="seg-button" data-clock-face="brutalist" aria-pressed="false">Brutalist</button>
                     <button type="button" class="seg-button" data-clock-face="botanical" aria-pressed="false">Botanical</button>
                   </div>
+                  <p class="clock-face-note" id="old-clock-face-note"></p>
                 </div>
                 <div class="control-group" role="group" aria-label="Second hand movement">
                   <p class="eyebrow">SECOND HAND</p>
@@ -889,6 +936,7 @@
       <a href="#/timer" data-route="timer" data-nav="timer">Timer</a>
       <a href="#/stopwatch" data-route="stopwatch" data-nav="stopwatch">Stopwatch</a>
       <a href="#/clocks" data-route="clocks" data-nav="clocks">World clocks</a>
+      <a href="#/standards" data-route="standards" data-nav="standards">Time standards</a>
       <a href="#/clock" data-route="clock" data-nav="clock">Old clock</a>
       <a href="#/calculator" data-route="calculator" data-nav="calculator">Time calculator</a>
       <a href="#/weather" data-route="weather" data-nav="weather">Weather</a>

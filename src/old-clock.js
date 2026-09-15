@@ -206,6 +206,9 @@ export function createOldClock({ elements = {}, getPlaceId, getWeather, notify, 
   }
 
   function syncSegments() {
+    // Each face explains itself (src/clock-themes.js); that line was written
+    // and never shown, so the picker was eight unlabelled words.
+    if (elements.faceNote) elements.faceNote.textContent = findClockTheme(prefs.theme).note;
     if (elements.facesGroup) {
       for (const button of elements.facesGroup.querySelectorAll("[data-clock-face]")) {
         const active = button.dataset.clockFace === prefs.theme;
