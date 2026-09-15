@@ -145,8 +145,20 @@ export function createScrollNav({ sections = [], onChange, fallback = DEFAULT_RO
       });
   }
 
+  function isFullscreenActive() {
+    return (
+      typeof document !== "undefined" &&
+      Boolean(
+        document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement
+      )
+    );
+  }
+
   function spyByPosition() {
-    if (settling > Date.now()) return;
+    if (settling > Date.now() || isFullscreenActive()) return;
     const scroller = document.scrollingElement || document.documentElement;
     const id = activeFromPositions(positions(), {
       scrollTop: scroller ? scroller.scrollTop : 0,
@@ -162,7 +174,7 @@ export function createScrollNav({ sections = [], onChange, fallback = DEFAULT_RO
     // when its content is where the eye is, not when it first peeks in.
     observer = new IntersectionObserver(
       (entries) => {
-        if (settling > Date.now()) return;
+        if (settling > Date.now() || isFullscreenActive()) return;
         const visible = entries
           .filter((entry) => entry.isIntersecting)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
