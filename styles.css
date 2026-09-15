@@ -625,7 +625,8 @@ body[data-appearance="storm"] {
 }
 
 /* Night: deep blue-black and a starfield. */
-body[data-appearance="night"] {
+body[data-appearance="night"],
+body[data-appearance^="night-"] {
   --canvas: #0d1020;
   --canvas-soft: #12162a;
   --surface: #171c33;
@@ -654,6 +655,15 @@ body[data-appearance="night"] {
   --sky-glow: #2a2f66;
   --star: 1;
 }
+
+/* Night weather keeps the moon and stars but changes the atmosphere and
+   particles. These combinations are intentionally distinct from daytime. */
+body[data-appearance="night-cloud"] { --canvas: #11182a; --canvas-soft: #182136; --cloud: .72; --star: .34; --sky-glow: #53617c; }
+body[data-appearance="night-fog"] { --canvas: #151c2a; --canvas-soft: #202939; --cloud: .9; --star: .12; --sky-glow: #718096; }
+body[data-appearance="night-rain"] { --canvas: #0c1528; --canvas-soft: #121e34; --rain: .72; --cloud: .5; --star: .2; --hero-3: #284d78; }
+body[data-appearance="night-snow"] { --canvas: #111b30; --canvas-soft: #192640; --snow: .72; --cloud: .28; --star: .38; --sky-glow: #708bb5; }
+body[data-appearance="night-wind"] { --canvas: #0d1c29; --canvas-soft: #142a38; --wind: .8; --cloud: .25; --star: .55; --hero-3: #286274; }
+body[data-appearance="night-storm"] { --canvas: #090d19; --canvas-soft: #101624; --rain: .95; --cloud: .9; --star: .08; --sky-glow: #695db5; --hero-2: #23264d; --hero-3: #544a99; }
 
 /* Manual light / dark simply reuse the two original palettes. */
 body[data-appearance="light"] {
@@ -705,6 +715,12 @@ html[data-appearance="snow"] { background: #eef4f9; }
 html[data-appearance="dusk"] { background: #241a24; }
 html[data-appearance="storm"] { background: #14161f; }
 html[data-appearance="night"] { background: #0d1020; }
+html[data-appearance="night-cloud"] { background: #11182a; }
+html[data-appearance="night-fog"] { background: #151c2a; }
+html[data-appearance="night-rain"] { background: #0c1528; }
+html[data-appearance="night-snow"] { background: #111b30; }
+html[data-appearance="night-wind"] { background: #0d1c29; }
+html[data-appearance="night-storm"] { background: #090d19; }
 html[data-appearance="dark"] { background: #191923; }
 
 /* ---------------------------------------------------------------- sky layer */
@@ -1830,8 +1846,17 @@ body[data-ui="dark"] .current-sound { color: #c3b8ff; }
 
 .scene { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; pointer-events: none; }
 .old-clock-stage[data-scene="none"] .scene { display: none; }
-/* When a scene is live it *is* the dial: the clock keeps its ring and hands. */
-.old-clock-stage:not([data-scene="none"]) .old-clock { background: transparent; box-shadow: 0 26px 50px rgba(30, 26, 60, .14); }
+/* Keep a translucent dial between animated weather and the hands. The former
+   fully-transparent face let clouds and rain erase numerals and hands. */
+.old-clock-stage:not([data-scene="none"]) .old-clock {
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 18%, transparent), 0 26px 50px rgba(30, 26, 60, .18);
+  backdrop-filter: blur(3px);
+}
+.old-clock-stage:not([data-scene="none"]) .old-clock[data-clock-theme="pocket"] { color: #4a3b28; background: rgba(255, 250, 240, .9); }
+.old-clock-stage:not([data-scene="none"]) .old-clock[data-clock-theme="botanical"] { color: #33453a; background: rgba(232, 241, 226, .88); }
+.old-clock-stage:not([data-scene="none"]) .old-clock[data-clock-theme="railway"],
+.old-clock-stage:not([data-scene="none"]) .old-clock[data-clock-theme="neon"] { color: #f2f4fb; background: rgba(12, 15, 32, .82); }
 
 /* Scene backdrops — the sky the particles live in. */
 .scene { background: radial-gradient(circle at 50% 40%, var(--surface-raised) 0%, var(--canvas-soft) 100%); }
