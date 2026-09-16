@@ -1,20 +1,22 @@
 # raneco
 
 **Tempo** — a single-scroll browser dashboard for your local time, **alarms
-that ring at a wall-clock time**, world clocks, live weather and forecast, an
-old-style clock, a timer with real alarms, a stopwatch, and time calculations.
+that ring at a wall-clock time**, a calendar, settings, world clocks, live
+weather and forecast, an old-style clock, a timer with real alarms, a
+stopwatch, and time calculations.
 Built with [Vite](https://vite.dev/), deployed as a static site: there is no
 backend and no API key to manage.
 
 Live site: https://pdeoitin-sketch.github.io/raneco/
 
-## One page, eleven sections
+## One page, thirteen sections
 
 Tempo used to be six routed pages behind a sidebar, then a single scroll with
 the weather sitting above the clocks. **The order now follows the reader: time
 first, sky after.** The things you *do* with time — alarms, timer, stopwatch,
-the clocks, the arithmetic — come before the weather and the forecast, and an
-About section closes the page. The sidebar still *reports where you are*
+the clocks, standards, calendar and arithmetic — come before the weather and
+the forecast; Settings gives display preferences a real home before About
+closes the page. The sidebar still *reports where you are*
 instead of deciding what you may see: as you scroll, the current section lights
 up and the URL quietly follows.
 
@@ -26,10 +28,12 @@ up and the URL quietly follows.
 | **Stopwatch** | `#/stopwatch` | Centisecond stopwatch with laps, goals and splits |
 | **World clocks** | `#/clocks` | Up to 12 places — **hour large and bold, that city's own temperature beside it**, the shift from home and the sun line small underneath |
 | **Time standards** | `#/standards` | **UTC, GMT, IST, GST, JST, EST…** — the clocks that are named rather than placed, short form and full form, by region |
+| **Calendar** | `#/calendar` | Home-zone month view with today, selected date details, ISO week and day-of-year facts |
 | **Old clock** | `#/clock` | Full-face clock with **eight faces**, a **live sky behind the dial**, sweep/tick hand and an hourly chime |
 | **Time calculator** | `#/calculator` | Difference between two moments, unit conversion, saved results |
 | **Weather** | `#/weather` | Live conditions for a point, plus a panel saying *where it thinks you are and how sure it is* |
 | **Forecast** | `#/forecast` | Next 24 hours hour-by-hour, next 7 days with highs, lows and rain chance |
+| **Settings** | `#/settings` | Text-size controls and theme choices, from Auto to rainy, cloudy, sunny, snowy and thunderous moods |
 | **About** | `#/about` | What Tempo is, where the numbers come from, honest limits, and tagged remarks kept in your browser |
 
 A **phrase sits under every heading** — time for the clock sections, sky for
@@ -42,12 +46,12 @@ bookmarked it lands on the timer section with a smooth scroll rather than a
 404. Renamed sections keep their old hashes as aliases — `#/focus`, the
 section that grew up and became the Stopwatch, still finds it. Clicking a
 sidebar entry jumps; scrolling updates the highlight; the hash is rewritten
-with `replaceState`, so one flick of the wheel does not push ten entries into
-the back button.
+with `replaceState`, so one flick of the wheel does not push a dozen entries
+into the back button.
 
 Everything persists in `localStorage`: home place, board, **wall-clock
 alarms**, timer settings, **alarm sound, volume and ring duration**, stopwatch
-laps, saved calculations, old-clock face, theme, unit system and remarks.
+laps, saved calculations, calendar selection, old-clock face, theme, text size, unit system and remarks.
 
 ## What is in the box
 
@@ -64,6 +68,8 @@ laps, saved calculations, old-clock face, theme, unit system and remarks.
 | **Alarm sounds** | `src/alarm-sounds.js` | 16 Web-Audio sounds, looping playback, YouTube/Spotify/file input |
 | **Clock faces** | `src/clock-themes.js` | Roman · Modern · Minimal · Railway · Pocket watch · Neon · Brutalist · Botanical — each one a genuinely different dial, and each explains itself in the picker |
 | **Time standards** | `src/time-standards.js` | 50 named clocks as fixed offsets, grouped by region; the ambiguous short forms kept apart |
+| **Calendar** | `src/calendar.js` | Monday-first month grid tied to the home time zone; today, selected date, ISO week and day-of-year facts |
+| **Settings** | `src/settings.js` + `src/theme.js` | Text-size preferences plus Auto/Light/Dark and fixed weather-mood theme choices |
 | **Board temperatures** | `src/board-weather.js` | Every world clock's temperature in **one** batched Open-Meteo request, each card in its own country's unit |
 | **Weather scenes** | `src/sky-scenes.js` | Eleven scenes behind the old clock, chosen from the live sky; mean-synodic moon phase |
 | **Heading phrases** | `src/phrases.js` | Day-number rotation; seasonal lines that flip with latitude |
@@ -71,7 +77,7 @@ laps, saved calculations, old-clock face, theme, unit system and remarks.
 | **Reverse geocoding** | `src/geocode.js` | Names a fix from a real gazetteer, and grades how much to trust it |
 | Device location | `src/location.js` | High-accuracy `navigator.geolocation` + zone confirmation + a real place name |
 | Solar time | `src/places.js` | Longitude-based sun time, so a wide country stops being one flat clock |
-| Weather palettes | `src/theme.js` + the palette block in `styles.css` | Twelve palettes keyed on the local clock *and* the live sky |
+| Weather palettes | `src/theme.js` + the palette block in `styles.css` | Auto palettes keyed on the local clock and live sky, plus manual weather moods from Settings |
 | Timer, stopwatch, calculator | `src/timer.js`, `src/stopwatch.js`, `src/calculator.js` | Plain local-time maths; independent of the network |
 
 ### The world card, re-read
@@ -303,30 +309,31 @@ time) and shows it everywhere it matters:
 * a plain-language note in the sidebar ("the sun lags the clock by 37 minutes"),
 * a warning when a place's legal time is more than two hours from its sun.
 
-### Weather themes
+### Settings: text size and theme moods
 
-**Auto** (the default) re-tints the page from the local clock *and* the live
-sky, in twelve palettes rather than a light/dark pair: dawn (cool lilac),
-sunny (clean white with a warm sun and drifting clouds), cloudy (soft slate),
-fog, rain (blue-slate with a soft drizzle), wind (pale mint with streaking
-gusts), snow (icy blue), dusk (low amber), storm (dark slate with rain),
-night (deep indigo with a starfield), plus the fixed light and dark palettes.
-Wind only shows its palette when the wind is genuinely worth mentioning
-(≥ 26 km/h sustained, or a ≥ 48 km/h gust) and the card then says *breezy*,
-*windy* or *gusting*, with direction. Palettes cross-fade through registered
-custom properties (`@property`) and `prefers-reduced-motion` is respected.
-**Light** and **Dark** fix the look instead. The choice is remembered in
-`localStorage`.
+Settings now has the first two preferences that belong there:
 
-### Bigger text, fixed
+* **Text size** — Compact, Default, Large and Extra large. The base ramp stays
+  readable (no tiny 7.5px captions coming back), while the major reading
+  surfaces scale from 94% to 124%. The choice is saved as `tempo-text-size`
+  and restored by the pre-paint script so reloads do not flash at the wrong
+  size.
+* **Themes** — Auto, Light, Dark, plus manual moods: Sunny, Cloudy, Rainy,
+  Snowy, Thunderous, Windy, Foggy, Sunrise, Sunset and Night. **Auto** still
+  derives the look from the home place's local clock and live weather; a manual
+  mood locks the palette until Auto is chosen again.
 
-The three-button text-size switch (**A · A⁺ · A⁺⁺**) was the wrong fix: it
-scaled everything *proportionally*, so a 7.5px caption stayed a caption and
-body copy was too small at every setting. It is gone. All 222 sizes now sit on
-a **fixed ramp** in `styles.css`: the smallest text on the page is **11.5px**
-(up from 7.5px), body copy sits at **14–15px**, and headings were already fine
-and keep the size they always rendered at. The `--type-scale` custom property
-and the `tempo-text-scale` storage key are both gone entirely.
+Auto re-tints the page from the local clock *and* the live sky: sunrise, sunny
+day, cloud, fog, rain, wind, snow, sunset, storm, clear night and night-weather
+combinations. Wind only shows its palette when the wind is genuinely worth
+mentioning (≥ 26 km/h sustained, or a ≥ 48 km/h gust) and the card then says
+*breezy*, *windy* or *gusting*, with direction. Palettes cross-fade through
+registered custom properties (`@property`) and `prefers-reduced-motion` is
+respected.
+
+The Settings section also names sensible next additions: calendar defaults,
+weather units, alarm defaults, notification behaviour, sound volume, privacy /
+location controls, and import/export for saved browser data.
 
 ### Eight faces, one live sky
 
@@ -395,17 +402,19 @@ New suites added with this upgrade:
 | `tests/clock-themes.test.mjs` | Exactly eight faces, ordered and drawable, with a legacy-numerals upgrade and a safe fallback; the renderer re-spells the dial per face; the stylesheet paints all eight faces and all eleven scenes; the mean-synodic moon anchors to a real new moon and reads real full/new moons correctly; `sceneFor()` maps the whole decision table — storms, snow, fog, the rainbow rule, moonlit vs moonless nights, the dark cloud at noon, breeze vs windstorm, and *no weather, no scene* |
 | `tests/time-standards.test.mjs` | Every record complete with a unique id; the ambiguous short forms (IST ×2, AST ×2, CST ×2, BST ×2) kept apart; the quarter- and half-hour clocks (+05:45, +04:30, +03:30, +06:30, +09:30, −03:30) exact; every daylight standard exactly one hour off its standard; unknown ids return `null` rather than a silent default; region grouping loses nothing; search reads short form, full form, note and zone; the clock is the offset applied to the instant (including the day that has already rolled over), 12-hour reads midnight as 12 AM and noon as 12 PM, and the shift sentence never says "0h ahead" |
 | `tests/board-weather.test.mjs` | One request for the whole board (a comma-separated coordinate list), capped at twelve; the reply keyed back to the places asked about; **each card in its own country's unit in the same request**; a single location's object form read as well as the array form; a location with no reading skipped rather than filled with a confident 0 °C; and every failure path — no places, no coordinates, no `fetch`, HTTP error, empty body, thrown network error — resolving to a reason instead of throwing |
-| `tests/phrases.test.mjs` | Day numbers are stable within a local day; every section's line comes from its own pool (time for clocks, sky for weather); the forecast's seasonal line flips with latitude; `seasonFor()` knows both hemispheres; rotation is by day, sections differ, and an unknown section still gets a line |
+| `tests/calendar.test.mjs` | Plain dates parse without the device zone; the month grid is Monday-first and six weeks tall; today, selected dates and weekends are marked; ISO week, day-of-year, leap-year and relative-date facts are pinned; month navigation crosses years |
+| `tests/settings.test.mjs` | Text-size options are ordered and sanitised, old raw scale values migrate on read, storage writes the new key, and applying a size sets the root data hook and scale variable |
+| `tests/phrases.test.mjs` | Day numbers are stable within a local day; every section's line comes from its own pool (time for clocks and settings, sky for weather); the forecast's seasonal line flips with latitude; `seasonFor()` knows both hemispheres; rotation is by day, sections differ, and an unknown section still gets a line |
 
 The earlier suites (alarm sounds, geocode, forecast, router, and friends) are
 still in place; the alarm-sounds suite renders all 16 sounds into a recording
 fake `AudioContext`, and the geocode suite still checks that a Bhaktapur fix is
 named *Bhaktapur*, not Kathmandu.
 
-The smoke test additionally checks that all eleven sections share one page in
-the time-first order, that a phrase sits under every heading, that the text-size
-switch is gone and `--type-scale` is never written (and that the smallest size
-in the stylesheet is 11.5px), that a wall-clock alarm rings when the clock
+The smoke test additionally checks that all thirteen sections share one page
+in the time-first order, that a phrase sits under every heading, that Settings
+can apply text size and manual weather moods, that Calendar renders a home-zone
+month and persists a selected day, that a wall-clock alarm rings when the clock
 reaches it and the page scrolls to it, that the Right-now glance and the
 Weather section render the same snapshot from one request, that the old clock
 wears all eight faces and upgrades an old numeral save, that each face is more

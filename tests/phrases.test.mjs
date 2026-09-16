@@ -33,7 +33,7 @@ describe("the phrase under every heading", () => {
 
   test("every section gets a phrase, and it is one of its own", () => {
     assert.deepEqual(SECTION_ORDER, [
-      "now", "alarms", "timer", "stopwatch", "clocks", "standards", "clock", "calculator", "weather", "forecast", "about",
+      "now", "alarms", "timer", "stopwatch", "clocks", "standards", "calendar", "clock", "calculator", "weather", "forecast", "settings", "about",
     ]);
     for (const section of SECTION_ORDER) {
       const phrase = phraseFor(section, { date: new Date(2026, 8, 14, 9), latitude: 27 });
@@ -47,7 +47,7 @@ describe("the phrase under every heading", () => {
 
   test("clock sections talk about time; the weather section talks about the sky", () => {
     const date = new Date(2026, 8, 14, 9);
-    for (const section of ["now", "alarms", "timer", "stopwatch", "clocks", "standards", "clock", "calculator", "about"]) {
+    for (const section of ["now", "alarms", "timer", "stopwatch", "clocks", "standards", "calendar", "clock", "calculator", "settings", "about"]) {
       assert.ok(
         PHRASE_POOLS.time.includes(phraseFor(section, { date })),
         `${section} draws from the time pool`
@@ -97,7 +97,7 @@ describe("the phrase under every heading", () => {
       "tomorrow's line is tomorrow's"
     );
 
-    // The offset by section means eleven headings do not all surface the same
+    // The offset by section means the headings do not all surface the same
     // index of their pools on the same day.
     const lines = new Set(SECTION_ORDER.map((section) => phraseFor(section, { date: today, latitude: 27 })));
     assert.ok(lines.size >= 3, `sections read differently, got ${lines.size} distinct lines`);

@@ -1,5 +1,5 @@
 /**
- * Theme engine: Auto / Light / Dark.
+ * Theme engine: Auto plus fixed light, dark and weather-mood themes.
  *
  * "Auto" (the default) derives the whole look from the *local* time of the home
  * zone plus the live weather: sunrise turns the page warm, a bright day is very
@@ -9,22 +9,45 @@
  * colours and animates the palette's custom properties, so switching mood is a
  * smooth cross-fade rather than a jarring repaint.
  *
- * This module is pure logic (no colour literals beyond the pre-paint hint), so
- * the decision table is unit tested in tests/theme.test.mjs.
+ * This module is mostly pure logic (the colour literals are palette metadata
+ * for the pre-paint hint), so the decision table is unit tested in
+ * tests/theme.test.mjs.
  */
 
 import { effectiveMood, wallClock, windDescription } from "./weather.js";
 
 export const MODE_STORAGE_KEY = "tempo-theme-mode";
 export const LAST_STORAGE_KEY = "tempo-theme-last";
-export const MODES = ["auto", "light", "dark"];
+
+/** Theme modes exposed in Settings. Auto is computed; the rest lock an appearance. */
+export const THEME_CHOICES = [
+  { id: "auto", label: "Auto", icon: "☼", kind: "automatic", summary: "Follows your home place: daylight, night and live weather choose the palette." },
+  { id: "light", label: "Light", icon: "☀", kind: "fixed", summary: "The original bright Tempo look, independent of the sky." },
+  { id: "dark", label: "Dark", icon: "☾", kind: "fixed", summary: "The original dark Tempo look, independent of the sky." },
+  { id: "sunny", label: "Sunny", icon: "☀", kind: "weather", summary: "Warm daylight tones, even when the forecast says otherwise." },
+  { id: "cloud", label: "Cloudy", icon: "☁", kind: "weather", summary: "Soft overcast greys with low glare." },
+  { id: "rain", label: "Rainy", icon: "☂", kind: "weather", summary: "Cool slate blues and a rainy page atmosphere." },
+  { id: "snow", label: "Snowy", icon: "❄", kind: "weather", summary: "Clean winter whites with a colder blue cast." },
+  { id: "storm", label: "Thunderous", icon: "⛈", kind: "weather", summary: "A dark, electric storm palette with rain in the background." },
+  { id: "wind", label: "Windy", icon: "🍃", kind: "weather", summary: "Airy green-blues with motion in the sky layer." },
+  { id: "fog", label: "Foggy", icon: "🌫", kind: "weather", summary: "Muted mist tones for a quiet, low-contrast page." },
+  { id: "dawn", label: "Sunrise", icon: "🌅", kind: "time", summary: "Peach and apricot tones from the early morning window." },
+  { id: "dusk", label: "Sunset", icon: "🌇", kind: "time", summary: "Amber evening light, fixed until you change it." },
+  { id: "night", label: "Night", icon: "✦", kind: "time", summary: "A deep clear-night palette with stars." },
+];
+
+export const MODES = THEME_CHOICES.map((choice) => choice.id);
+
+export function themeChoice(mode) {
+  return THEME_CHOICES.find((choice) => choice.id === mode) || THEME_CHOICES[0];
+}
 
 /** Every appearance, with the words used in captions and the <meta> colour. */
 export const APPEARANCES = {
   light: { label: "Light", icon: "☀", dark: false, canvas: "#f7f7fb", kind: "fixed" },
   dark: { label: "Dark", icon: "☾", dark: true, canvas: "#191923", kind: "fixed" },
   dawn: { label: "Sunrise", icon: "🌅", dark: false, canvas: "#fdeadb", kind: "sunrise" },
-  sunny: { label: "Sunny day", icon: "☀", dark: false, canvas: "#fffbe9", kind: "sunny" },
+  sunny: { label: "Sunny day", icon: "☀", dark: false, canvas: "#fffdf3", kind: "sunny" },
   cloud: { label: "Overcast", icon: "☁", dark: false, canvas: "#eceef2", kind: "cloud" },
   fog: { label: "Foggy", icon: "🌫", dark: false, canvas: "#e9eef1", kind: "fog" },
   wind: { label: "Windy", icon: "🍃", dark: false, canvas: "#eaf6f1", kind: "wind" },
@@ -66,14 +89,20 @@ export function dayPartFromClock(hour) {
  * Decide the appearance.
  *
  * @param {object} input
- *   @param {"auto"|"light"|"dark"} mode
+ *   @param {string} mode          "auto" or one of THEME_CHOICES
  *   @param {number} hour          local hour (0-23) in the home zone
  *   @param {object|null} weather   parsed Open-Meteo snapshot, or null
  *   @param {number} now            epoch ms
  */
 export function resolveAppearance({ mode = "auto", hour = 12, weather = null, now = Date.now(), minute = 0 } = {}) {
-  if (mode === "light") return { appearance: "light", reason: "Light theme locked in", manual: true };
-  if (mode === "dark") return { appearance: "dark", reason: "Dark theme locked in", manual: true };
+  if (mode !== "auto" && APPEARANCES[mode]) {
+    const choice = themeChoice(mode);
+    return {
+      appearance: mode,
+      reason: `${choice.label || APPEARANCES[mode].label} theme locked in`,
+      manual: true,
+    };
+  }
 
   const code = weather && weather.ok ? weather : null;
   const clock = `${String(hour).padStart(2, "0")}:${String(Math.max(0, Math.min(59, Number(minute) || 0))).padStart(2, "0")}`;
@@ -158,8 +187,10 @@ function minutesUntilEpoch(epoch, now) {
  */
 export function themeCaption({ mode, appearance, place = "", reason = "" }) {
   const info = APPEARANCES[appearance] || APPEARANCES.light;
-  if (mode === "light") return "Light theme · fixed";
-  if (mode === "dark") return "Dark theme · fixed";
+  if (mode && mode !== "auto") {
+    const choice = themeChoice(mode);
+    return `${choice.label || info.label} theme · fixed`;
+  }
   const where = place ? ` in ${place}` : "";
   return `Auto · ${info.label}${where}${reason ? ` — ${reason}` : ""}`;
 }
@@ -203,9 +234,10 @@ export function readMode(storage) {
   try {
     const store = storage || (typeof localStorage !== "undefined" ? localStorage : null);
     if (!store) return "auto";
-    const raw = store.getItem(MODE_STORAGE_KEY);
-    // The old build stored "light"/"dark" here — both still work.
-    if (raw === "dark" || raw === "light") return raw;
+    const raw = store.getItem(MODE_STORAGE_KEY) || store.getItem("tempo-theme");
+    // The old build stored only "light"/"dark" here — both still work.
+    // A very early weather palette called clear is the sunny palette now.
+    if (raw === "clear") return "sunny";
     return MODES.includes(raw) ? raw : "auto";
   } catch (_) {
     return "auto";
@@ -213,9 +245,11 @@ export function readMode(storage) {
 }
 
 export function writeMode(mode) {
+  const next = MODES.includes(mode) ? mode : "auto";
   try {
-    localStorage.setItem(MODE_STORAGE_KEY, mode);
+    localStorage.setItem(MODE_STORAGE_KEY, next);
   } catch (_) {
     // Preference lives for this visit only when storage is blocked.
   }
+  return next;
 }

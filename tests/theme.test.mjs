@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   APPEARANCES,
+  THEME_CHOICES,
   dayPartFromClock,
   isDarkAppearance,
   readMode,
@@ -140,10 +141,13 @@ test("missing sunrise data does not invent a sunrise", () => {
   assert.equal(result.appearance, "sunny");
 });
 
-test("Light and Dark are honoured over the live conditions", () => {
+test("manual themes are honoured over the live conditions", () => {
   const stormy = sky({ mood: "storm", condition: "Thunderstorm" });
   assert.equal(resolveAppearance({ mode: "light", hour: 23, now: NOW, weather: stormy }).appearance, "light");
   assert.equal(resolveAppearance({ mode: "dark", hour: 12, now: NOW, weather: stormy }).appearance, "dark");
+  assert.equal(resolveAppearance({ mode: "rain", hour: 12, now: NOW, weather: stormy }).appearance, "rain");
+  assert.equal(resolveAppearance({ mode: "snow", hour: 12, now: NOW, weather: sky({ mood: "clear" }) }).appearance, "snow");
+  assert.equal(resolveAppearance({ mode: "storm", hour: 12, now: NOW, weather: null }).reason, "Thunderous theme locked in");
   assert.equal(resolveAppearance({ mode: "light", hour: 23, now: NOW, weather: null }).appearance, "light");
 });
 
@@ -180,6 +184,8 @@ test("captions explain what Auto is doing", () => {
   assert.equal(themeCaption({ mode: "auto", appearance: "night", place: "Kathmandu" }), "Auto · Clear night in Kathmandu");
   assert.equal(themeCaption({ mode: "light", appearance: "light", place: "Kathmandu" }), "Light theme · fixed");
   assert.equal(themeCaption({ mode: "dark", appearance: "dark" }), "Dark theme · fixed");
+  assert.equal(themeCaption({ mode: "rain", appearance: "rain" }), "Rainy theme · fixed");
+  assert.equal(themeCaption({ mode: "storm", appearance: "storm" }), "Thunderous theme · fixed");
 });
 
 test("the stored mode survives old values and bad storage", () => {
@@ -187,9 +193,26 @@ test("the stored mode survives old values and bad storage", () => {
   assert.equal(readMode(memory("auto")), "auto");
   assert.equal(readMode(memory("dark")), "dark", "values from the old toggle still work");
   assert.equal(readMode(memory("light")), "light");
+  assert.equal(readMode(memory("rain")), "rain");
+  assert.equal(readMode(memory("storm")), "storm");
+  assert.equal(readMode(memory("clear")), "sunny", "the old clear name maps to Sunny");
   assert.equal(readMode(memory("neon")), "auto");
   assert.equal(readMode(memory(null)), "auto");
   assert.equal(readMode({ getItem: () => { throw new Error("blocked"); } }), "auto");
+});
+
+test("the settings theme catalogue exposes the available manual themes", () => {
+  const ids = THEME_CHOICES.map((choice) => choice.id);
+  assert.deepEqual(ids.slice(0, 3), ["auto", "light", "dark"]);
+  for (const required of ["sunny", "cloud", "rain", "snow", "storm", "wind", "fog", "dawn", "dusk", "night"]) {
+    assert.ok(ids.includes(required), `${required} is offered in settings`);
+  }
+  assert.equal(new Set(ids).size, ids.length, "theme ids are unique");
+  for (const choice of THEME_CHOICES) {
+    assert.ok(choice.label);
+    assert.ok(choice.icon);
+    assert.ok(choice.summary.length > 20);
+  }
 });
 
 test("the whole look differs between palettes", () => {

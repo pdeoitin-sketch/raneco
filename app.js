@@ -1,15 +1,16 @@
 /**
  * Tempo — the dashboard shell.
  *
- * **One page, ten sections, time first.** Tempo used to be six routed pages
+ * **One page, thirteen sections, time first.** Tempo used to be six routed pages
  * behind a sidebar, then a single scroll with weather sitting above the
  * clocks. Now the order follows the reader: Right now, Alarms, Timer,
- * Stopwatch, World clocks, Old clock, Time calculator — the things you do
- * with time — and only then Weather, Forecast and About (see src/router.js).
+ * Stopwatch, World clocks, Time standards, Calendar, Old clock and Time
+ * calculator — the things you do with time — then Weather, Forecast, Settings
+ * and About (see src/router.js).
  * Old links still work: they scroll, and renamed sections keep their old
  * hashes as aliases (`#/focus` still finds the Stopwatch).
  *
- * Underneath, eight ideas do the work:
+ * Underneath, ten ideas do the work:
  *   • places      src/places.js        one model for zones, cities and GPS fixes
  *   • location    src/location.js      a real fix, named by a real gazetteer
  *   • weather     src/weather.js       Open-Meteo, key-less and failure-tolerant
@@ -17,7 +18,9 @@
  *   • alarms      src/alarms.js        wall-clock alarms, DST-safe, 90 s grace
  *   • sounds      src/alarm-sounds.js  16 synthesised sounds + your own music
  *   • faces       src/clock-themes.js + src/sky-scenes.js  eight dials, a live sky
- *   • theme       src/theme.js         Auto / Light / Dark, keyed to the live sky
+ *   • theme       src/theme.js         Auto / fixed mood themes, keyed to the live sky
+ *   • calendar    src/calendar.js      a home-zone month view
+ *   • settings    src/settings.js      text size and display preferences
  */
 
 import { createCityPicker } from "./src/city-picker.js";
@@ -28,6 +31,7 @@ import { createStandardsBoard } from "./src/standards-board.js";
 import { createTimer } from "./src/timer.js";
 import { createStopwatch } from "./src/stopwatch.js";
 import { createCalculator } from "./src/calculator.js";
+import { createCalendar } from "./src/calendar.js";
 import { createWeatherCard } from "./src/weather-card.js";
 import { createForecast } from "./src/forecast.js";
 import { createScrollNav } from "./src/router.js";
@@ -35,7 +39,8 @@ import { createAlarms } from "./src/alarms.js";
 import { createRemarks } from "./src/remarks.js";
 import { phraseFor } from "./src/phrases.js";
 import { createToaster, $, $$, escapeHTML, flatten, pad } from "./src/ui.js";
-import { APPEARANCES, applyAppearance, readMode, resolveAppearance, themeCaption, writeMode } from "./src/theme.js";
+import { TEXT_SIZE_OPTIONS, applyTextSize, readTextSize, textSizeOption, writeTextSize } from "./src/settings.js";
+import { APPEARANCES, THEME_CHOICES, applyAppearance, readMode, resolveAppearance, themeCaption, themeChoice, writeMode } from "./src/theme.js";
 import { REFRESH_MS, effectiveMood, fetchWeather, preferImperial } from "./src/weather.js";
 import { BOARD_REFRESH_MS, fetchBoardTemperatures, unitForRecord } from "./src/board-weather.js";
 import {
@@ -86,10 +91,12 @@ import {
     stopwatch: "One thing at a time.",
     clocks: "Around the world.",
     standards: "Every clock has a name.",
+    calendar: "Your dates, on your clock.",
     clock: "A slower kind of clock.",
     calculator: "Time, without the mental maths.",
     weather: "The sky, where you actually are.",
     forecast: "What the week is planning.",
+    settings: "Make Tempo fit you.",
     about: "What Tempo is, and what it is not.",
   };
 
@@ -100,10 +107,12 @@ import {
     stopwatch: "TRACK ELAPSED TIME",
     clocks: "STAY IN SYNC",
     standards: "SHORT FORM, FULL FORM",
+    calendar: "DATES ON YOUR CLOCK",
     clock: "A SLOWER KIND OF CLOCK",
     calculator: "NO MENTAL MATH REQUIRED",
     weather: "RIGHT NOW, OUTSIDE",
     forecast: "THE WEEK AHEAD",
+    settings: "MAKE IT YOURS",
     about: "WHAT THIS IS",
   };
 
@@ -170,6 +179,7 @@ import {
     homeId: storedHomePlace(),
     board: storedBoard(),
     themeMode: readMode(),
+    textSize: readTextSize(),
     appearance: "light",
     weather: null,
     // The sky the Auto theme paints from. This is tied to the *home place*
@@ -251,6 +261,26 @@ import {
 
     themeSwitch: $("#theme-switch"),
     themeCaption: $("#theme-caption"),
+
+    calendarMonth: $("#calendar-month"),
+    calendarGrid: $("#calendar-grid"),
+    calendarSummary: $("#calendar-summary"),
+    calendarTodayPill: $("#calendar-today-pill"),
+    calendarPrev: $("#calendar-prev"),
+    calendarNext: $("#calendar-next"),
+    calendarToday: $("#calendar-today"),
+    calendarSelectedTitle: $("#calendar-selected-title"),
+    calendarSelectedMeta: $("#calendar-selected-meta"),
+    calendarSelectedIso: $("#calendar-selected-iso"),
+    calendarSelectedWeek: $("#calendar-selected-week"),
+    calendarSelectedYearDay: $("#calendar-selected-year-day"),
+    calendarSelectedRemaining: $("#calendar-selected-remaining"),
+
+    settingsThemeGrid: $("#settings-theme-grid"),
+    settingsThemeStatus: $("#settings-theme-status"),
+    settingsTextSize: $("#settings-text-size"),
+    settingsTextStatus: $("#settings-text-status"),
+    settingsReset: $("#settings-reset"),
 
     footerYear: $("#footer-year"),
   };
@@ -341,6 +371,7 @@ import {
 
     board.update(now);
     if (standardsVisible) standards.update(now);
+    if (calendarVisible) calendar.sync(now);
     oldClockTick(now);
 
     // Every half minute is enough for a palette that follows the sun, and it
@@ -369,6 +400,7 @@ import {
 
     if (elements.themeCaption) {
       const info = APPEARANCES[result.appearance] || APPEARANCES.light;
+      const choice = state.themeMode === "auto" ? info : themeChoice(state.themeMode);
       const place = homePlace();
       const weatherLine =
         state.homeWeather && state.homeWeather.ok
@@ -378,7 +410,7 @@ import {
           : "no live weather";
       const detail = state.themeMode === "auto" ? `Auto · ${place.city}` : "fixed by you";
       elements.themeCaption.innerHTML =
-        `<b>${escapeHTML(`${info.icon} ${info.label}`)}</b><span>${escapeHTML(detail)}</span>` +
+        `<b>${escapeHTML(`${choice.icon || info.icon} ${choice.label || info.label}`)}</b><span>${escapeHTML(detail)}</span>` +
         `<small>${escapeHTML(weatherLine)}</small>`;
       elements.themeCaption.title = themeCaption({
         mode: state.themeMode,
@@ -393,19 +425,112 @@ import {
       button.classList.toggle("active", active);
       button.setAttribute("aria-checked", String(active));
     });
+    syncSettingsPanel(result);
     if (picker && picker.isOpen) picker.refresh();
   }
 
-  function setThemeMode(mode) {
-    state.themeMode = mode;
-    writeMode(mode);
+  function setThemeMode(mode, { silent = false } = {}) {
+    const next = THEME_CHOICES.some((choice) => choice.id === mode) ? mode : "auto";
+    state.themeMode = next;
+    writeMode(next);
     applyTheme();
+    if (silent) return;
     const info = APPEARANCES[state.appearance] || APPEARANCES.light;
+    const choice = themeChoice(next);
     notify(
-      mode === "auto"
+      next === "auto"
         ? `Auto is back on — ${info.label.toLowerCase()} from your time and weather.`
-        : `${mode === "dark" ? "Dark" : "Light"} theme stays until you switch back to Auto.`
+        : `${choice.label} theme stays until you switch back to Auto.`
     );
+  }
+
+  /* ------------------------------------------------------------- settings */
+
+  function renderSettingsShell() {
+    if (elements.settingsThemeGrid && !elements.settingsThemeGrid.dataset.ready) {
+      const groups = { automatic: "Automatic", fixed: "Classic", weather: "Weather moods", time: "Day parts" };
+      elements.settingsThemeGrid.innerHTML = THEME_CHOICES
+        .map((choice) => {
+          const group = groups[choice.kind] || "Theme";
+          return `<button type="button" class="setting-choice" role="radio" aria-checked="false" data-settings-theme="${escapeHTML(
+            choice.id
+          )}" data-theme-kind="${escapeHTML(choice.kind)}">
+            <span class="setting-choice-kicker">${escapeHTML(group)}</span>
+            <span class="setting-choice-main"><span aria-hidden="true">${escapeHTML(choice.icon)}</span><strong>${escapeHTML(choice.label)}</strong></span>
+            <small>${escapeHTML(choice.summary)}</small>
+          </button>`;
+        })
+        .join("");
+      elements.settingsThemeGrid.dataset.ready = "true";
+    }
+
+    if (elements.settingsTextSize && !elements.settingsTextSize.dataset.ready) {
+      elements.settingsTextSize.innerHTML = TEXT_SIZE_OPTIONS
+        .map(
+          (option) => `<button type="button" class="seg-button" role="radio" aria-checked="false"
+            data-text-size="${escapeHTML(option.id)}" title="${escapeHTML(option.summary)}">
+            <span class="text-size-token">${escapeHTML(option.token)}</span>${escapeHTML(option.label)}
+          </button>`
+        )
+        .join("");
+      elements.settingsTextSize.dataset.ready = "true";
+    }
+  }
+
+  function syncSettingsPanel(result = null) {
+    if (elements.settingsThemeGrid) {
+      $$("[data-settings-theme]", elements.settingsThemeGrid).forEach((button) => {
+        const active = button.dataset.settingsTheme === state.themeMode;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-checked", String(active));
+      });
+    }
+    if (elements.settingsTextSize) {
+      $$("[data-text-size]", elements.settingsTextSize).forEach((button) => {
+        const active = button.dataset.textSize === state.textSize;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-checked", String(active));
+      });
+    }
+
+    if (elements.settingsThemeStatus) {
+      const resolved = result || { appearance: state.appearance, reason: "" };
+      const choice = state.themeMode === "auto" ? themeChoice("auto") : themeChoice(state.themeMode);
+      const appearance = APPEARANCES[resolved.appearance] || APPEARANCES.light;
+      const line = state.themeMode === "auto"
+        ? `Auto is using ${appearance.label.toLowerCase()} for ${homePlace().city}.`
+        : `${choice.label} is locked in until you choose Auto again.`;
+      elements.settingsThemeStatus.textContent = line;
+      elements.settingsThemeStatus.title = themeCaption({
+        mode: state.themeMode,
+        appearance: resolved.appearance,
+        place: homePlace().city,
+        reason: resolved.reason || "",
+      });
+    }
+
+    if (elements.settingsTextStatus) {
+      const option = textSizeOption(state.textSize);
+      elements.settingsTextStatus.textContent = `${option.label} text · ${Math.round(option.scale * 100)}% scale. ${option.summary}`;
+    }
+  }
+
+  function setTextSize(size, { silent = false } = {}) {
+    const option = applyTextSize(document, size);
+    state.textSize = writeTextSize(option.id);
+    syncSettingsPanel();
+    if (!silent) notify(`${option.label} text size applied.`);
+  }
+
+  function resetSettings() {
+    state.themeMode = "auto";
+    state.textSize = "default";
+    writeMode(state.themeMode);
+    writeTextSize(state.textSize);
+    applyTextSize(document, state.textSize);
+    applyTheme();
+    syncSettingsPanel();
+    notify("Settings reset — Auto theme and default text are back.");
   }
 
   /* ------------------------------------------------------------- phrases */
@@ -803,6 +928,7 @@ import {
 
   let oldClock = null;
   let oldClockVisible = false;
+  let calendarVisible = false;
   // The standards grid only ticks while it is on screen; off screen it is a
   // few dozen text nodes nobody is reading.
   let standardsVisible = false;
@@ -923,6 +1049,7 @@ import {
     renderPopularCities();
     applyTheme();
     calculator.refreshZone();
+    calendar.refreshZone();
     updateNotes();
     // The phrases follow the place: the forecast's seasonal line flips with
     // latitude, and the glance names the place it is describing.
@@ -1100,6 +1227,27 @@ import {
     notify,
   });
 
+  const calendar = createCalendar({
+    elements: {
+      month: elements.calendarMonth,
+      grid: elements.calendarGrid,
+      summary: elements.calendarSummary,
+      todayPill: elements.calendarTodayPill,
+      prev: elements.calendarPrev,
+      next: elements.calendarNext,
+      today: elements.calendarToday,
+      selectedTitle: elements.calendarSelectedTitle,
+      selectedMeta: elements.calendarSelectedMeta,
+      selectedIso: elements.calendarSelectedIso,
+      selectedWeek: elements.calendarSelectedWeek,
+      selectedYearDay: elements.calendarSelectedYearDay,
+      selectedRemaining: elements.calendarSelectedRemaining,
+    },
+    getZone: () => homeZone(),
+    getPlace: () => homePlace(),
+    notify,
+  });
+
   /* --------------------------------------------------------------- remarks */
 
   /**
@@ -1139,10 +1287,12 @@ import {
       { id: "stopwatch", page: $("#page-stopwatch"), title: "Stopwatch" },
       { id: "clocks", page: $("#page-clocks"), title: "World clocks" },
       { id: "standards", page: $("#page-standards"), title: "Time standards" },
+      { id: "calendar", page: $("#page-calendar"), title: "Calendar" },
       { id: "clock", page: $("#page-clock"), title: "Old clock" },
       { id: "calculator", page: $("#page-calculator"), title: "Time calculator" },
       { id: "weather", page: $("#page-weather"), title: "Weather" },
       { id: "forecast", page: $("#page-forecast"), title: "Forecast" },
+      { id: "settings", page: $("#page-settings"), title: "Settings" },
       { id: "about", page: $("#page-about"), title: "About" },
     ],
     // The Focus section grew up and became the Stopwatch; anyone who
@@ -1169,6 +1319,8 @@ import {
       }
       standardsVisible = section.id === "standards";
       if (standardsVisible) standards.render();
+      calendarVisible = section.id === "calendar";
+      if (calendarVisible) calendar.render();
       if (section.id === "forecast") forecast.activate();
     },
   });
@@ -1240,6 +1392,22 @@ import {
         buttons[next].click();
       });
     }
+
+    if (elements.settingsThemeGrid) {
+      elements.settingsThemeGrid.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-settings-theme]");
+        if (!button) return;
+        setThemeMode(button.dataset.settingsTheme);
+      });
+    }
+    if (elements.settingsTextSize) {
+      elements.settingsTextSize.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-text-size]");
+        if (!button) return;
+        setTextSize(button.dataset.textSize);
+      });
+    }
+    if (elements.settingsReset) elements.settingsReset.addEventListener("click", resetSettings);
 
     if (elements.mobileMenuButton) {
       elements.mobileMenuButton.addEventListener("click", () => {
@@ -1373,15 +1541,18 @@ import {
 
     standards.init();
 
+    renderSettingsShell();
     renderSoundList();
     timer.init();
     stopwatch.init();
     calculator.init();
+    calendar.init();
     alarms.init();
     remarks.init();
     forecast.init();
     bindEvents();
 
+    setTextSize(state.textSize, { silent: true });
     applyTheme();
     updateLiveTime();
     updateNotes();
