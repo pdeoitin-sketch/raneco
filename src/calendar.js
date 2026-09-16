@@ -1,21 +1,36 @@
 /**
- * A small home-zone calendar.
+ * A home-zone calendar that speaks more than one calendar.
  *
- * A clock app should not make the reader leave the page just to answer
- * "what day is that?". This calendar is deliberately date-only: it follows
- * the dashboard's home place, highlights that place's today, and stores the
- * month/day you were looking at in localStorage. All calculations are done as
- * plain UTC dates so the browser's own time zone cannot move a calendar cell.
+ * The grid itself stays Gregorian and honest: it follows the dashboard's
+ * home place, highlights that place's today, and remembers the month and day
+ * you were looking at. Around that spine:
+ *
+ *   • The week can start Monday, Sunday or Saturday (Settings).
+ *   • Each cell can carry a second date — Bikram Sambat, Chinese, Korean
+ *     (Dangi), Hebrew, Hijri, Persian, Indian, Thai Buddhist or Japanese —
+ *     from `calendar-systems.js`.
+ *   • Holidays and observances from `calendar-events.js` mark cells with
+ *     colored dots, grouped in a legend, and list themselves on the
+ *     selected day.
+ *   • And any date can hold the reader's own notes, kept on this device
+ *     (`calendar-notes.js`).
+ *
+ * All calculations are done as plain UTC dates so the browser's own time
+ * zone cannot move a calendar cell.
  */
 
 import { escapeHTML } from "./ui.js";
 import { getFormatter, partsFor } from "./time-math.js";
+import { describeInSystem, calendarSystem } from "./calendar-systems.js";
+import { eventCategory, eventsForDate } from "./calendar-events.js";
+import { addNote, notesForDate, removeNote } from "./calendar-notes.js";
 
 export const CALENDAR_STORAGE_KEY = "tempo-calendar";
 export const WEEK_STARTS_ON = "monday";
 export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const DAY = 86_400_000;
+const SUN_FIRST_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const monthTitleFormatter = getFormatter("en-US", { timeZone: "UTC", month: "long", year: "numeric" });
 const fullDateFormatter = getFormatter("en-US", { timeZone: "UTC", weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -86,15 +101,26 @@ export function monthKey(view) {
   return `${String(view.year).padStart(4, "0")}-${pad2(view.month)}`;
 }
 
-export function buildMonth({ year, month, today, selected } = {}) {
+/**
+ * Weekday headers for a week start. `weekStart` is a getUTCDay-style index:
+ * 1 = Monday (default), 0 = Sunday, 6 = Saturday.
+ */
+export function weekdayLabels(weekStart = 1) {
+  const start = Number.isInteger(weekStart) && weekStart >= 0 && weekStart <= 6 ? weekStart : 1;
+  return Array.from({ length: 7 }, (_, index) => SUN_FIRST_WEEKDAYS[(start + index) % 7]);
+}
+
+export function buildMonth({ year, month, today, selected, weekStart = 1 } = {}) {
+  const start = Number.isInteger(weekStart) && weekStart >= 0 && weekStart <= 6 ? weekStart : 1;
+  const labels = weekdayLabels(start);
   const first = new Date(Date.UTC(year, month - 1, 1));
-  const firstMondayIndex = (first.getUTCDay() + 6) % 7;
-  const start = Date.UTC(year, month - 1, 1 - firstMondayIndex);
+  const leading = (first.getUTCDay() - start + 7) % 7;
+  const gridStart = Date.UTC(year, month - 1, 1 - leading);
   const todayIso = today ? plainDate(today) : "";
   const selectedIso = selected || todayIso;
 
   return Array.from({ length: 42 }, (_, index) => {
-    const stamp = new Date(start + index * DAY);
+    const stamp = new Date(gridStart + index * DAY);
     const cell = {
       year: stamp.getUTCFullYear(),
       month: stamp.getUTCMonth() + 1,
@@ -105,7 +131,7 @@ export function buildMonth({ year, month, today, selected } = {}) {
     return {
       ...cell,
       iso,
-      weekday: WEEKDAYS[(nativeDay + 6) % 7],
+      weekday: labels[index % 7],
       inMonth: cell.month === month,
       isToday: iso === todayIso,
       isSelected: iso === selectedIso,
@@ -171,10 +197,26 @@ function todayInZone(zone, at = new Date()) {
   return { year: parts.year, month: parts.month, day: parts.day };
 }
 
-export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace = () => ({ city: "your home place" }), notify } = {}) {
+const FALLBACK_PREFERENCES = { weekStart: "monday", calendarSystem: "gregorian", holidays: {} };
+const WEEK_START_DAYS = { monday: 1, sunday: 0, saturday: 6 };
+
+export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace = () => ({ city: "your home place" }), getPreferences, notify } = {}) {
   const state = readCalendarState();
   let bound = false;
   let lastToday = "";
+
+  function preferences() {
+    try {
+      const prefs = typeof getPreferences === "function" ? getPreferences() : null;
+      return { ...FALLBACK_PREFERENCES, ...(prefs || {}) };
+    } catch (_) {
+      return { ...FALLBACK_PREFERENCES };
+    }
+  }
+
+  function weekStartDay(prefs = preferences()) {
+    return WEEK_START_DAYS[prefs.weekStart] ?? 1;
+  }
 
   function ensureState(now = new Date()) {
     const today = todayInZone(getZone(), now);
@@ -183,25 +225,42 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
     return today;
   }
 
+  function systemInfo(prefs = preferences()) {
+    const system = calendarSystem(prefs.calendarSystem);
+    return { id: system.id, system, active: system.id !== "gregorian" };
+  }
+
   function render(now = new Date()) {
     const today = ensureState(now);
     const todayIso = plainDate(today);
     lastToday = todayIso;
 
+    const prefs = preferences();
+    const start = weekStartDay(prefs);
+    const second = systemInfo(prefs);
+
     const selected = parsePlainDate(state.selected) || today;
     const selectedIso = plainDate(selected);
-    const cells = buildMonth({ ...state.view, today, selected: selectedIso });
+    const cells = buildMonth({ ...state.view, today, selected: selectedIso, weekStart: start });
     const place = getPlace() || {};
     const city = place.city || place.label || "your home place";
 
     if (elements.month) elements.month.textContent = monthTitle(state.view);
     if (elements.summary) {
       const todayDetail = describeDate(today, today);
-      elements.summary.textContent = `Today in ${city}: ${todayDetail.title}. Calendar weeks start on Monday.`;
+      const weekNote = start === 1 ? "Weeks start on Monday" : `Weeks start on ${start === 0 ? "Sunday" : "Saturday"}`;
+      const secondNote = second.active ? ` Second dates: ${second.system.label}.` : "";
+      elements.summary.textContent = `Today in ${city}: ${todayDetail.title}. ${weekNote}.${secondNote}`;
     }
     if (elements.todayPill) elements.todayPill.textContent = `TODAY · ${todayIso}`;
+    if (elements.systemBadge) {
+      elements.systemBadge.hidden = !second.active;
+      elements.systemBadge.textContent = second.active ? `+ ${second.system.label}` : "";
+    }
     if (elements.grid) {
-      const weekdays = WEEKDAYS.map((day) => `<span class="calendar-weekday" role="columnheader">${day}</span>`).join("");
+      const labels = weekdayLabels(start);
+      const weekdays = labels.map((day) => `<span class="calendar-weekday" role="columnheader">${day}</span>`).join("");
+      const markedCategories = new Set();
       const days = cells
         .map((cell) => {
           const classes = ["calendar-day"];
@@ -209,20 +268,61 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
           if (cell.isToday) classes.push("is-today");
           if (cell.isSelected) classes.push("is-selected");
           if (cell.isWeekend) classes.push("is-weekend");
+
+          const events = eventsForDate(cell, prefs.holidays);
+          for (const event of events) markedCategories.add(event.category);
+          const notes = notesForDate(cell.iso);
+          const alt = second.active ? describeInSystem(second.id, cell) : null;
+          if (events.length || notes.length) classes.push("is-marked");
+
           const label = describeDate(cell, today).title;
-          return `<button type="button" class="${classes.join(" ")}" role="gridcell" data-date="${escapeHTML(cell.iso)}" aria-pressed="${cell.isSelected}" aria-label="${escapeHTML(label)}${cell.isToday ? ", today" : ""}">
+          const aria = [label];
+          if (alt) aria.push(`${alt.label}: ${alt.long}`);
+          if (events.length) aria.push(events.map((event) => event.name).join(", "));
+          if (notes.length) aria.push(`${notes.length} note${notes.length === 1 ? "" : "s"}`);
+
+          const dots = [];
+          for (const event of events.slice(0, 3)) {
+            dots.push(`<span class="calendar-dot" data-cat="${escapeHTML(event.category)}"></span>`);
+          }
+          if (events.length > 3) dots.push(`<span class="calendar-dot-extra">+${events.length - 3}</span>`);
+          if (notes.length) dots.push('<span class="calendar-dot calendar-dot-note"></span>');
+
+          return `<button type="button" class="${classes.join(" ")}" role="gridcell" data-date="${escapeHTML(cell.iso)}" aria-pressed="${cell.isSelected}" aria-label="${escapeHTML(aria.join(" — "))}${cell.isToday ? ", today" : ""}">
             <span class="calendar-number">${cell.day}</span>
+            ${alt ? `<span class="calendar-alt">${escapeHTML(alt.cell)}</span>` : ""}
             ${cell.isToday ? '<small class="calendar-day-tag">Today</small>' : ""}
+            ${dots.length ? `<span class="calendar-dots">${dots.join("")}</span>` : ""}
           </button>`;
         })
         .join("");
       elements.grid.innerHTML = weekdays + days;
+      renderLegend(prefs, markedCategories);
+    } else {
+      renderLegend(prefs, new Set());
     }
 
-    renderSelected(selected, today);
+    renderSelected(selected, today, prefs);
   }
 
-  function renderSelected(selected, today) {
+  function renderLegend(prefs, markedCategories) {
+    if (!elements.legend) return;
+    const second = systemInfo(prefs);
+    const order = new Map([["world", 0], ["national", 1], ["cultural", 2], ["religious", 3]]);
+    const parts = [...markedCategories]
+      .sort((a, b) => (order.get(a) ?? 9) - (order.get(b) ?? 9))
+      .map((id) => {
+        const category = eventCategory(id);
+        return `<span class="calendar-legend-item"><span class="calendar-dot" data-cat="${escapeHTML(category.id)}"></span>${escapeHTML(category.label)}</span>`;
+      });
+    parts.push(`<span class="calendar-legend-item"><span class="calendar-dot calendar-dot-note"></span>Your note</span>`);
+    if (second.active) {
+      parts.push(`<span class="calendar-legend-item calendar-legend-alt">Small date: ${escapeHTML(second.system.label)}</span>`);
+    }
+    elements.legend.innerHTML = parts.join("");
+  }
+
+  function renderSelected(selected, today, prefs = preferences()) {
     const detail = describeDate(selected, today);
     if (elements.selectedTitle) elements.selectedTitle.textContent = detail.title;
     if (elements.selectedMeta) {
@@ -232,6 +332,58 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
     if (elements.selectedWeek) elements.selectedWeek.textContent = `Week ${pad2(detail.isoWeek.week)}, ${detail.isoWeek.year}`;
     if (elements.selectedYearDay) elements.selectedYearDay.textContent = `Day ${detail.dayOfYear}`;
     if (elements.selectedRemaining) elements.selectedRemaining.textContent = `${detail.daysLeft} days left`;
+
+    const second = systemInfo(prefs);
+    if (elements.secondary) {
+      const alt = second.active ? describeInSystem(second.id, selected) : null;
+      elements.secondary.hidden = !alt;
+      if (alt) {
+        elements.secondary.textContent = `${second.system.label}: ${alt.long}${alt.approximate ? " (tabular date — may differ locally by a day)" : ""}`;
+      }
+    }
+
+    renderSelectedEvents(selected, prefs);
+    renderNotes(selected);
+  }
+
+  function renderSelectedEvents(selected, prefs) {
+    const events = eventsForDate(selected, prefs.holidays);
+    if (elements.eventsBlock) elements.eventsBlock.hidden = false;
+    if (elements.events) {
+      elements.events.innerHTML = events.length
+        ? events
+            .map(
+              (event) => `<li class="calendar-event" data-cat="${escapeHTML(event.category)}">
+                <span class="calendar-dot" data-cat="${escapeHTML(event.category)}"></span>
+                <span class="calendar-event-name">${escapeHTML(event.name)}</span>
+                <small>${escapeHTML(eventCategory(event.category).label)}${event.place ? ` · ${escapeHTML(event.place)}` : ""}${event.approximate ? " · approx." : ""}</small>
+              </li>`
+            )
+            .join("")
+        : `<li class="calendar-event-empty">No holidays marked on this date.</li>`;
+    }
+  }
+
+  function renderNotes(selected) {
+    const iso = plainDate(selected);
+    const notes = notesForDate(iso);
+    if (elements.noteCount) {
+      elements.noteCount.textContent = notes.length ? `${notes.length}` : "";
+      elements.noteCount.hidden = notes.length === 0;
+    }
+    if (elements.notesList) {
+      elements.notesList.innerHTML = notes.length
+        ? notes
+            .map(
+              (note) => `<li class="calendar-note" data-note-id="${escapeHTML(note.id)}">
+                <span class="calendar-note-chip" data-color="${escapeHTML(note.color)}"></span>
+                <span class="calendar-note-text">${escapeHTML(note.text)}</span>
+                <button type="button" class="calendar-note-remove" data-note-remove="${escapeHTML(note.id)}" aria-label="Delete note">×</button>
+              </li>`
+            )
+            .join("")
+        : `<li class="calendar-note-empty">Nothing pinned to this date yet — add a note above.</li>`;
+    }
   }
 
   function selectDate(iso, { silent = false } = {}) {
@@ -267,6 +419,27 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
     if (typeof notify === "function") notify("Calendar returned to today.");
   }
 
+  function addNoteFromEditor() {
+    ensureState();
+    const selected = parsePlainDate(state.selected);
+    if (!selected || !elements.noteInput) return;
+    const iso = plainDate(selected);
+    const text = elements.noteInput.value;
+    const color = elements.noteColor ? elements.noteColor.value : "violet";
+    if (!text.trim()) {
+      if (typeof notify === "function") notify("Write the note first, then pin it to the date.", "!");
+      return;
+    }
+    const note = addNote(iso, { text, color });
+    if (!note) {
+      if (typeof notify === "function") notify("That date already has all the notes it can hold.", "!");
+      return;
+    }
+    elements.noteInput.value = "";
+    render();
+    if (typeof notify === "function") notify(`Note pinned to ${describeDate(selected, ensureState()).short}.`);
+  }
+
   function bindEvents() {
     if (bound) return;
     bound = true;
@@ -278,6 +451,29 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
         const day = event.target.closest("[data-date]");
         if (!day) return;
         selectDate(day.dataset.date);
+      });
+    }
+    if (elements.noteAdd) elements.noteAdd.addEventListener("click", addNoteFromEditor);
+    if (elements.noteInput) {
+      elements.noteInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault();
+          addNoteFromEditor();
+        }
+      });
+    }
+    if (elements.notesList) {
+      elements.notesList.addEventListener("click", (event) => {
+        const removeButton = event.target.closest("[data-note-remove]");
+        if (!removeButton) return;
+        ensureState();
+        const selected = parsePlainDate(state.selected);
+        if (!selected) return;
+        const iso = plainDate(selected);
+        if (removeNote(iso, removeButton.dataset.noteRemove)) {
+          render();
+          if (typeof notify === "function") notify("Note removed from that date.");
+        }
       });
     }
   }
@@ -303,6 +499,10 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
     },
     refreshZone(now = new Date()) {
       ensureState(now);
+      render(now);
+    },
+    /** Re-read preferences (week start, second calendar, holiday sets) now. */
+    refreshPreferences(now = new Date()) {
       render(now);
     },
     selectDate,

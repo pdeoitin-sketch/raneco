@@ -28,12 +28,12 @@ up and the URL quietly follows.
 | **Stopwatch** | `#/stopwatch` | Centisecond stopwatch with laps, goals and splits |
 | **World clocks** | `#/clocks` | Up to 12 places — **hour large and bold, that city's own temperature beside it**, the shift from home and the sun line small underneath |
 | **Time standards** | `#/standards` | **UTC, GMT, IST, GST, JST, EST…** — the clocks that are named rather than placed, short form and full form, by region |
-| **Calendar** | `#/calendar` | Home-zone month view with today, selected date details, ISO week and day-of-year facts |
+| **Calendar** | `#/calendar` | Home-zone month view that **speaks nine more calendars** (Bikram Sambat, Chinese, Korean Dangi, Hebrew, Hijri, Persian, Indian, Thai Buddhist, Japanese), marks world holidays and 60+ national days in color, and keeps **your own notes** pinned to any date |
 | **Old clock** | `#/clock` | Full-face clock with **eight faces**, a **live sky behind the dial**, sweep/tick hand and an hourly chime |
 | **Time calculator** | `#/calculator` | Difference between two moments, unit conversion, saved results |
 | **Weather** | `#/weather` | Live conditions for a point, plus a panel saying *where it thinks you are and how sure it is* |
 | **Forecast** | `#/forecast` | Next 24 hours hour-by-hour, next 7 days with highs, lows and rain chance |
-| **Settings** | `#/settings` | Text-size controls and theme choices, from Auto to rainy, cloudy, sunny, snowy and thunderous moods |
+| **Settings** | `#/settings` | Text size and themes, plus the grown-up set: calendar week start and second calendar, holiday sets, weather units, alarm volume/duration, notification behaviour, a GPS privacy switch, a full-data wipe, and **export/import of everything Tempo remembers** |
 | **About** | `#/about` | What Tempo is, where the numbers come from, honest limits, and tagged remarks kept in your browser |
 
 A **phrase sits under every heading** — time for the clock sections, sky for
@@ -51,7 +51,11 @@ into the back button.
 
 Everything persists in `localStorage`: home place, board, **wall-clock
 alarms**, timer settings, **alarm sound, volume and ring duration**, stopwatch
-laps, saved calculations, calendar selection, old-clock face, theme, text size, unit system and remarks.
+laps, saved calculations, calendar selection, **calendar notes**, the
+**preferences** (week start, second calendar, holiday sets, GPS switch),
+old-clock face, theme, text size, unit system and remarks. Settings →
+Export/Import pours that whole `tempo-*` namespace into one JSON file and
+restores it back.
 
 ## What is in the box
 
@@ -68,7 +72,12 @@ laps, saved calculations, calendar selection, old-clock face, theme, text size, 
 | **Alarm sounds** | `src/alarm-sounds.js` | 16 Web-Audio sounds, looping playback, YouTube/Spotify/file input |
 | **Clock faces** | `src/clock-themes.js` | Roman · Modern · Minimal · Railway · Pocket watch · Neon · Brutalist · Botanical — each one a genuinely different dial, and each explains itself in the picker |
 | **Time standards** | `src/time-standards.js` | 50 named clocks as fixed offsets, grouped by region; the ambiguous short forms kept apart |
-| **Calendar** | `src/calendar.js` | Monday-first month grid tied to the home time zone; today, selected date, ISO week and day-of-year facts |
+| **Calendar** | `src/calendar.js` | Month grid tied to the home time zone with a chosen week start; today, selected date, ISO week and day-of-year facts; holiday dots, a legend, and a notes editor on the selected day |
+| **Calendar systems** | `src/calendar-systems.js` | Bikram Sambat from an embedded month-length table (BS 2000–2090), the Chinese, Korean (Dangi), Hebrew, Hijri, Persian, Indian, Thai Buddhist and Japanese calendars from the browser's own ICU — feature-detected, honestly omitted when unsupported |
+| **Calendar events** | `src/calendar-events.js` | Fixed world days, Easter by the Western computus, 60+ national days (Nepal's counted in BS, Israel's in the Hebrew calendar), lunar new years, tabular-Hijri feasts — all switchable by set |
+| **Calendar notes** | `src/calendar-notes.js` | Up to 20 color-coded notes per date, trimmed, capped and pruned when emptied |
+| **Preferences** | `src/preferences.js` | One `tempo-preferences` blob for week start / second calendar / holiday sets / GPS, plus the shared `tempo-weather-units`, `tempo-alarm-volume/-duration/-notify` keys the tools already read |
+| **Data backup** | `src/data-backup.js` | Export/import of the whole `tempo-*` namespace as one validated JSON document |
 | **Settings** | `src/settings.js` + `src/theme.js` | Text-size preferences plus Auto/Light/Dark and fixed weather-mood theme choices |
 | **Board temperatures** | `src/board-weather.js` | Every world clock's temperature in **one** batched Open-Meteo request, each card in its own country's unit |
 | **Weather scenes** | `src/sky-scenes.js` | Eleven scenes behind the old clock, chosen from the live sky; mean-synodic moon phase |
@@ -402,7 +411,12 @@ New suites added with this upgrade:
 | `tests/clock-themes.test.mjs` | Exactly eight faces, ordered and drawable, with a legacy-numerals upgrade and a safe fallback; the renderer re-spells the dial per face; the stylesheet paints all eight faces and all eleven scenes; the mean-synodic moon anchors to a real new moon and reads real full/new moons correctly; `sceneFor()` maps the whole decision table — storms, snow, fog, the rainbow rule, moonlit vs moonless nights, the dark cloud at noon, breeze vs windstorm, and *no weather, no scene* |
 | `tests/time-standards.test.mjs` | Every record complete with a unique id; the ambiguous short forms (IST ×2, AST ×2, CST ×2, BST ×2) kept apart; the quarter- and half-hour clocks (+05:45, +04:30, +03:30, +06:30, +09:30, −03:30) exact; every daylight standard exactly one hour off its standard; unknown ids return `null` rather than a silent default; region grouping loses nothing; search reads short form, full form, note and zone; the clock is the offset applied to the instant (including the day that has already rolled over), 12-hour reads midnight as 12 AM and noon as 12 PM, and the shift sentence never says "0h ahead" |
 | `tests/board-weather.test.mjs` | One request for the whole board (a comma-separated coordinate list), capped at twelve; the reply keyed back to the places asked about; **each card in its own country's unit in the same request**; a single location's object form read as well as the array form; a location with no reading skipped rather than filled with a confident 0 °C; and every failure path — no places, no coordinates, no `fetch`, HTTP error, empty body, thrown network error — resolving to a reason instead of throwing |
-| `tests/calendar.test.mjs` | Plain dates parse without the device zone; the month grid is Monday-first and six weeks tall; today, selected dates and weekends are marked; ISO week, day-of-year, leap-year and relative-date facts are pinned; month navigation crosses years |
+| `tests/calendar.test.mjs` | Plain dates parse without the device zone; the month grid is Monday-first and six weeks tall; today, selected dates and weekends are marked; ISO week, day-of-year, leap-year and relative-date facts are pinned; month navigation crosses years; **week starts rotate** — Sunday- and Saturday-first grids lead with the right days without moving the dates |
+| `tests/calendar-systems.test.mjs` | The BS epoch (2000-01-01 BS = 1943-04-14 AD), real Nepali New Years (2082 → 2025-04-14, 2083 → 2026-04-14) and the table's honest edges; the inverse conversion; ICU-backed systems reading real days (a Horse-year CNY, Ramadan flagged approximate, Reiwa eras); zodiac mapping |
+| `tests/calendar-events.test.mjs` | Fixed world days; Easter by computus (2026-04-05, 2025-04-20, 2024-03-31) with Good Friday/Easter Monday; shared independence days (Aug 15 = India and Korea both); lunar new years (CNY/Seollal 2026-02-17, Nowruz 2026-03-21); Nepal's BS-counted national days (Republic May 29, Constitution Sep 19, Democracy Feb 19); tabular Hijri feasts flagged approximate; disabling a set removes only its events |
+| `tests/calendar-notes.test.mjs` | Notes pin/list/unpin per date with the last removal pruning the date; text trimmed at 280 and capped at 20 per day; colours validated; a corrupt store reads empty instead of throwing |
+| `tests/preferences.test.mjs` | Defaults survive a corrupt blob; patches merge and persist; unrecognised values are inert; the shared time keys write the exact shapes the tools read (volume as a 0–1 gain, duration 0 = "until dismissed", units auto/metric/imperial) |
+| `tests/data-backup.test.mjs` | Export gathers every `tempo-*` key and nothing else; build → parse → import round-trips; import restores rather than merges; malformed, foreign, future-version and key-smuggling files are refused politely |
 | `tests/settings.test.mjs` | Text-size options are ordered and sanitised, old raw scale values migrate on read, storage writes the new key, and applying a size sets the root data hook and scale variable |
 | `tests/phrases.test.mjs` | Day numbers are stable within a local day; every section's line comes from its own pool (time for clocks and settings, sky for weather); the forecast's seasonal line flips with latitude; `seasonFor()` knows both hemispheres; rotation is by day, sections differ, and an unknown section still gets a line |
 
@@ -413,8 +427,15 @@ named *Bhaktapur*, not Kathmandu.
 
 The smoke test additionally checks that all thirteen sections share one page
 in the time-first order, that a phrase sits under every heading, that Settings
-can apply text size and manual weather moods, that Calendar renders a home-zone
-month and persists a selected day, that a wall-clock alarm rings when the clock
+can apply text size and manual weather moods — and, grown up, that the units
+choice refetches weather in Fahrenheit, the volume slider writes the shared
+gain key, the geo master switch disables every GPS button, and a browser
+without the Notification API is told so honestly — that Calendar renders a
+home-zone month and persists a selected day, carries a Bikram Sambat second
+date in every cell, marks Constitution Day's dot on Ashwin 3, keeps world-day
+dots when the national set is hidden, reflows the grid when weeks start on
+Sunday, and pins and unpins a note to a date with the store to match, that a
+wall-clock alarm rings when the clock
 reaches it and the page scrolls to it, that the Right-now glance and the
 Weather section render the same snapshot from one request, that the old clock
 wears all eight faces and upgrades an old numeral save, that each face is more

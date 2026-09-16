@@ -639,6 +639,63 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.document.documentElement.dataset.textSize, "default");
   });
 
+  test("settings grew: units, alarm defaults, notification behaviour and privacy controls", async () => {
+    app = await boot({ homeZone: "Asia/Katmandu" });
+    await app.go("settings");
+
+    // Weather units: three choices, the auto default, an honest refetch.
+    const unitChoices = app.$$("#settings-units [data-units-choice]").map((button) => button.dataset.unitsChoice);
+    assert.deepEqual(unitChoices, ["auto", "metric", "imperial"]);
+    assert.equal(app.$('#settings-units [data-units-choice="auto"]').classList.contains("active"), true);
+    const fetchesBefore = app.weatherCalls().length;
+    app.click('#settings-units [data-units-choice="imperial"]');
+    await wait(60);
+    assert.equal(app.localStorage.getItem("tempo-weather-units"), "imperial");
+    assert.ok(app.weatherCalls().length > fetchesBefore, "the change refetches weather");
+    assert.ok(
+      app.weatherCalls().some((url) => url.includes("temperature_unit=fahrenheit")),
+      "the refetch asks for Fahrenheit"
+    );
+    assert.match(app.$("#settings-units-status").textContent, /Fahrenheit/);
+
+    // Alarm defaults: the slider writes the shared 0–1 gain key.
+    const volume = app.$("#settings-volume");
+    volume.value = "25";
+    volume.dispatchEvent(new app.window.Event("input", { bubbles: true }));
+    await wait(40);
+    assert.equal(app.localStorage.getItem("tempo-alarm-volume"), "0.25");
+    assert.equal(app.$("#settings-volume-label").textContent, "25%");
+
+    app.click('#settings-duration [data-duration-choice="60"]');
+    await wait(40);
+    assert.equal(app.localStorage.getItem("tempo-alarm-duration"), "60");
+
+    // Notification behaviour: jsdom has no Notification API, and the card says so.
+    app.click("#settings-notifications");
+    await wait(40);
+    assert.match(app.$("#settings-notify-status").textContent, /no notification support/i);
+    assert.notEqual(app.localStorage.getItem("tempo-alarm-notify"), "on");
+
+    // Privacy: the geo master switch disables every GPS button.
+    assert.equal(app.$("#use-location-button").disabled, false);
+    app.click("#settings-geo");
+    await wait(40);
+    assert.equal(JSON.parse(app.localStorage.getItem("tempo-preferences")).geo, false);
+    assert.equal(app.$("#use-location-button").disabled, true, "home-place GPS button is gated");
+    assert.equal(app.$("#location-locate").disabled, true, "weather GPS button is gated too");
+    assert.match(app.$("#settings-geo-status").textContent, /switched off/);
+    app.click("#settings-geo");
+    await wait(40);
+    assert.equal(app.$("#use-location-button").disabled, false);
+
+    // The week-start and calendar choices live in their own smoke test in the
+    // calendar section; here the card simply lists them.
+    assert.ok(app.$("#settings-week-start"), "week start control exists");
+    assert.ok(app.$('#settings-holiday-toggles [data-holiday-set="cultural"]'), "holiday set toggles exist");
+    assert.ok(app.$("#settings-export"), "export/import lives here too");
+    assert.ok(app.$("#settings-clear-data"), "and the privacy wipe");
+  });
+
   test("a remembered manual theme is applied before the clocks start", async () => {
     app = await boot({ homeZone: "Asia/Katmandu" });
     app.document.body.dataset.appearance = "pending";
@@ -1202,6 +1259,74 @@ describe("tempo in a browser-like DOM", () => {
     app.click("#calendar-today");
     await wait(30);
     assert.ok(app.$("#calendar-grid .calendar-day.is-today.is-selected"), "Today jumps back and selects today");
+  });
+
+  test("calendar carries a second calendar, holiday marks and your own notes", async () => {
+    // Seed the view at September 2026 so the fixed-date assertions hold on
+    // whatever day the suite happens to run.
+    app = await boot({
+      homeZone: "Asia/Kathmandu",
+      storage: { "tempo-calendar": JSON.stringify({ view: "2026-09", selected: "2026-09-19" }) },
+    });
+    await app.go("calendar");
+
+    // Bikram Sambat: the toolbar picker and the Settings card share a catalogue.
+    const systemSelect = app.$("#calendar-system");
+    assert.ok(systemSelect.querySelector('option[value="bikram"]'), "Bikram Sambat is on offer");
+    assert.ok(systemSelect.querySelector('option[value="chinese"]'), "Chinese is on offer");
+    assert.ok(systemSelect.querySelector('option[value="dangi"]'), "Korean (Dangi) is on offer");
+    systemSelect.value = "bikram";
+    systemSelect.dispatchEvent(new app.window.Event("change", { bubbles: true }));
+    await wait(40);
+
+    assert.ok(app.$("#calendar-grid .calendar-day .calendar-alt"), "cells carry the second date");
+    assert.match(app.$("#calendar-summary").textContent, /Bikram Sambat/);
+    const system = JSON.parse(app.localStorage.getItem("tempo-preferences"));
+    assert.equal(system.calendarSystem, "bikram", "the choice is a preference, so it survives reloads");
+    assert.equal(app.$("#settings-calendar-system").value, "bikram", "the Settings card's picker agrees");
+
+    // Constitution Day in Nepal lands Ashwin 3 BS: 2026-09-19 in this grid.
+    const day19 = app.$('#calendar-grid .calendar-day[data-date="2026-09-19"]');
+    assert.ok(day19.querySelector('.calendar-dot[data-cat="national"]'), "a national-day dot marks the 19th");
+    day19.click();
+    await wait(30);
+    assert.match(app.$("#calendar-holidays").textContent, /Constitution Day/);
+    assert.match(app.$("#calendar-holidays").textContent, /Nepal/);
+    assert.match(app.$("#calendar-secondary").textContent, /Bikram Sambat: Ashwin 3, 2083 BS/);
+
+    // Peace Day keeps its world-day dot on the 21st.
+    assert.ok(app.$('#calendar-grid .calendar-day[data-date="2026-09-21"] .calendar-dot[data-cat="world"]'));
+
+    // Pinning a note to the selected date works, persists, unpins.
+    const noteInput = app.$("#calendar-note-input");
+    noteInput.value = " Mum's birthday — call early!";
+    app.click("#calendar-note-add");
+    await wait(30);
+    assert.match(app.$("#calendar-notes-list").textContent, /Mum's birthday/);
+    assert.equal(app.$("#calendar-note-count").hidden, false);
+    const savedNotes = JSON.parse(app.localStorage.getItem("tempo-calendar-notes"));
+    assert.equal(savedNotes["2026-09-19"].length, 1);
+    assert.ok(app.$('#calendar-grid .calendar-day[data-date="2026-09-19"] .calendar-dot-note'), "the grid cell shows the note dot");
+
+    app.$("#calendar-notes-list [data-note-remove]").click();
+    await wait(30);
+    assert.equal(JSON.parse(app.localStorage.getItem("tempo-calendar-notes"))["2026-09-19"], undefined);
+
+    // Week start: Sunday-first re-lays the grid from Settings.
+    app.click('#settings-week-start [data-week-start="sunday"]');
+    await wait(40);
+    assert.equal(app.$("#calendar-grid .calendar-weekday").textContent, "Sun");
+    assert.match(app.$("#calendar-summary").textContent, /Weeks start on Sunday/);
+
+    // Hiding a holiday set clears its marks and only its marks.
+    const nationalToggle = app.$('#settings-holiday-toggles [data-holiday-set="national"]');
+    nationalToggle.click();
+    await wait(40);
+    assert.match(app.$("#calendar-holidays").textContent, /No holidays marked/, "national set hidden for the 19th");
+    assert.ok(
+      app.$('#calendar-grid .calendar-day[data-date="2026-09-21"] .calendar-dot[data-cat="world"]'),
+      "world days survive"
+    );
   });
 
   test("time standards is a section of its own, short form and full form", async () => {

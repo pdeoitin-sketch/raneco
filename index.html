@@ -175,7 +175,7 @@
               <span class="status-dot"></span>
               <span id="top-timezone">Detecting your time zone</span>
             </button>
-            <button class="pill-button" id="use-location-button" type="button">
+            <button class="pill-button" id="use-location-button" type="button" data-needs-geo>
               <span class="pill-icon" aria-hidden="true">⌖</span> Use my location
             </button>
             <button class="icon-button mobile-menu-button" id="mobile-menu-button" type="button" aria-label="Open navigation">
@@ -553,7 +553,7 @@
               </p>
             </div>
             <div class="page-actions">
-              <button class="outline-button" id="use-location-clock" type="button">
+              <button class="outline-button" id="use-location-clock" type="button" data-needs-geo>
                 <span class="button-plus" aria-hidden="true">⌖</span> Add my location
               </button>
               <button class="outline-button" id="add-city-button" type="button">
@@ -617,8 +617,9 @@
               <h2 id="calendar-title">Calendar</h2>
               <p class="section-phrase" id="calendar-phrase"></p>
               <p class="section-intro">
-                A month view tied to your home place. Today, selected dates, ISO week numbers and day-of-year
-                details all follow the same clock as your alarms and dashboard.
+                A month view tied to your home place — with a second calendar of your choice riding along in
+                every cell, world holidays and national days marked in color, and room for your own notes on
+                any date. ISO week numbers and day-of-year details still follow the same clock as your alarms.
                 <span class="section-count" id="calendar-today-pill">TODAY</span>
               </p>
             </div>
@@ -638,23 +639,61 @@
                 </div>
                 <span class="formula-icon soft" aria-hidden="true">31</span>
               </div>
+              <div class="calendar-toolbar">
+                <label class="calendar-system-field" for="calendar-system">
+                  <span>Second calendar</span>
+                  <select id="calendar-system" aria-label="Second calendar shown in each date cell"></select>
+                </label>
+                <span class="calendar-system-badge" id="calendar-system-badge" hidden></span>
+              </div>
               <p class="calendar-summary" id="calendar-summary">Calendar follows your home place.</p>
               <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Home place calendar"></div>
+              <p class="calendar-legend" id="calendar-legend" aria-label="Marker legend"></p>
             </article>
 
             <article class="note-card calendar-detail-card" aria-labelledby="calendar-selected-title">
               <p class="eyebrow">SELECTED DATE</p>
               <h3 id="calendar-selected-title">Today</h3>
               <p class="note-copy" id="calendar-selected-meta">Pick a date to see its details.</p>
+              <p class="note-copy calendar-secondary-line" id="calendar-secondary" hidden></p>
               <dl class="calendar-facts">
                 <div><dt>ISO date</dt><dd id="calendar-selected-iso">—</dd></div>
                 <div><dt>ISO week</dt><dd id="calendar-selected-week">—</dd></div>
                 <div><dt>Year day</dt><dd id="calendar-selected-year-day">—</dd></div>
                 <div><dt>Year left</dt><dd id="calendar-selected-remaining">—</dd></div>
               </dl>
+
+              <div class="calendar-events-block" id="calendar-events-block">
+                <p class="eyebrow">HOLIDAYS &amp; OBSERVANCES</p>
+                <ul class="calendar-events" id="calendar-holidays"></ul>
+              </div>
+
+              <div class="calendar-notes-block">
+                <p class="eyebrow">YOUR NOTES <span class="calendar-note-count" id="calendar-note-count" hidden></span></p>
+                <label class="sr-only" for="calendar-note-input">Note for the selected date</label>
+                <textarea id="calendar-note-input" rows="2" maxlength="280"
+                  placeholder="Pin a note to this date — a birthday, a booking, a plan…"></textarea>
+                <div class="calendar-note-editor-row">
+                  <label class="calendar-note-color-field" for="calendar-note-color">
+                    <span class="sr-only">Note color</span>
+                    <select id="calendar-note-color" aria-label="Note color">
+                      <option value="violet">Violet</option>
+                      <option value="mint">Mint</option>
+                      <option value="amber">Amber</option>
+                      <option value="coral">Coral</option>
+                    </select>
+                  </label>
+                  <button class="pill-button" type="button" id="calendar-note-add">
+                    <span class="pill-icon" aria-hidden="true">＋</span> Pin to this date
+                  </button>
+                </div>
+                <ul class="calendar-notes" id="calendar-notes-list"></ul>
+              </div>
+
               <p class="note-copy small muted">
-                This is the first calendar layer: date browsing now; events, holidays or scheduling defaults can
-                land here later without crowding the clock tools.
+                Islamic dates follow the tabular Hijri calendar, and Hebrew feasts begin at sundown — both can
+                sit a day off local observance. Feasts counted by tithi (Dashain, Tihar, Diwali, Losar) are not
+                tracked yet.
               </p>
             </article>
           </div>
@@ -801,7 +840,7 @@
               </p>
             </div>
             <div class="page-actions">
-              <button class="outline-button" id="weather-use-location-top" type="button">
+              <button class="outline-button" id="weather-use-location-top" type="button" data-needs-geo>
                 <span class="button-plus" aria-hidden="true">⌖</span> Use my location
               </button>
               <button class="outline-button" id="weather-set-location-top" type="button">
@@ -847,7 +886,7 @@
                 </div>
 
                 <div class="weather-location-row">
-                  <button class="text-button weather-location" type="button" id="weather-use-location">Use my location</button>
+                  <button class="text-button weather-location" type="button" id="weather-use-location" data-needs-geo>Use my location</button>
                   <button class="text-button weather-location" type="button" id="weather-set-location">Choose a place…</button>
                 </div>
               </div>
@@ -868,7 +907,7 @@
                 <div><dt>Time zone</dt><dd id="location-zone">—</dd></div>
               </dl>
               <p class="location-warning" id="location-warning" hidden></p>
-              <button class="pill-button wide" type="button" id="location-locate">
+              <button class="pill-button wide" type="button" id="location-locate" data-needs-geo>
                 <span class="pill-icon" aria-hidden="true">⌖</span> Locate me precisely
               </button>
               <p class="location-foot">
@@ -923,8 +962,9 @@
               <h2 id="settings-title">Settings</h2>
               <p class="section-phrase" id="settings-phrase"></p>
               <p class="section-intro">
-                A new home for preferences. This first pass keeps the choices you asked for here: text size and
-                theme, including weather moods you can lock manually or leave on Auto.
+                The preferences home, grown up: text size and themes, plus the calendar's week start and second
+                calendar, weather units, alarm defaults, notification behaviour, privacy controls, and an
+                export/import backup of everything Tempo remembers.
               </p>
             </div>
             <div class="page-actions">
@@ -966,12 +1006,124 @@
               <p class="setting-status" id="settings-theme-status">Auto follows your local time and weather.</p>
             </article>
 
-            <article class="note-card settings-ideas" aria-labelledby="settings-next-title">
-              <p class="eyebrow">NEXT SETTINGS TO ADD</p>
-              <h3 id="settings-next-title">A place to grow</h3>
+            <article class="tool-card settings-card" aria-labelledby="settings-calendar-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">CALENDAR</p>
+                  <h3 id="settings-calendar-title">Week start &amp; calendars</h3>
+                </div>
+                <span class="formula-icon soft" aria-hidden="true">🗓</span>
+              </div>
               <p class="note-copy">
-                Good follow-ups for this section: default calendar week start, weather units, alarm defaults,
-                notification behaviour, sound volume, privacy/location controls, and export/import for saved data.
+                Where the week begins, a second calendar in every date cell, and which holiday sets the month
+                marks up.
+              </p>
+              <p class="eyebrow settings-field-label">WEEKS BEGIN ON</p>
+              <div class="segmented wrap" id="settings-week-start" role="radiogroup" aria-label="Week starts on"></div>
+              <label class="settings-select-field" for="settings-calendar-system">
+                <span class="eyebrow settings-field-label">SECOND CALENDAR</span>
+                <select id="settings-calendar-system"></select>
+              </label>
+              <p class="eyebrow settings-field-label">MARK THESE DAYS</p>
+              <div class="settings-checks" id="settings-holiday-toggles"></div>
+              <p class="setting-status" id="settings-calendar-status">The Calendar section follows these choices.</p>
+            </article>
+
+            <article class="tool-card settings-card" aria-labelledby="settings-units-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">WEATHER</p>
+                  <h3 id="settings-units-title">Units</h3>
+                </div>
+                <span class="formula-icon soft" aria-hidden="true">°</span>
+              </div>
+              <p class="note-copy">
+                Auto picks the measuring system each place actually uses — °F for the US and its neighbours, °C
+                elsewhere. You can overrule it; the weather card and forecast follow.
+              </p>
+              <div class="segmented wrap" id="settings-units" role="radiogroup" aria-label="Weather units"></div>
+              <p class="setting-status" id="settings-units-status">Units follow each place by default.</p>
+            </article>
+
+            <article class="tool-card settings-card" aria-labelledby="settings-alarms-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">ALARMS &amp; SOUND</p>
+                  <h3 id="settings-alarms-title">Ring defaults</h3>
+                </div>
+                <span class="formula-icon soft" aria-hidden="true">🔔</span>
+              </div>
+              <p class="note-copy">
+                How loud a ring starts and how long it keeps going. Wall-clock alarms always follow these; the
+                timer mirrors them until you tweak its own controls.
+              </p>
+              <p class="eyebrow settings-field-label">VOLUME <span class="volume-value" id="settings-volume-label">70%</span></p>
+              <input class="alarm-volume settings-volume" id="settings-volume" type="range" min="0" max="100" value="70"
+                aria-label="Default alarm volume" />
+              <p class="eyebrow settings-field-label">KEEP RINGING FOR</p>
+              <div class="segmented wrap" id="settings-duration" role="radiogroup" aria-label="Default ring duration"></div>
+              <p class="eyebrow settings-field-label">WHEN A RING GOES OFF</p>
+              <button class="pill-button" type="button" id="settings-notifications" aria-pressed="false">
+                <span class="pill-icon" aria-hidden="true">🔔</span> Also send a notification
+              </button>
+              <p class="setting-status" id="settings-notify-status">Sound only, by default.</p>
+            </article>
+
+            <article class="tool-card settings-card" aria-labelledby="settings-privacy-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">PRIVACY &amp; LOCATION</p>
+                  <h3 id="settings-privacy-title">Your data stays here</h3>
+                </div>
+                <span class="formula-icon soft" aria-hidden="true">⚲</span>
+              </div>
+              <p class="note-copy">
+                Everything Tempo knows lives in this browser's storage — no account, no server, nothing sent
+                anywhere but the weather and gazetteer lookups you trigger. GPS buttons can be switched off
+                entirely, and one button wipes it all.
+              </p>
+              <button class="pill-button" type="button" id="settings-geo" aria-pressed="true">
+                <span class="pill-icon" aria-hidden="true">⌖</span> Location buttons on
+              </button>
+              <p class="setting-status" id="settings-geo-status">
+                Every “use my location” button asks your device for a position.
+              </p>
+              <button class="outline-button danger" type="button" id="settings-clear-data">
+                <span class="button-plus" aria-hidden="true">🗑</span> Clear all saved Tempo data on this device
+              </button>
+            </article>
+
+            <article class="tool-card settings-card" aria-labelledby="settings-data-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">EXPORT / IMPORT</p>
+                  <h3 id="settings-data-title">Take it with you</h3>
+                </div>
+                <span class="formula-icon soft" aria-hidden="true">⇅</span>
+              </div>
+              <p class="note-copy">
+                Every preference, alarm, world clock, calendar note, remark and saved calculation, poured into
+                one JSON file you can keep or move to another browser. Importing restores it here.
+              </p>
+              <div class="settings-data-actions">
+                <button class="pill-button" type="button" id="settings-export">
+                  <span class="pill-icon" aria-hidden="true">⤓</span> Export a backup
+                </button>
+                <button class="pill-button" type="button" id="settings-import">
+                  <span class="pill-icon" aria-hidden="true">⤒</span> Import a backup…
+                </button>
+                <input type="file" id="settings-import-file" accept="application/json,.json" hidden />
+              </div>
+              <p class="setting-status" id="settings-data-status">Nothing exported or imported yet.</p>
+            </article>
+
+            <article class="note-card settings-ideas" aria-labelledby="settings-next-title">
+              <p class="eyebrow">STILL A PLACE TO GROW</p>
+              <h3 id="settings-next-title">What could land next</h3>
+              <p class="note-copy">
+                This section grew: week start, calendars, holiday sets, units, alarm defaults, notifications,
+                privacy and backup all live above. Honest next steps: a default alarm sound, tithi-based
+                feasts (Dashain, Tihar, Diwali), per-section visibility, and keyboard shortcuts.
               </p>
             </article>
           </div>
@@ -1130,7 +1282,7 @@
 
         <p class="picker-summary" id="picker-summary">Start typing, or pick from the list below.</p>
         <div class="dialog-actions">
-          <button type="button" class="secondary-button" id="picker-use-location">⌖ Use my location</button>
+          <button type="button" class="secondary-button" id="picker-use-location" data-needs-geo>⌖ Use my location</button>
           <button class="primary-button dialog-submit" id="zone-submit" type="submit">Use this place</button>
         </div>
       </form>
