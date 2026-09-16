@@ -1,9 +1,9 @@
 /**
  * The calendars a date can wear besides the Gregorian one.
  *
- * The month grid always stays Gregorian — it is the calendar the alarms,
- * the timer and the rest of Tempo think in — but every cell can carry a
- * small second date in the calendar the reader actually feels: Vikram
+ * The alarm and timer spine remains Gregorian, while the month grid can put
+ * another calendar first in each cell and keep Gregorian as the small date
+ * underneath: Vikram
  * (Bikram) Sambat for Nepal, the Chinese and Korean lunisolar calendars,
  * Hebrew, Hijri, the Persian and Indian national solar calendars, Thai
  * Buddhist Era years, or the Japanese imperial eras.
@@ -33,18 +33,21 @@ export const BS_FIRST_YEAR = 2000;
 export const BS_LAST_YEAR = 2090;
 
 export const BS_MONTHS = [
-  { id: "baisakh", name: "Baisakh", short: "Bai" },
-  { id: "jestha", name: "Jestha", short: "Jes" },
-  { id: "ashadh", name: "Ashadh", short: "Asa" },
-  { id: "shrawan", name: "Shrawan", short: "Shr" },
-  { id: "bhadra", name: "Bhadra", short: "Bha" },
-  { id: "ashwin", name: "Ashwin", short: "Asw" },
-  { id: "kartik", name: "Kartik", short: "Kar" },
-  { id: "mangsir", name: "Mangsir", short: "Man" },
-  { id: "poush", name: "Poush", short: "Pou" },
-  { id: "magh", name: "Magh", short: "Mag" },
-  { id: "falgun", name: "Falgun", short: "Fal" },
-  { id: "chaitra", name: "Chaitra", short: "Cha" },
+  // `name` is the spelling used in the date sentence. The aliases and
+  // Devanagari names are deliberately kept beside it: Nepali month names
+  // have several perfectly normal English transliterations.
+  { id: "baisakh", name: "Baisakh", aliases: ["Baishakh", "Baisak"], native: "बैशाख", short: "Bai" },
+  { id: "jestha", name: "Jestha", aliases: ["Jeth"], native: "जेठ", short: "Jes" },
+  { id: "ashadh", name: "Ashadh", aliases: ["Asadh", "Asar"], native: "असार", short: "Asa" },
+  { id: "shrawan", name: "Shrawan", aliases: ["Shravan", "Saun"], native: "साउन", short: "Shr" },
+  { id: "bhadra", name: "Bhadra", aliases: ["Bhadau"], native: "भदौ", short: "Bha" },
+  { id: "ashwin", name: "Ashwin", aliases: ["Ashoj", "Asoj"], native: "असोज", short: "Asw" },
+  { id: "kartik", name: "Kartik", aliases: ["Kattik"], native: "कात्तिक", short: "Kar" },
+  { id: "mangsir", name: "Mangsir", aliases: ["Margashirsha", "Mansir"], native: "मंसिर", short: "Man" },
+  { id: "poush", name: "Poush", aliases: ["Paush", "Push"], native: "पुस", short: "Pou" },
+  { id: "magh", name: "Magh", aliases: ["Magha"], native: "माघ", short: "Mag" },
+  { id: "falgun", name: "Falgun", aliases: ["Phagun"], native: "फागुन", short: "Fal" },
+  { id: "chaitra", name: "Chaitra", aliases: ["Chait"], native: "चैत", short: "Cha" },
 ];
 
 /**
@@ -112,6 +115,18 @@ export function bikramMonthName(month, { short = false } = {}) {
   const entry = BS_MONTHS[month - 1];
   if (!entry) return "";
   return short ? entry.short : entry.name;
+}
+
+/**
+ * A reader-friendly label that makes the common transliteration visible
+ * without making the compact date cell too wide.
+ */
+export function bikramMonthLabel(month, { includeNative = true } = {}) {
+  const entry = BS_MONTHS[month - 1];
+  if (!entry) return "";
+  const aliases = entry.aliases.filter((alias) => alias !== entry.name);
+  const spelling = [entry.name, ...aliases].join(" / ");
+  return includeNative ? `${spelling} (${entry.native})` : spelling;
 }
 
 /* ------------------------------------------------------------------- ICU calendars */
@@ -329,6 +344,9 @@ export function describeInSystem(id, date) {
         day: bs.day,
         month: bs.month,
         monthName: month.name,
+        monthAliases: month.aliases,
+        monthNative: month.native,
+        monthLabel: bikramMonthLabel(bs.month),
         year: bs.year,
         cell: bs.day === 1 ? `${month.short} 1` : String(bs.day),
         long: `${month.name} ${bs.day}, ${bs.year} BS`,

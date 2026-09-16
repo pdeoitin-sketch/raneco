@@ -2656,6 +2656,26 @@ html[data-text-size] h3 { font-size: var(--tempo-h3-size); }
 .calendar-day.is-selected .calendar-alt { color: color-mix(in srgb, var(--on-violet) 78%, transparent); }
 .calendar-day.is-outside .calendar-alt { opacity: .8; }
 
+/* Switching a calendar is a real display change, not just an extra label:
+ * the chosen system owns the large number and the Gregorian day is the
+ * quiet date underneath it. */
+.calendar-card[data-calendar-primary]:not([data-calendar-primary="gregorian"]) .calendar-number {
+  font-size: 22px;
+  letter-spacing: -.45px;
+}
+.calendar-card[data-calendar-primary]:not([data-calendar-primary="gregorian"]) .calendar-gregorian-date {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+.calendar-card[data-calendar-primary]:not([data-calendar-primary="gregorian"]) .calendar-day.is-outside .calendar-gregorian-date {
+  opacity: .72;
+}
+.calendar-card[data-calendar-primary]:not([data-calendar-primary="gregorian"]) .calendar-day.is-selected .calendar-gregorian-date {
+  color: color-mix(in srgb, var(--on-violet) 78%, transparent);
+}
+
 .calendar-dots {
   display: inline-flex;
   align-items: center;

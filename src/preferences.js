@@ -3,8 +3,8 @@
  *
  * Text size and the theme mode already had their own homes (`settings.js`,
  * `theme.js`). This module owns the preferences that several sections read
- * at once: how the calendar starts its weeks, which second calendar the
- * date cells carry, which holiday sets are marked, whether the GPS buttons
+ * at once: how the calendar starts its weeks, which calendar is primary in
+ * the date cells, which holiday sets are marked, whether the GPS buttons
  * are on, and — through the keys the timer, alarms and weather card already
  * used — default weather units, alarm volume, ring duration and whether a
  * finished countdown may also send a browser notification.

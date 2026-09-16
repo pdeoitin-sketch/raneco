@@ -17,12 +17,13 @@
  *
  * Honest edges, stated up front: Islamic dates use the tabular calendar, so
  * a local moon sighting may celebrate a day earlier or later; Hebrew feasts
- * begin at sundown the evening before the date shown; and tithi-based feasts
- * (Dashain, Tihar, Diwali, Losar) need published tables this file does not
- * try to fake — so they simply are not here.
+ * begin at sundown the evening before the date shown; and Nepali tithi-based
+ * festivals use the published Bikram Sambat festival tables included below.
+ * A tithi is not a fixed Gregorian date, so the table is keyed by year rather
+ * than pretending that Dashain, Tihar or Holi repeat on the same AD day.
  */
 
-import { bikramFromGregorian, describeInSystem } from "./calendar-systems.js";
+import { bikramFromGregorian, bikramMonthLabel, describeInSystem } from "./calendar-systems.js";
 
 export const EVENT_CATEGORIES = [
   { id: "world", label: "International day" },
@@ -223,11 +224,153 @@ const BIKRAM_EVENTS = [
   { month: 11, day: 7, name: "Democracy Day (Prajatantra Diwas)", category: "national", place: "Nepal" },
 ];
 
+/*
+ * Nepal's important festivals are not all public holidays, and many are
+ * regional or community observances. They still belong on a calendar. The
+ * dates below are the published 2082/2083 BS festival tables for the current
+ * supported Gregorian season (2025–2027), including the full Dashain, Tihar
+ * and Chhath sequences rather than only their headline days.
+ *
+ * These are Gregorian anchors because the celebrations are tithi-based. Each
+ * event is decorated with its Bikram Sambat date at render time, so a user
+ * can see both dates and the Nepali month name. Adding another year's table
+ * is intentionally a data change, not a calendar algorithm guess.
+ */
+export const NEPALI_FESTIVAL_DATES = [
+  /* 2081/2082 BS — the 2025 festival season. */
+  [2025, 1, 14, "Maghe Sankranti (Maghi Parba)", "cultural", "Nepal"],
+  [2025, 1, 30, "Sonam Losar (Tamang New Year)", "cultural", "Tamang communities"],
+  [2025, 1, 30, "Martyrs' Memorial Day (Sahid Diwas)", "national", "Nepal"],
+  [2025, 2, 26, "Maha Shivaratri", "religious", "Nepal"],
+  [2025, 2, 28, "Gyalpo Losar (Tibetan New Year)", "cultural", "Himalayan communities"],
+  [2025, 3, 13, "Holi — Fagu Purnima (hill regions)", "cultural", "Nepal hill regions"],
+  [2025, 3, 14, "Holi — Fagu Purnima (Terai regions)", "cultural", "Nepal Terai"],
+  [2025, 3, 29, "Ghode Jatra", "cultural", "Kathmandu Valley"],
+  [2025, 4, 6, "Ram Navami", "religious", "Nepal"],
+  [2025, 5, 12, "Buddha Jayanti (Buddha Purnima)", "religious", "Lumbini & Nepal"],
+  [2025, 5, 12, "Ubhauli / Chandi Purnima", "cultural", "Kirat communities"],
+  [2025, 8, 9, "Janai Purnima / Raksha Bandhan", "cultural", "Nepal"],
+  [2025, 8, 10, "Gai Jatra (Saparu)", "cultural", "Kathmandu Valley & Newar communities"],
+  [2025, 8, 16, "Krishna Janmashtami", "religious", "Nepal"],
+  [2025, 8, 25, "Dar Khane Din (Teej eve)", "cultural", "Nepal"],
+  [2025, 8, 26, "Haritalika Teej", "cultural", "Nepal"],
+  [2025, 8, 30, "Rishi Panchami (Teej conclusion)", "cultural", "Nepal"],
+  [2025, 8, 31, "Gaura Parva", "cultural", "Western Nepal"],
+  [2025, 9, 6, "Indra Jatra / Yenya begins", "cultural", "Kathmandu Valley"],
+  [2025, 9, 15, "Jitiya Parwa", "cultural", "Mithila & Terai communities"],
+  [2025, 9, 22, "Ghatasthapana (Dashain begins)", "religious", "Nepal"],
+  [2025, 9, 29, "Phulpati (Dashain)", "religious", "Nepal"],
+  [2025, 9, 30, "Maha Ashtami (Dashain)", "religious", "Nepal"],
+  [2025, 10, 1, "Maha Navami (Dashain)", "religious", "Nepal"],
+  [2025, 10, 2, "Vijaya Dashami (Dashain Tika)", "religious", "Nepal"],
+  [2025, 10, 3, "Papakunsha Ekadashi (Dashain)", "religious", "Nepal"],
+  [2025, 10, 4, "Dwadashi (Dashain)", "religious", "Nepal"],
+  [2025, 10, 6, "Kojagrat Purnima (Dashain concludes)", "religious", "Nepal"],
+  [2025, 10, 20, "Laxmi Puja (Tihar / Diwali)", "cultural", "Nepal"],
+  [2025, 10, 21, "Gai Tihar (Cow Day)", "cultural", "Nepal"],
+  [2025, 10, 22, "Goru Tihar & Govardhan Puja", "cultural", "Nepal"],
+  [2025, 10, 23, "Bhai Tika (Tihar)", "cultural", "Nepal"],
+  [2025, 10, 24, "Tihar closing day", "cultural", "Nepal"],
+  [2025, 10, 27, "Chhath Puja — Sandhya Arghya", "religious", "Terai & Nepal"],
+  [2025, 11, 5, "Guru Nanak Jayanti", "religious", "Nepal Sikh communities"],
+  [2025, 11, 11, "Phalgunanda Jayanti", "cultural", "Kirat communities"],
+  [2025, 12, 4, "Udhauli Parva", "cultural", "Kirat communities"],
+  [2025, 12, 5, "Yomari Punhi & Dhanya Purnima", "cultural", "Newar communities"],
+  [2025, 12, 30, "Tamu Lhosar (Gurung New Year)", "cultural", "Gurung communities"],
+
+  /* 2082 BS — January through April 2026. */
+  [2026, 1, 15, "Maghe Sankranti (Maghi Parba)", "cultural", "Nepal"],
+  [2026, 1, 19, "Sonam Losar (Tamang New Year)", "cultural", "Tamang communities"],
+  [2026, 2, 15, "Maha Shivaratri", "religious", "Nepal"],
+  [2026, 2, 18, "Gyalpo Losar (Tibetan New Year)", "cultural", "Himalayan communities"],
+  [2026, 3, 2, "Holi — Fagu Purnima (hill regions)", "cultural", "Nepal hill regions"],
+  [2026, 3, 3, "Holi — Fagu Purnima (Terai regions)", "cultural", "Nepal Terai"],
+  [2026, 3, 18, "Ghode Jatra", "cultural", "Kathmandu Valley"],
+  [2026, 3, 26, "Chaitra Dashain (Chaite Dashain)", "religious", "Nepal"],
+  [2026, 3, 27, "Ram Navami", "religious", "Nepal"],
+  [2026, 4, 14, "Bisket Jatra (Nepali New Year season)", "cultural", "Bhaktapur"],
+  [2026, 4, 15, "Sindur Jatra", "cultural", "Thimi, Bhaktapur"],
+  [2026, 4, 17, "Mata Tirtha Aunsi (Nepali Mother's Day)", "cultural", "Nepal"],
+  [2026, 4, 21, "Rato Machhindranath Jatra begins", "cultural", "Patan, Lalitpur"],
+  [2026, 5, 1, "Buddha Jayanti (Buddha Purnima)", "religious", "Lumbini & Nepal"],
+  [2026, 5, 1, "Ubhauli / Chandi Purnima", "cultural", "Kirat communities"],
+  [2026, 5, 13, "Tiji Festival begins", "cultural", "Upper Mustang"],
+  [2026, 6, 29, "Ropain Jatra (Rice Planting Festival)", "cultural", "Nepal"],
+
+  /* 2083 BS — the autumn festival season and the Nepali New Year that
+   * follows it. */
+  [2026, 8, 14, "Nag Panchami", "religious", "Nepal"],
+  [2026, 8, 28, "Janai Purnima / Raksha Bandhan", "cultural", "Nepal"],
+  [2026, 8, 29, "Gai Jatra (Saparu)", "cultural", "Kathmandu Valley & Newar communities"],
+  [2026, 9, 4, "Gaura Parva", "cultural", "Western Nepal"],
+  [2026, 9, 4, "Krishna Janmashtami", "religious", "Nepal"],
+  [2026, 9, 13, "Dar Khane Din (Teej eve)", "cultural", "Nepal"],
+  [2026, 9, 14, "Haritalika Teej", "cultural", "Nepal"],
+  [2026, 9, 16, "Rishi Panchami (Teej conclusion)", "cultural", "Nepal"],
+  [2026, 9, 14, "Ganesh Chaturthi", "religious", "Nepal"],
+  [2026, 9, 25, "Indra Jatra / Yenya begins", "cultural", "Kathmandu Valley"],
+  [2026, 10, 4, "Jitiya Parwa", "cultural", "Mithila & Terai communities"],
+  [2026, 10, 11, "Ghatasthapana (Dashain begins)", "religious", "Nepal"],
+  [2026, 10, 17, "Phulpati (Dashain)", "religious", "Nepal"],
+  [2026, 10, 18, "Maha Ashtami (Dashain)", "religious", "Nepal"],
+  [2026, 10, 19, "Maha Navami (Dashain)", "religious", "Nepal"],
+  [2026, 10, 20, "Maha Navami observance (Dashain)", "religious", "Nepal"],
+  [2026, 10, 21, "Vijaya Dashami (Dashain Tika)", "religious", "Nepal"],
+  [2026, 10, 22, "Papakunsha Ekadashi (Dashain)", "religious", "Nepal"],
+  [2026, 10, 23, "Dwadashi (Dashain)", "religious", "Nepal"],
+  [2026, 10, 25, "Kojagrat Purnima (Dashain concludes)", "religious", "Nepal"],
+  [2026, 11, 7, "Kaag Tihar (Crow Day)", "cultural", "Nepal"],
+  [2026, 11, 8, "Kukur Tihar & Laxmi Puja (Tihar / Diwali)", "cultural", "Nepal"],
+  [2026, 11, 9, "Gai Tihar (Cow Day)", "cultural", "Nepal"],
+  [2026, 11, 10, "Goru Tihar, Govardhan Puja & Mha Puja", "cultural", "Nepal & Newar communities"],
+  [2026, 11, 10, "Nepal Sambat New Year", "cultural", "Newar communities"],
+  [2026, 11, 11, "Bhai Tika (Tihar)", "cultural", "Nepal"],
+  [2026, 11, 11, "Phalgunanda Jayanti", "cultural", "Kirat communities"],
+  [2026, 11, 12, "Tihar closing day", "cultural", "Nepal"],
+  [2026, 11, 13, "Chhath Puja — Nahay Khay", "religious", "Terai & Nepal"],
+  [2026, 11, 14, "Chhath Puja — Kharna", "religious", "Terai & Nepal"],
+  [2026, 11, 15, "Chhath Puja — Sandhya Arghya", "religious", "Terai & Nepal"],
+  [2026, 11, 16, "Chhath Puja — Usha Arghya", "religious", "Terai & Nepal"],
+  [2026, 11, 24, "Guru Nanak Jayanti", "religious", "Nepal Sikh communities"],
+  [2026, 12, 24, "Udhauli, Dhanya Purnima & Yomari Punhi", "cultural", "Kirat & Newar communities"],
+  [2026, 12, 30, "Tamu Lhosar (Gurung New Year)", "cultural", "Gurung communities"],
+
+  /* The opening months of 2083/2084, so navigating forward does not make
+   * the festival layer suddenly disappear. */
+  [2027, 1, 11, "Prithvi Jayanti / National Unity Day", "national", "Nepal"],
+  [2027, 1, 15, "Maghe Sankranti (Maghi Parba)", "cultural", "Nepal"],
+  [2027, 1, 30, "Martyrs' Day (Sahid Diwas)", "national", "Nepal"],
+  [2027, 2, 7, "Sonam Losar (Tamang New Year)", "cultural", "Tamang communities"],
+  [2027, 2, 19, "National Democracy Day (Prajatantra Diwas)", "national", "Nepal"],
+  [2027, 3, 6, "Maha Shivaratri", "religious", "Nepal"],
+  [2027, 3, 9, "Gyalpo Losar (Tibetan New Year)", "cultural", "Himalayan communities"],
+  [2027, 3, 21, "Holi — Fagu Purnima (hill regions)", "cultural", "Nepal hill regions"],
+  [2027, 3, 22, "Holi — Fagu Purnima (Terai regions)", "cultural", "Nepal Terai"],
+  [2027, 4, 6, "Ghode Jatra", "cultural", "Kathmandu Valley"],
+  [2027, 4, 14, "Bisket Jatra (Nepali New Year season)", "cultural", "Bhaktapur"],
+  [2027, 5, 12, "Buddha Jayanti (Buddha Purnima)", "religious", "Lumbini & Nepal"],
+];
+
 const ALL_SETS = ["world", "national", "cultural", "religious"];
 
 function setEnabled(sets, category) {
   if (!sets) return true;
   return sets[category] !== false;
+}
+
+function addNepaliDate(event, bs) {
+  return {
+    ...event,
+    nepali: true,
+    bs: bs
+      ? {
+          year: bs.year,
+          month: bs.month,
+          day: bs.day,
+          monthName: bikramMonthLabel(bs.month),
+        }
+      : undefined,
+  };
 }
 
 /**
@@ -249,10 +392,30 @@ export function eventsForDate(date, sets) {
     if (bs) {
       for (const event of BIKRAM_EVENTS) {
         if (bs.month === event.month && bs.day === event.day && setEnabled(sets, event.category)) {
-          events.push({ id: `bikram-${event.month}-${event.day}`, ...event });
+          events.push(
+            addNepaliDate({ id: `bikram-${event.month}-${event.day}`, ...event }, {
+              year: bs.year,
+              month: bs.month,
+              day: bs.day,
+            })
+          );
         }
       }
     }
+  }
+
+  // Tithi-based festivals are read from their published year table. Keeping
+  // this separate from the month/day rules above prevents a moving festival
+  // from being accidentally treated as a solar anniversary.
+  for (const [year, month, day, name, category, place] of NEPALI_FESTIVAL_DATES) {
+    if (date.year !== year || date.month !== month || date.day !== day || !setEnabled(sets, category)) continue;
+    const bs = bikramFromGregorian(date);
+    events.push(
+      addNepaliDate(
+        { id: `nepal-${year}-${month}-${day}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, name, category, place },
+        bs
+      )
+    );
   }
 
   // Only consult the ICU calendars that at least one enabled rule needs.
