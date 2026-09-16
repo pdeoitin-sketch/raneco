@@ -5,33 +5,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="A calm, capable dashboard for your local time, alarms that ring at a wall-clock time, world clocks, live weather and forecast, a timer, a stopwatch, and time arithmetic — one page, in your browser."
+      content="A calm, capable dashboard for your local time, calendar, settings, alarms that ring at a wall-clock time, world clocks, live weather and forecast, a timer, a stopwatch, and time arithmetic — one page, in your browser."
     />
     <title>Tempo — Time, made useful</title>
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#f7f7fb" />
     <script>
-      // Runs before the first paint so a remembered Auto palette (or a manual
-      // dark choice) never flashes the wrong way. app.js re-reads the same
-      // keys and keeps them in sync. (Text size used to live here too; the
-      // sizes are now a fixed ramp in styles.css, so there is nothing to
-      // restore — see the "Small text, fixed" note in the README.)
+      // Runs before the first paint so remembered display settings never flash
+      // the wrong way. app.js re-reads the same keys and keeps them in sync.
       (function () {
         try {
+          var root = document.documentElement;
           var last = localStorage.getItem("tempo-theme-last");
+          var mode = localStorage.getItem("tempo-theme-mode") || localStorage.getItem("tempo-theme");
+          if (mode === "clear") mode = "sunny";
+          var canvases = {
+            light: "#f7f7fb",
+            dark: "#191923",
+            dawn: "#fdeadb",
+            sunny: "#fffdf3",
+            cloud: "#eceef2",
+            fog: "#e9eef1",
+            wind: "#eaf6f1",
+            rain: "#e3ecf6",
+            snow: "#edf4fa",
+            dusk: "#ffd97a",
+            storm: "#14161f",
+            night: "#0d1020",
+          };
           if (last) {
             var parts = last.split("|");
-            document.documentElement.setAttribute("data-appearance", parts[0]);
-            if (parts[1]) document.documentElement.style.background = parts[1];
-          } else if (
-            localStorage.getItem("tempo-theme-mode") === "dark" ||
-            localStorage.getItem("tempo-theme") === "dark"
-          ) {
-            document.documentElement.setAttribute("data-appearance", "dark");
-            document.documentElement.style.background = "#191923";
+            var appearance = parts[0] === "clear" ? "sunny" : parts[0];
+            root.setAttribute("data-appearance", appearance);
+            if (parts[1]) root.style.background = appearance === "sunny" ? canvases.sunny : parts[1];
+          } else if (canvases[mode]) {
+            root.setAttribute("data-appearance", mode);
+            root.style.background = canvases[mode];
+          }
+
+          var textSizes = { compact: 0.94, default: 1, large: 1.12, extra: 1.24 };
+          var textSize = localStorage.getItem("tempo-text-size");
+          if (textSizes[textSize]) {
+            root.setAttribute("data-text-size", textSize);
+            root.style.setProperty("--tempo-text-scale", textSizes[textSize]);
           }
         } catch (error) {
-          /* private mode: the default light palette is fine */
+          /* private mode: the default palette and text size are fine */
         }
       })();
     </script>
@@ -91,6 +110,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M12 7.4v5.1l3.4 2M3.75 12h2M18.25 12h2"></path></svg>
             <span>Time standards</span>
           </a>
+          <a class="nav-link" href="#/calendar" data-route="calendar" data-nav="calendar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.25" y="5.25" width="15.5" height="14.5" rx="2.25"></rect><path d="M8 3.75v3M16 3.75v3M4.25 9.25h15.5M8.25 13h.01M12 13h.01M15.75 13h.01M8.25 16.5h.01M12 16.5h.01"></path></svg>
+            <span>Calendar</span>
+          </a>
           <a class="nav-link" href="#/clock" data-route="clock" data-nav="clock">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.5" r="7.75"></circle><path d="M12 8.25v4.5l3 1.85M9.4 3.6h5.2M12 3.6V5.5M6.6 20.4h10.8"></path></svg>
             <span>Old clock</span>
@@ -106,6 +129,10 @@
           <a class="nav-link" href="#/forecast" data-route="forecast" data-nav="forecast">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18.5h5M4 14h9M4 9.5h7"></path><path d="M14.5 5.5a4 4 0 0 1 3.9 3.1 3 3 0 0 1-.4 5.9"></path></svg>
             <span>Forecast</span>
+          </a>
+          <a class="nav-link" href="#/settings" data-route="settings" data-nav="settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.25"></circle><path d="M12 3.75v2.2M12 18.05v2.2M4.42 7.12l1.9 1.1M17.68 15.78l1.9 1.1M4.42 16.88l1.9-1.1M17.68 8.22l1.9-1.1"></path></svg>
+            <span>Settings</span>
           </a>
           <a class="nav-link" href="#/about" data-route="about" data-nav="about">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M12 10.6v5.4M12 7.8h.01"></path></svg>
@@ -128,6 +155,7 @@
               </button>
             </div>
             <p class="theme-caption" id="theme-caption">Auto · follows your local time and weather</p>
+            <a class="theme-settings-link" href="#/settings" data-route="settings">All settings <span>→</span></a>
           </div>
         </div>
       </aside>
@@ -581,6 +609,56 @@
           <div class="standards-grid" id="standards-grid" aria-live="polite"></div>
           <p class="empty-state" id="standards-empty" hidden>No standard matches that — try the short form, like GST.</p>
         </section>
+        <!-- ============================================================= SECTION: CALENDAR -->
+        <section class="page" id="page-calendar" data-page="calendar" aria-labelledby="calendar-title">
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">DATES ON YOUR CLOCK</p>
+              <h2 id="calendar-title">Calendar</h2>
+              <p class="section-phrase" id="calendar-phrase"></p>
+              <p class="section-intro">
+                A month view tied to your home place. Today, selected dates, ISO week numbers and day-of-year
+                details all follow the same clock as your alarms and dashboard.
+                <span class="section-count" id="calendar-today-pill">TODAY</span>
+              </p>
+            </div>
+            <div class="page-actions calendar-actions" aria-label="Calendar controls">
+              <button class="outline-button" id="calendar-prev" type="button"><span class="button-plus" aria-hidden="true">‹</span> Previous month</button>
+              <button class="outline-button" id="calendar-today" type="button"><span class="button-plus" aria-hidden="true">◎</span> Today</button>
+              <button class="outline-button" id="calendar-next" type="button">Next month <span class="button-plus" aria-hidden="true">›</span></button>
+            </div>
+          </div>
+
+          <div class="calendar-layout">
+            <article class="tool-card calendar-card" aria-labelledby="calendar-month">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">MONTH</p>
+                  <h3 id="calendar-month">Loading month</h3>
+                </div>
+                <span class="formula-icon soft" aria-hidden="true">31</span>
+              </div>
+              <p class="calendar-summary" id="calendar-summary">Calendar follows your home place.</p>
+              <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Home place calendar"></div>
+            </article>
+
+            <article class="note-card calendar-detail-card" aria-labelledby="calendar-selected-title">
+              <p class="eyebrow">SELECTED DATE</p>
+              <h3 id="calendar-selected-title">Today</h3>
+              <p class="note-copy" id="calendar-selected-meta">Pick a date to see its details.</p>
+              <dl class="calendar-facts">
+                <div><dt>ISO date</dt><dd id="calendar-selected-iso">—</dd></div>
+                <div><dt>ISO week</dt><dd id="calendar-selected-week">—</dd></div>
+                <div><dt>Year day</dt><dd id="calendar-selected-year-day">—</dd></div>
+                <div><dt>Year left</dt><dd id="calendar-selected-remaining">—</dd></div>
+              </dl>
+              <p class="note-copy small muted">
+                This is the first calendar layer: date browsing now; events, holidays or scheduling defaults can
+                land here later without crowding the clock tools.
+              </p>
+            </article>
+          </div>
+        </section>
         <!-- ============================================================= SECTION: OLD CLOCK -->
         <section class="page" id="page-clock" data-page="clock" aria-labelledby="old-clock-title">
           <div class="page-intro">
@@ -837,6 +915,67 @@
             <ol class="day-list" id="forecast-days" aria-label="Daily forecast"></ol>
           </article>
         </section>
+        <!-- ============================================================= SECTION: SETTINGS -->
+        <section class="page" id="page-settings" data-page="settings" aria-labelledby="settings-title">
+          <div class="page-intro">
+            <div>
+              <p class="eyebrow">MAKE IT YOURS</p>
+              <h2 id="settings-title">Settings</h2>
+              <p class="section-phrase" id="settings-phrase"></p>
+              <p class="section-intro">
+                A new home for preferences. This first pass keeps the choices you asked for here: text size and
+                theme, including weather moods you can lock manually or leave on Auto.
+              </p>
+            </div>
+            <div class="page-actions">
+              <button class="outline-button" id="settings-reset" type="button">
+                <span class="button-plus" aria-hidden="true">↺</span> Reset display settings
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-layout">
+            <article class="tool-card settings-card" aria-labelledby="settings-text-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">READABILITY</p>
+                  <h3 id="settings-text-title">Text size</h3>
+                </div>
+                <span class="formula-icon soft" aria-hidden="true">A</span>
+              </div>
+              <p class="note-copy">
+                Make the page denser or easier to read. The choice is saved on this device before the first paint.
+              </p>
+              <div class="segmented wrap settings-text-size" id="settings-text-size" role="radiogroup" aria-label="Text size"></div>
+              <p class="setting-status" id="settings-text-status">Default text size.</p>
+            </article>
+
+            <article class="tool-card settings-card settings-theme-card" aria-labelledby="settings-theme-title">
+              <div class="calculator-card-heading">
+                <div>
+                  <p class="card-label">THEMES</p>
+                  <h3 id="settings-theme-title">Auto or pick the sky yourself</h3>
+                </div>
+                <span class="formula-icon soft" aria-hidden="true">☼</span>
+              </div>
+              <p class="note-copy">
+                Auto follows the home place's real weather. If you want the page to feel rainy, cloudy, sunny,
+                snowy or thunderous no matter what is outside, choose that theme here.
+              </p>
+              <div class="settings-theme-grid" id="settings-theme-grid" role="radiogroup" aria-label="Theme"></div>
+              <p class="setting-status" id="settings-theme-status">Auto follows your local time and weather.</p>
+            </article>
+
+            <article class="note-card settings-ideas" aria-labelledby="settings-next-title">
+              <p class="eyebrow">NEXT SETTINGS TO ADD</p>
+              <h3 id="settings-next-title">A place to grow</h3>
+              <p class="note-copy">
+                Good follow-ups for this section: default calendar week start, weather units, alarm defaults,
+                notification behaviour, sound volume, privacy/location controls, and export/import for saved data.
+              </p>
+            </article>
+          </div>
+        </section>
         <!-- ============================================================= SECTION: ABOUT -->
         <section class="page" id="page-about" data-page="about" aria-labelledby="about-title">
           <div class="page-intro">
@@ -853,11 +992,11 @@
           <div class="about-grid">
             <article class="note-card about-card">
               <p class="eyebrow">WHAT TEMPO IS</p>
-              <h3>One page, ten sections</h3>
+              <h3>One page, thirteen sections</h3>
               <p class="note-copy">
                 Tempo is a single-scroll dashboard for your time and your sky: the clock you live on, alarms that
-                ring at a wall-clock time, a timer, a stopwatch, the world's clocks, an old clock with a live sky
-                behind it, time arithmetic, weather and a seven-day forecast. There is no account, no backend and
+                ring at a wall-clock time, a timer, a stopwatch, the world's clocks, time standards, a calendar,
+                an old clock with a live sky behind it, time arithmetic, weather, a seven-day forecast and settings. There is no account, no backend and
                 no key to manage — it is a static page that runs entirely in your browser.
               </p>
             </article>
@@ -937,10 +1076,12 @@
       <a href="#/stopwatch" data-route="stopwatch" data-nav="stopwatch">Stopwatch</a>
       <a href="#/clocks" data-route="clocks" data-nav="clocks">World clocks</a>
       <a href="#/standards" data-route="standards" data-nav="standards">Time standards</a>
+      <a href="#/calendar" data-route="calendar" data-nav="calendar">Calendar</a>
       <a href="#/clock" data-route="clock" data-nav="clock">Old clock</a>
       <a href="#/calculator" data-route="calculator" data-nav="calculator">Time calculator</a>
       <a href="#/weather" data-route="weather" data-nav="weather">Weather</a>
       <a href="#/forecast" data-route="forecast" data-nav="forecast">Forecast</a>
+      <a href="#/settings" data-route="settings" data-nav="settings">Settings</a>
       <a href="#/about" data-route="about" data-nav="about">About</a>
     </nav>
 

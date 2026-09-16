@@ -14,8 +14,8 @@
  * Phrases rotate **by day number**, never randomly: the same reader sees the
  * same line all day (a phrase that changed on every glance is just noise),
  * and tomorrow's line is tomorrow's. Each section is offset by its place in
- * the page so the ten headings do not all surface the same index of their
- * pools on the same day.
+ * the page so the headings do not all surface the same index of their pools on
+ * the same day.
  */
 
 /** The sections of the page, in scroll order — also the phrase offset. */
@@ -26,10 +26,12 @@ export const SECTION_ORDER = [
   "stopwatch",
   "clocks",
   "standards",
+  "calendar",
   "clock",
   "calculator",
   "weather",
   "forecast",
+  "settings",
   "about",
 ];
 
@@ -41,9 +43,11 @@ export const PHRASE_SECTIONS = {
   stopwatch: "time",
   clocks: "time",
   standards: "time",
+  calendar: "time",
   clock: "time",
   calculator: "time",
   about: "time",
+  settings: "time",
   weather: "sky",
   forecast: "season",
 };

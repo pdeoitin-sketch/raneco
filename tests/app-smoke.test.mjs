@@ -309,12 +309,12 @@ describe("tempo in a browser-like DOM", () => {
   test("every section is on one scroll, and the nav follows the reader", async () => {
     app = await boot();
 
-    // The whole dashboard is present at once — ten sections now, time first
-    // and weather after the tools, which is the order this round chose.
+    // The whole dashboard is present at once — thirteen sections now, time first
+    // and weather/settings after the tools, which is the order this round chose.
     assert.deepEqual(
       app.visiblePages(),
-      ["now", "alarms", "timer", "stopwatch", "clocks", "standards", "clock", "calculator", "weather", "forecast", "about"],
-      "all eleven sections share one page, in the time-first order"
+      ["now", "alarms", "timer", "stopwatch", "clocks", "standards", "calendar", "clock", "calculator", "weather", "forecast", "settings", "about"],
+      "all thirteen sections share one page, in the time-first order"
     );
     assert.equal(app.activeSection(), "now", "and the reader starts at the top");
     assert.match(app.$("#page-title").textContent, /moment/);
@@ -329,7 +329,7 @@ describe("tempo in a browser-like DOM", () => {
     // A phrase sits under every heading, chosen by the day — stable within
     // the day, present for every section including the new ones.
     const phrases = app.$$(".section-phrase");
-    assert.equal(phrases.length, 11, "every section carries a phrase");
+    assert.equal(phrases.length, 13, "every section carries a phrase");
     for (const phrase of phrases) {
       assert.ok(phrase.textContent.trim().length > 8, `a phrase is written under its heading, got "${phrase.textContent}"`);
     }
@@ -340,16 +340,18 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.activeNav(), "clocks");
     assert.equal(app.$('.nav-link[data-route="now"]').hasAttribute("aria-current"), false);
     // Nothing was hidden to get there.
-    assert.equal(app.visiblePages().length, 11, "sections are never torn down");
+    assert.equal(app.visiblePages().length, 13, "sections are never torn down");
 
     for (const [route, heading] of [
       ["alarms", /clock says so/],
       ["timer", /timer/i],
       ["stopwatch", /one thing at a time/i],
+      ["calendar", /dates, on your clock/i],
       ["clock", /slower kind of clock/i],
       ["calculator", /mental maths/],
       ["weather", /sky/i],
       ["forecast", /week/i],
+      ["settings", /fit you/i],
       ["about", /what tempo is/i],
     ]) {
       await app.go(route);
@@ -594,27 +596,47 @@ describe("tempo in a browser-like DOM", () => {
     app = await boot();
   });
 
-  test("the text-size switch is gone, and the sizes are a fixed ramp", async () => {
+  test("settings expose text size and manual weather themes", async () => {
     app = await boot();
+    await app.go("settings");
 
-    // The three-button switch was the wrong fix: body copy was too small at
-    // every setting. The sizes now live on a fixed ramp in styles.css, so
-    // the control — and the variable it drove — are gone entirely.
-    assert.equal(app.$("#text-size-switch"), null, "the text-size control no longer exists");
-    assert.equal(app.document.documentElement.style.getPropertyValue("--type-scale"), "");
-    app.click("#page-now"); // any interaction must not resurrect it
-    assert.equal(app.document.documentElement.style.getPropertyValue("--type-scale"), "", "--type-scale is never written");
-    assert.equal(app.localStorage.getItem("tempo-text-scale"), null, "and the old key is not written either");
+    assert.equal(app.activeSection(), "settings");
+    assert.ok(app.$("#page-settings"), "settings has its own section");
 
-    // The ramp itself: no --type-scale anywhere, and no text below 11.5px.
-    const css = readFileSync(resolve(root, "styles.css"), "utf8");
-    assert.equal(css.includes("--type-scale"), false, "the variable is gone from the stylesheet");
-    const sizes = [...css.matchAll(/font-size:\s*([\d.]+)px/g)].map((match) => Number(match[1]));
-    assert.ok(sizes.length > 150, `expected a full ramp of sizes, found ${sizes.length}`);
-    assert.equal(Math.min(...sizes), 11.5, "the smallest text on the page is 11.5px, not 7.5px");
-    // Body copy: the section-intro and note-copy rules sit at 14–15px.
-    assert.match(css, /\.section-intro \{[^}]*font-size: 15px/);
-    assert.match(css, /\.note-copy \{[^}]*font-size: 1[45](?:\.5)?px/);
+    const textOptions = app.$$("#settings-text-size [data-text-size]").map((button) => button.dataset.textSize);
+    assert.deepEqual(textOptions, ["compact", "default", "large", "extra"]);
+    assert.equal(app.$('#settings-text-size [data-text-size="default"]').getAttribute("aria-checked"), "true");
+
+    app.click('#settings-text-size [data-text-size="large"]');
+    await wait(30);
+    assert.equal(app.localStorage.getItem("tempo-text-size"), "large");
+    assert.equal(app.document.documentElement.dataset.textSize, "large");
+    assert.equal(app.document.documentElement.style.getPropertyValue("--tempo-text-scale"), "1.12");
+    assert.match(app.$("#settings-text-status").textContent, /Large text/);
+
+    const themeOptions = app.$$("#settings-theme-grid [data-settings-theme]").map((button) => button.dataset.settingsTheme);
+    for (const required of ["auto", "sunny", "cloud", "rain", "snow", "storm", "wind", "fog", "night"]) {
+      assert.ok(themeOptions.includes(required), `${required} is available as a theme`);
+    }
+
+    app.click('#settings-theme-grid [data-settings-theme="rain"]');
+    await wait(30);
+    assert.equal(app.localStorage.getItem("tempo-theme-mode"), "rain");
+    assert.equal(app.document.body.dataset.appearance, "rain", "rain can be locked even if the stubbed weather changes");
+    assert.match(app.$("#theme-caption").textContent, /Rainy/);
+    assert.match(app.$("#settings-theme-status").textContent, /Rainy is locked in/);
+
+    app.click('#settings-theme-grid [data-settings-theme="storm"]');
+    await wait(30);
+    assert.equal(app.document.body.dataset.appearance, "storm");
+    assert.equal(app.document.body.dataset.ui, "dark", "the thunderous theme uses the dark component treatment");
+    assert.match(app.$("#settings-theme-status").textContent, /Thunderous is locked in/);
+
+    app.click("#settings-reset");
+    await wait(30);
+    assert.equal(app.localStorage.getItem("tempo-theme-mode"), "auto");
+    assert.equal(app.localStorage.getItem("tempo-text-size"), "default");
+    assert.equal(app.document.documentElement.dataset.textSize, "default");
   });
 
   test("a remembered manual theme is applied before the clocks start", async () => {
@@ -1151,6 +1173,37 @@ describe("tempo in a browser-like DOM", () => {
     }
   });
 
+  test("calendar is a home-zone month view with selectable days", async () => {
+    app = await boot({ homeZone: "Asia/Kathmandu" });
+    await app.go("calendar");
+
+    assert.equal(app.activeSection(), "calendar");
+    assert.match(app.$("#page-title").textContent, /dates, on your clock/i);
+    assert.match(app.$("#calendar-month").textContent, /\w+ \d{4}/);
+    assert.match(app.$("#calendar-summary").textContent, /Today in Kathmandu/);
+    assert.equal(app.$$("#calendar-grid .calendar-weekday").length, 7);
+    assert.equal(app.$$("#calendar-grid .calendar-day").length, 42);
+    assert.ok(app.$("#calendar-grid .calendar-day.is-today"), "today is highlighted");
+    assert.ok(app.$("#calendar-grid .calendar-day.is-selected"), "one date is selected");
+    assert.match(app.$("#calendar-selected-iso").textContent, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(app.$("#calendar-selected-week").textContent, /Week \d{2}/);
+    assert.match(app.$("#calendar-selected-year-day").textContent, /Day \d+/);
+
+    const firstInMonth = app.$$("#calendar-grid .calendar-day:not(.is-outside)")[0];
+    firstInMonth.click();
+    await wait(30);
+    assert.equal(app.localStorage.getItem("tempo-calendar").includes(firstInMonth.dataset.date), true);
+    assert.equal(app.$("#calendar-selected-iso").textContent, firstInMonth.dataset.date);
+
+    const monthBefore = app.$("#calendar-month").textContent;
+    app.click("#calendar-next");
+    await wait(30);
+    assert.notEqual(app.$("#calendar-month").textContent, monthBefore, "next month changes the view");
+    app.click("#calendar-today");
+    await wait(30);
+    assert.ok(app.$("#calendar-grid .calendar-day.is-today.is-selected"), "Today jumps back and selects today");
+  });
+
   test("time standards is a section of its own, short form and full form", async () => {
     app = await boot({ homeZone: "Asia/Kathmandu" });
     await app.go("standards");
@@ -1362,7 +1415,7 @@ describe("tempo in a browser-like DOM", () => {
   test("booting produces no console errors", async () => {
     app = await boot();
     await wait(200);
-    for (const route of ["alarms", "clocks", "timer", "stopwatch", "clock", "calculator", "weather", "forecast", "about", "now"]) {
+    for (const route of ["alarms", "clocks", "standards", "calendar", "timer", "stopwatch", "clock", "calculator", "weather", "forecast", "settings", "about", "now"]) {
       await app.go(route);
     }
     assert.deepEqual(app.errors, [], `console output: ${app.errors.join(" | ")}`);

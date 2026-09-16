@@ -24,6 +24,19 @@
   --font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "DM Mono", "SFMono-Regular", Consolas, monospace;
   --font-display: "Fraunces", Georgia, serif;
+  --tempo-text-scale: 1;
+  --tempo-body-font-size: 16px;
+  --tempo-copy-font-size: 15px;
+  --tempo-phrase-font-size: 14.5px;
+  --tempo-nav-font-size: 15px;
+  --tempo-control-font-size: 14px;
+  --tempo-small-font-size: 13.5px;
+  --tempo-calendar-number-size: 20px;
+  --tempo-h1-min: 28.5px;
+  --tempo-h1-max: 38px;
+  --tempo-h2-min: 31px;
+  --tempo-h2-max: 41.5px;
+  --tempo-h3-size: 22px;
 }
 
 * { box-sizing: border-box; }
@@ -707,7 +720,7 @@ body[data-appearance="dark"] {
 
 /* Pre-paint background so a reload never flashes white. */
 html[data-appearance="dawn"] { background: #fdf1e6; }
-html[data-appearance="clear"] { background: #ffffff; }
+html[data-appearance="sunny"], html[data-appearance="clear"] { background: #fffdf3; }
 html[data-appearance="cloud"] { background: #eceef2; }
 html[data-appearance="fog"] { background: #eaedf1; }
 html[data-appearance="rain"] { background: #e6edf4; }
@@ -2308,4 +2321,265 @@ body[data-ui="dark"] .standard-day { color: #8fabf0; }
   .standards-search { flex: 1 1 100%; }
   .world-headline { flex-wrap: wrap; gap: 4px; }
   .world-temp-slot { padding-top: 0; }
+}
+
+
+/* =====================================================================
+   Calendar and Settings
+   ===================================================================== */
+
+.theme-settings-link {
+  width: fit-content;
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 700;
+  transition: color .16s ease;
+}
+.theme-settings-link:hover { color: var(--violet); }
+.theme-settings-link span { color: var(--violet); }
+
+.calendar-layout,
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, .85fr);
+  gap: 20px;
+  align-items: start;
+}
+.calendar-card { min-height: 0; }
+.calendar-summary,
+.setting-status {
+  margin: 12px 0 0;
+  color: var(--ink-3);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 18px;
+}
+.calendar-weekday {
+  padding: 0 5px 4px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+}
+.calendar-day {
+  min-height: 76px;
+  display: grid;
+  align-content: space-between;
+  justify-items: start;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  text-align: left;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, color .16s ease;
+}
+.calendar-day:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--violet) 45%, var(--line));
+  background: var(--violet-soft);
+}
+.calendar-day.is-outside { color: var(--ink-3); background: color-mix(in srgb, var(--canvas-soft) 72%, var(--surface)); opacity: .72; }
+.calendar-day.is-weekend .calendar-number { color: var(--coral); }
+.calendar-day.is-today { border-color: color-mix(in srgb, var(--mint) 60%, var(--line)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mint) 36%, transparent); }
+.calendar-day.is-selected { color: var(--on-violet); border-color: var(--violet); background: var(--violet); opacity: 1; }
+.calendar-day.is-selected .calendar-number,
+.calendar-day.is-selected .calendar-day-tag { color: var(--on-violet); }
+.calendar-number { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -.7px; }
+.calendar-day-tag {
+  justify-self: end;
+  padding: 2px 6px;
+  border-radius: 100px;
+  color: #2f8f72;
+  background: color-mix(in srgb, var(--mint) 16%, transparent);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.calendar-facts {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+.calendar-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.calendar-facts dt {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.calendar-facts dd {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  text-align: right;
+}
+
+.settings-layout { grid-template-columns: minmax(280px, .8fr) minmax(0, 1.2fr); }
+.settings-theme-card { grid-row: span 2; }
+.settings-ideas { align-self: stretch; }
+.settings-text-size { margin-top: 18px; }
+.settings-text-size .seg-button { display: inline-flex; align-items: center; gap: 6px; }
+.text-size-token { color: var(--violet-dark); font-family: var(--font-mono); font-size: .9em; }
+.seg-button.active .text-size-token { color: var(--on-violet); }
+.settings-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+.setting-choice {
+  min-height: 112px;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface-raised);
+  color: var(--ink-2);
+  text-align: left;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+.setting-choice:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--violet) 42%, var(--line));
+  background: var(--violet-soft);
+}
+.setting-choice.active {
+  border-color: var(--violet);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--violet-soft) 78%, var(--surface)), var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--violet) 30%, transparent), var(--shadow-small);
+}
+.setting-choice-kicker {
+  color: var(--ink-3);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+}
+.setting-choice-main { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); }
+.setting-choice-main > span { font-size: 19px; line-height: 1; }
+.setting-choice-main strong { font-size: 16.5px; letter-spacing: -.25px; }
+.setting-choice small { color: var(--ink-3); font-size: 13px; line-height: 1.45; }
+.setting-choice[data-theme-kind="weather"] .setting-choice-kicker { color: var(--violet-dark); }
+.setting-choice[data-settings-theme="rain"] { background-image: linear-gradient(145deg, color-mix(in srgb, #dce8f5 65%, var(--surface)), var(--surface-raised)); }
+.setting-choice[data-settings-theme="cloud"] { background-image: linear-gradient(145deg, color-mix(in srgb, #e4e7ee 70%, var(--surface)), var(--surface-raised)); }
+.setting-choice[data-settings-theme="sunny"] { background-image: linear-gradient(145deg, color-mix(in srgb, #fff0cd 70%, var(--surface)), var(--surface-raised)); }
+.setting-choice[data-settings-theme="snow"] { background-image: linear-gradient(145deg, color-mix(in srgb, #e6f0f8 70%, var(--surface)), var(--surface-raised)); }
+.setting-choice[data-settings-theme="storm"] { background-image: linear-gradient(145deg, #202636, #171a27); color: #c7cee0; }
+.setting-choice[data-settings-theme="storm"] .setting-choice-main,
+.setting-choice[data-settings-theme="storm"] .setting-choice-kicker { color: #eef1fb; }
+.setting-choice[data-settings-theme="storm"] small { color: #aeb7cd; }
+
+/* Text-size preference: targeted reading surfaces scale while the clock digits
+   keep their carefully fitted geometry. The unitless --tempo-text-scale is
+   exposed for tests and future calculations; explicit length tokens keep the
+   actual font-size rules compatible with older calc() parsers. */
+html[data-text-size="compact"] {
+  --tempo-body-font-size: 15px;
+  --tempo-copy-font-size: 14px;
+  --tempo-phrase-font-size: 13.5px;
+  --tempo-nav-font-size: 14px;
+  --tempo-control-font-size: 13px;
+  --tempo-small-font-size: 12.5px;
+  --tempo-calendar-number-size: 19px;
+  --tempo-h1-min: 27px;
+  --tempo-h1-max: 36px;
+  --tempo-h2-min: 29px;
+  --tempo-h2-max: 39px;
+  --tempo-h3-size: 20.5px;
+}
+html[data-text-size="default"] {
+  --tempo-body-font-size: 16px;
+  --tempo-copy-font-size: 15px;
+  --tempo-phrase-font-size: 14.5px;
+  --tempo-nav-font-size: 15px;
+  --tempo-control-font-size: 14px;
+  --tempo-small-font-size: 13.5px;
+  --tempo-calendar-number-size: 20px;
+  --tempo-h1-min: 28.5px;
+  --tempo-h1-max: 38px;
+  --tempo-h2-min: 31px;
+  --tempo-h2-max: 41.5px;
+  --tempo-h3-size: 22px;
+}
+html[data-text-size="large"] {
+  --tempo-body-font-size: 18px;
+  --tempo-copy-font-size: 17px;
+  --tempo-phrase-font-size: 16px;
+  --tempo-nav-font-size: 17px;
+  --tempo-control-font-size: 15.5px;
+  --tempo-small-font-size: 15px;
+  --tempo-calendar-number-size: 22.5px;
+  --tempo-h1-min: 32px;
+  --tempo-h1-max: 42.5px;
+  --tempo-h2-min: 34.5px;
+  --tempo-h2-max: 46.5px;
+  --tempo-h3-size: 24.5px;
+}
+html[data-text-size="extra"] {
+  --tempo-body-font-size: 20px;
+  --tempo-copy-font-size: 18.5px;
+  --tempo-phrase-font-size: 18px;
+  --tempo-nav-font-size: 18.5px;
+  --tempo-control-font-size: 17.5px;
+  --tempo-small-font-size: 16.5px;
+  --tempo-calendar-number-size: 25px;
+  --tempo-h1-min: 35.5px;
+  --tempo-h1-max: 47px;
+  --tempo-h2-min: 38.5px;
+  --tempo-h2-max: 51.5px;
+  --tempo-h3-size: 27.5px;
+}
+html[data-text-size] body { font-size: var(--tempo-body-font-size); }
+html[data-text-size] .section-intro,
+html[data-text-size] .note-copy,
+html[data-text-size] .calendar-summary,
+html[data-text-size] .setting-status { font-size: var(--tempo-copy-font-size); }
+html[data-text-size] .section-phrase { font-size: var(--tempo-phrase-font-size); }
+html[data-text-size] .nav-link,
+html[data-text-size] .city-chip { font-size: var(--tempo-nav-font-size); }
+html[data-text-size] .outline-button,
+html[data-text-size] .pill-button,
+html[data-text-size] .soft-button { font-size: var(--tempo-control-font-size); }
+html[data-text-size] .world-sun,
+html[data-text-size] .board-weather-note,
+html[data-text-size] .weather-details,
+html[data-text-size] .weather-condition,
+html[data-text-size] .location-warning,
+html[data-text-size] .location-foot,
+html[data-text-size] .remark-text { font-size: var(--tempo-small-font-size); }
+html[data-text-size] .calendar-number { font-size: var(--tempo-calendar-number-size); }
+html[data-text-size] h1 { font-size: clamp(var(--tempo-h1-min), 2.5vw, var(--tempo-h1-max)); }
+html[data-text-size] .page-intro h2 { font-size: clamp(var(--tempo-h2-min), 3vw, var(--tempo-h2-max)); }
+html[data-text-size] h3 { font-size: var(--tempo-h3-size); }
+
+@media (max-width: 900px) {
+  .calendar-layout,
+  .settings-layout { grid-template-columns: 1fr; }
+  .settings-theme-card { grid-row: auto; }
+}
+@media (max-width: 620px) {
+  .calendar-actions .outline-button { flex: 1 1 100%; }
+  .calendar-grid { gap: 4px; }
+  .calendar-day { min-height: 58px; padding: 7px; border-radius: 10px; }
+  .calendar-number { font-size: 17px; }
+  .calendar-day-tag { display: none; }
+  .settings-theme-grid { grid-template-columns: 1fr; }
 }
