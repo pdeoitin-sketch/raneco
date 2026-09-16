@@ -142,7 +142,11 @@ export function createScrollNav({ sections = [], onChange, fallback = DEFAULT_RO
         const rect = section.page.getBoundingClientRect();
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
         return { id: section.id, top: rect.top + scrollTop, bottom: rect.bottom + scrollTop };
-      });
+      })
+      // A dedicated route (Settings) is display:none while the dashboard is
+      // scrolling. Its zero rect must never win the positional fallback and
+      // pretend that the reader scrolled into a page that is not on screen.
+      .filter((entry) => entry.bottom > entry.top);
   }
 
   function isFullscreenActive() {

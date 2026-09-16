@@ -124,6 +124,21 @@ export function createTimer({ elements = {}, notify, player } = {}) {
     return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
   }
 
+  function formatClockTime(epochMs) {
+    try {
+      return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(epochMs));
+    } catch (_) {
+      const date = new Date(epochMs);
+      return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+  }
+
+  function writeInputs(milliseconds) {
+    const totalSeconds = Math.max(0, Math.min(999 * 60 + 59, Math.round(milliseconds / 1000)));
+    if (elements.minutes) elements.minutes.value = String(Math.floor(totalSeconds / 60));
+    if (elements.seconds) elements.seconds.value = String(totalSeconds % 60);
+  }
+
   function readInputs() {
     if (!elements.minutes || !elements.seconds) return state.original;
     const minutes = Math.max(0, Math.min(999, Number.parseInt(elements.minutes.value, 10) || 0));
@@ -149,6 +164,27 @@ export function createTimer({ elements = {}, notify, player } = {}) {
     if (elements.ring) {
       elements.ring.style.background = `conic-gradient(${foreground} 0deg ${degrees}deg, var(--canvas-soft) ${degrees}deg 360deg)`;
       elements.ring.classList.toggle("is-ringing", state.ringing);
+      elements.ring.classList.toggle("is-running", running);
+      elements.ring.dataset.timerState = state.ringing ? "ringing" : running ? "running" : remaining !== original ? "paused" : "ready";
+    }
+    if (elements.progressCopy) {
+      const complete = original > 0 ? Math.round((1 - percentage) * 100) : 0;
+      elements.progressCopy.textContent = state.ringing
+        ? "Finished · stop the sound when you are ready."
+        : running
+          ? `${complete}% complete · stay with it.`
+          : remaining > 0 && remaining !== original
+            ? `${complete}% complete · paused for you.`
+            : "Pick a rhythm or set your own.";
+    }
+    if (elements.endTime) {
+      elements.endTime.textContent = state.ringing
+        ? "Finished now"
+        : running
+          ? `Ends at ${formatClockTime(state.endAt)}`
+          : remaining > 0 && remaining !== original
+            ? `${formatMilliseconds(remaining)} waiting`
+            : `Would end at ${formatClockTime(Date.now() + remaining)}`;
     }
     if (elements.start) {
       elements.start.innerHTML = running
@@ -282,6 +318,28 @@ export function createTimer({ elements = {}, notify, player } = {}) {
       }
     }
     render();
+  }
+
+  function adjust(seconds) {
+    if (state.ringing) dismiss({ silent: true });
+    const delta = Number(seconds) * 1000;
+    if (!Number.isFinite(delta) || delta === 0) return state.remaining;
+    const maximum = (999 * 60 + 59) * 1000;
+
+    if (state.running) {
+      state.endAt = Math.max(Date.now(), Math.min(Date.now() + maximum, state.endAt + delta));
+      state.remaining = Math.max(0, state.endAt - Date.now());
+      state.original = Math.max(state.remaining, Math.min(maximum, state.original + delta));
+      if (state.remaining <= 0) finish();
+      else render();
+    } else {
+      state.remaining = Math.max(0, Math.min(maximum, state.remaining + delta));
+      state.original = state.remaining;
+      writeInputs(state.remaining);
+      render();
+    }
+    if (notify) notify(`${delta > 0 ? "Added" : "Removed"} ${Math.abs(Number(seconds)) / 60} min.`, delta > 0 ? "+" : "−");
+    return state.remaining;
   }
 
   function toggle() {
@@ -449,6 +507,11 @@ export function createTimer({ elements = {}, notify, player } = {}) {
         });
       }
     }
+    if (elements.adjustButtons) {
+      for (const button of elements.adjustButtons) {
+        button.addEventListener("click", () => adjust(Number(button.dataset.timerAdjust)));
+      }
+    }
     if (elements.start) elements.start.addEventListener("click", toggle);
     if (elements.reset) elements.reset.addEventListener("click", reset);
     if (elements.dismiss) elements.dismiss.addEventListener("click", () => dismiss());
@@ -529,6 +592,7 @@ export function createTimer({ elements = {}, notify, player } = {}) {
     render,
     toggle,
     reset,
+    adjust,
     dismiss,
     setSound,
     setVolume,

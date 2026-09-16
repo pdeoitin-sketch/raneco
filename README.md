@@ -1,24 +1,23 @@
 # raneco
 
-**Tempo** — a single-scroll browser dashboard for your local time, **alarms
-that ring at a wall-clock time**, a calendar, settings, world clocks, live
-weather and forecast, an old-style clock, a timer with real alarms, a
-stopwatch, and time calculations.
+**Tempo** — a browser dashboard for your local time, **alarms that ring at a
+wall-clock time**, a universal calendar with named secondary dates, world
+clocks, live weather and forecast, an old-style clock, an interactive timer,
+a stopwatch, time calculations, and a dedicated settings view.
 Built with [Vite](https://vite.dev/), deployed as a static site: there is no
 backend and no API key to manage.
 
 Live site: https://pdeoitin-sketch.github.io/raneco/
 
-## One page, thirteen sections
+## A fluent dashboard, with settings out of the scroll
 
-Tempo used to be six routed pages behind a sidebar, then a single scroll with
-the weather sitting above the clocks. **The order now follows the reader: time
-first, sky after.** The things you *do* with time — alarms, timer, stopwatch,
-the clocks, standards, calendar and arithmetic — come before the weather and
-the forecast; Settings gives display preferences a real home before About
-closes the page. The sidebar still *reports where you are*
-instead of deciding what you may see: as you scroll, the current section lights
-up and the URL quietly follows.
+The main experience is a time-first scroll: alarms, timer, stopwatch, clocks,
+standards, calendar and arithmetic come before weather, forecast and About.
+**Settings is deliberately different.** It remains a utility on the side and
+opens a focused view only when clicked, so preferences never interrupt normal
+scrolling. Return to the dashboard and every other tool is still safe and
+ready. The sidebar reports where you are as the current section lights up and
+the URL quietly follows.
 
 | Section | Anchor | What it does |
 | --- | --- | --- |
@@ -28,12 +27,12 @@ up and the URL quietly follows.
 | **Stopwatch** | `#/stopwatch` | Centisecond stopwatch with laps, goals and splits |
 | **World clocks** | `#/clocks` | Up to 12 places — **hour large and bold, that city's own temperature beside it**, the shift from home and the sun line small underneath |
 | **Time standards** | `#/standards` | **UTC, GMT, IST, GST, JST, EST…** — the clocks that are named rather than placed, short form and full form, by region |
-| **Calendar** | `#/calendar` | Home-zone month view that **speaks nine more calendars** (Bikram Sambat, Chinese, Korean Dangi, Hebrew, Hijri, Persian, Indian, Thai Buddhist, Japanese), can put the chosen calendar first in every cell, marks world holidays plus Nepali festival dates in color, and keeps **your own notes** pinned to any date |
+| **Calendar** | `#/calendar` | Home-zone month view with **Gregorian as the universal main calendar** (January stays January) and one compact, named secondary date — BS, AH, AP, Śaka, BE and more — plus holidays and **your own notes** |
 | **Old clock** | `#/clock` | Full-face clock with **eight faces**, a **live sky behind the dial**, sweep/tick hand and an hourly chime |
 | **Time calculator** | `#/calculator` | Difference between two moments, unit conversion, saved results |
 | **Weather** | `#/weather` | Live conditions for a point, plus a panel saying *where it thinks you are and how sure it is* |
 | **Forecast** | `#/forecast` | Next 24 hours hour-by-hour, next 7 days with highs, lows and rain chance |
-| **Settings** | `#/settings` | Text size and themes, plus the grown-up set: calendar week start and primary calendar, Nepali festival sets, weather units, alarm volume/duration, notification behaviour, a GPS privacy switch, a full-data wipe, and **export/import of everything Tempo remembers** |
+| **Settings** | `#/settings` | A dedicated view opened from the sidebar: text size, themes, week start and secondary calendar, holidays, weather units, alarm defaults, notification behaviour, GPS privacy, data wipe and **export/import** |
 | **About** | `#/about` | What Tempo is, where the numbers come from, honest limits, and tagged remarks kept in your browser |
 
 A **phrase sits under every heading** — time for the clock sections, sky for
@@ -52,7 +51,7 @@ into the back button.
 Everything persists in `localStorage`: home place, board, **wall-clock
 alarms**, timer settings, **alarm sound, volume and ring duration**, stopwatch
 laps, saved calculations, calendar selection, **calendar notes**, the
-**preferences** (week start, primary calendar, holiday sets, GPS switch),
+**preferences** (week start, secondary calendar, holiday sets, GPS switch),
 old-clock face, theme, text size, unit system and remarks. Settings →
 Export/Import pours that whole `tempo-*` namespace into one JSON file and
 restores it back.
@@ -76,7 +75,7 @@ restores it back.
 | **Calendar systems** | `src/calendar-systems.js` | Bikram Sambat from an embedded month-length table (BS 2000–2090), the Chinese, Korean (Dangi), Hebrew, Hijri, Persian, Indian, Thai Buddhist and Japanese calendars from the browser's own ICU — feature-detected, honestly omitted when unsupported |
 | **Calendar events** | `src/calendar-events.js` | Fixed world days, Easter by the Western computus, 60+ national days (Nepal's counted in BS, Israel's in the Hebrew calendar), lunar new years, tabular-Hijri feasts — all switchable by set |
 | **Calendar notes** | `src/calendar-notes.js` | Up to 20 color-coded notes per date, trimmed, capped and pruned when emptied |
-| **Preferences** | `src/preferences.js` | One `tempo-preferences` blob for week start / primary calendar / holiday sets / GPS, plus the shared `tempo-weather-units`, `tempo-alarm-volume/-duration/-notify` keys the tools already read |
+| **Preferences** | `src/preferences.js` | One `tempo-preferences` blob for week start / secondary calendar / holiday sets / GPS, plus the shared `tempo-weather-units`, `tempo-alarm-volume/-duration/-notify` keys the tools already read |
 | **Data backup** | `src/data-backup.js` | Export/import of the whole `tempo-*` namespace as one validated JSON document |
 | **Settings** | `src/settings.js` + `src/theme.js` | Text-size preferences plus Auto/Light/Dark and fixed weather-mood theme choices |
 | **Board temperatures** | `src/board-weather.js` | Every world clock's temperature in **one** batched Open-Meteo request, each card in its own country's unit |
@@ -318,9 +317,9 @@ time) and shows it everywhere it matters:
 * a plain-language note in the sidebar ("the sun lags the clock by 37 minutes"),
 * a warning when a place's legal time is more than two hours from its sun.
 
-### Settings: text size and theme moods
+### Settings: a focused view, not a scroll interruption
 
-Settings now has the first two preferences that belong there:
+Settings opens from the sidebar as its own focused view. It includes:
 
 * **Text size** — Compact, Default, Large and Extra large. The base ramp stays
   readable (no tiny 7.5px captions coming back), while the major reading
@@ -340,9 +339,9 @@ mentioning (≥ 26 km/h sustained, or a ≥ 48 km/h gust) and the card then says
 registered custom properties (`@property`) and `prefers-reduced-motion` is
 respected.
 
-The Settings section also names sensible next additions: calendar defaults,
-weather units, alarm defaults, notification behaviour, sound volume, privacy /
-location controls, and import/export for saved browser data.
+The same view also owns week start and secondary-calendar preferences, holiday
+sets, weather units, alarm volume and duration, notification behaviour, GPS
+privacy controls, full local-data clearing, and JSON export/import.
 
 ### Eight faces, one live sky
 
@@ -425,9 +424,9 @@ still in place; the alarm-sounds suite renders all 16 sounds into a recording
 fake `AudioContext`, and the geocode suite still checks that a Bhaktapur fix is
 named *Bhaktapur*, not Kathmandu.
 
-The smoke test additionally checks that all thirteen sections share one page
-in the time-first order, that a phrase sits under every heading, that Settings
-can apply text size and manual weather moods — and, grown up, that the units
+The smoke test additionally checks the time-first dashboard and its dedicated
+Settings route, that a phrase sits under every heading, and that Settings can
+apply text size and manual weather moods — including that the units
 choice refetches weather in Fahrenheit, the volume slider writes the shared
 gain key, the geo master switch disables every GPS button, and a browser
 without the Notification API is told so honestly — that Calendar renders a

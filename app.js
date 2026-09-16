@@ -1,13 +1,12 @@
 /**
  * Tempo — the dashboard shell.
  *
- * **One page, thirteen sections, time first.** Tempo used to be six routed pages
- * behind a sidebar, then a single scroll with weather sitting above the
- * clocks. Now the order follows the reader: Right now, Alarms, Timer,
- * Stopwatch, World clocks, Time standards, Calendar, Old clock and Time
- * calculator — the things you do with time — then Weather, Forecast, Settings
- * and About (see src/router.js).
- * Old links still work: they scroll, and renamed sections keep their old
+ * **A time-first dashboard with focused settings.** The main tools remain one
+ * fluent scroll: Right now, Alarms, Timer, Stopwatch, World clocks, Time
+ * standards, Calendar, Old clock and Time calculator, then Weather, Forecast
+ * and About. Settings remains on the side but opens as a dedicated view, so
+ * preferences never interrupt the dashboard scroll (see src/router.js).
+ * Old links still work: they navigate, and renamed sections keep their old
  * hashes as aliases (`#/focus` still finds the Stopwatch).
  *
  * Underneath, ten ideas do the work:
@@ -538,8 +537,9 @@ import {
      * build cannot compute are listed but disabled, honestly. */
     const systemOption = (system) => {
       const available = calendarSystemAvailable(system.id);
-      return `<option value="${escapeHTML(system.id)}"${available ? "" : " disabled"}>${escapeHTML(system.label)}${
-        system.place ? ` — ${escapeHTML(system.place)}` : ""
+      const short = system.id === "gregorian" ? "" : ` · ${system.shortLabel}`;
+      return `<option value="${escapeHTML(system.id)}"${available ? "" : " disabled"}>${escapeHTML(system.label)}${escapeHTML(short)}${
+        system.place && system.id !== "gregorian" ? ` — ${escapeHTML(system.place)}` : ""
       }${available ? "" : " (not in this browser)"}</option>`;
     };
     const systemOptionsHtml = CALENDAR_SYSTEMS.map(systemOption).join("");
@@ -657,7 +657,7 @@ import {
       const system = calendarSystem(prefs.calendarSystem);
       const marked = HOLIDAY_SETS.filter((set) => prefs.holidays[set.id] !== false).map((set) => set.label.toLowerCase());
       elements.settingsCalendarStatus.textContent =
-        `Weeks begin ${start.label}. Calendar shown first: ${system.label}. Gregorian stays underneath. Marking: ${marked.length ? marked.join(", ") : "nothing — a clean grid"}.`;
+        `Weeks begin ${start.label}. Universal calendar: Gregorian. Secondary: ${system.id === "gregorian" ? "none" : `${system.shortLabel} · ${system.label}`}. Marking: ${marked.length ? marked.join(", ") : "nothing — a clean grid"}.`;
     }
 
     const units = readWeatherUnits();
@@ -763,8 +763,8 @@ import {
       const system = calendarSystem(prefs.calendarSystem);
       notify(
         system.id === "gregorian"
-          ? "Gregorian is primary — the plain calendar is back."
-          : `${system.label} is now the primary date; Gregorian stays underneath.`
+          ? "Gregorian stays universal — secondary dates are now hidden."
+          : `${system.shortLabel} · ${system.label} now appears as the small secondary date; Gregorian stays main.`
       );
     }
   }
@@ -1485,10 +1485,13 @@ import {
       seconds: $("#timer-seconds"),
       display: $("#timer-display"),
       ring: $("#timer-ring"),
+      progressCopy: $("#timer-progress-copy"),
+      endTime: $("#timer-end-time"),
       status: $("#timer-status"),
       start: $("#timer-start"),
       reset: $("#timer-reset"),
-      presets: $$("#page-timer .preset-button"),
+      presets: $$("#page-timer .preset-button[data-seconds]"),
+      adjustButtons: $$("#page-timer [data-timer-adjust]"),
       // The alarm: its picker, its settings, and the bar that appears when
       // the countdown is over and the sound is still going.
       ringingBar: $("#timer-ringing"),
@@ -1582,12 +1585,15 @@ import {
   const alarms = createAlarms({
     elements: {
       editorTitle: $("#alarms-editor-title"),
+      preview: $("#alarms-preview"),
       time: $("#alarms-time"),
       date: $("#alarms-date"),
+      schedulePresets: $("#alarms-schedule-presets"),
       repeatRow: $("#alarms-repeat"),
       label: $("#alarms-label"),
       notes: $("#alarms-notes"),
       sound: $("#alarms-sound"),
+      testSound: $("#alarms-test-sound"),
       save: $("#alarms-save"),
       cancel: $("#alarms-cancel"),
       list: $("#alarms-list"),
@@ -1690,6 +1696,7 @@ import {
    * burning frames on a clock nobody is looking at is rude), and the forecast
    * loads the first time you reach it rather than on boot.
    */
+  let lastDashboardSection = "now";
   const nav = createScrollNav({
     sections: [
       { id: "now", page: $("#page-now"), title: "Right now" },
@@ -1710,6 +1717,15 @@ import {
     // bookmarked `#/focus` (a real URL in the routed era) still lands there.
     aliases: { focus: "stopwatch" },
     onChange: (section) => {
+      const settingsBack = $("#settings-back");
+      if (section.id === "settings") {
+        if (settingsBack) {
+          settingsBack.dataset.route = lastDashboardSection;
+          settingsBack.href = `#/${lastDashboardSection}`;
+        }
+      } else {
+        lastDashboardSection = section.id;
+      }
       if (elements.pageTitle) elements.pageTitle.textContent = PAGE_TITLES[section.id] || PAGE_TITLES.now;
       if (elements.todayLabel && SECTION_EYEBROWS[section.id]) {
         elements.todayLabel.dataset.section = section.id;

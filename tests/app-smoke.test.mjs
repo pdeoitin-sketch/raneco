@@ -306,15 +306,16 @@ describe("tempo in a browser-like DOM", () => {
     assert.equal(app.localStorage.getItem("tempo-home-zone"), "zone:Asia/Kathmandu");
   });
 
-  test("every section is on one scroll, and the nav follows the reader", async () => {
+  test("the dashboard stays time-first and Settings opens as a focused route", async () => {
     app = await boot();
 
-    // The whole dashboard is present at once — thirteen sections now, time first
-    // and weather/settings after the tools, which is the order this round chose.
+    // All tools stay mounted for safety and persistence. CSS removes Settings
+    // from the normal scroll and reveals it alone when body.currentPage says
+    // settings, while this DOM smoke test verifies the complete route order.
     assert.deepEqual(
       app.visiblePages(),
       ["now", "alarms", "timer", "stopwatch", "clocks", "standards", "calendar", "clock", "calculator", "weather", "forecast", "settings", "about"],
-      "all thirteen sections share one page, in the time-first order"
+      "all routes stay mounted in the time-first document order"
     );
     assert.equal(app.activeSection(), "now", "and the reader starts at the top");
     assert.match(app.$("#page-title").textContent, /moment/);
@@ -358,6 +359,15 @@ describe("tempo in a browser-like DOM", () => {
       assert.equal(app.activeSection(), route, `#/${route} selects its section`);
       assert.match(app.$("#page-title").textContent, heading);
     }
+
+    // Settings remembers where the dashboard was, so its back action restores
+    // that tool instead of dumping the reader at the top.
+    await app.go("timer");
+    await app.go("settings");
+    assert.equal(app.$("#settings-back").dataset.route, "timer");
+    app.click("#settings-back");
+    await wait(40);
+    assert.equal(app.activeSection(), "timer");
 
     // A hash left over from an older build (or a typo) changes nothing.
     const before = app.activeSection();
@@ -768,8 +778,11 @@ describe("tempo in a browser-like DOM", () => {
     app.click("#timer-start");
     await wait(140);
     assert.equal(app.$("#timer-status").textContent, "RUNNING");
+    assert.match(app.$("#timer-end-time").textContent, /Ends at/);
     await wait(1100);
     assert.notEqual(app.$("#timer-display").textContent, "01:00", "it counts down");
+    app.click('[data-timer-adjust="60"]');
+    assert.match(app.$("#timer-display").textContent, /^01:/, "a minute can be added without pausing");
     // It keeps running while you are on another page.
     await app.go("clocks");
     await wait(300);
@@ -1279,12 +1292,12 @@ describe("tempo in a browser-like DOM", () => {
     systemSelect.dispatchEvent(new app.window.Event("change", { bubbles: true }));
     await wait(40);
 
-    assert.ok(app.$("#calendar-grid .calendar-day .calendar-alt"), "cells carry the Gregorian date underneath");
+    assert.ok(app.$("#calendar-grid .calendar-day .calendar-alt"), "cells carry the named secondary date");
     assert.match(app.$("#calendar-summary").textContent, /Bikram Sambat/);
-    assert.match(app.$("#calendar-month").textContent, /Bhadra|Ashwin/);
+    assert.equal(app.$("#calendar-month").textContent, "September 2026", "the universal Gregorian month stays main");
     const primaryCell = app.$('#calendar-grid .calendar-day[data-date="2026-09-19"]');
-    assert.equal(primaryCell.querySelector(".calendar-number").textContent.trim(), "3", "Bikram day is primary");
-    assert.equal(primaryCell.querySelector(".calendar-gregorian-date").textContent.trim(), "19", "Gregorian day moves underneath");
+    assert.equal(primaryCell.querySelector(".calendar-number").textContent.trim(), "19", "Gregorian day stays primary");
+    assert.match(primaryCell.querySelector(".calendar-secondary-date").textContent, /BS\s+3/, "the small calendar is named and translated");
     const system = JSON.parse(app.localStorage.getItem("tempo-preferences"));
     assert.equal(system.calendarSystem, "bikram", "the choice is a preference, so it survives reloads");
     assert.equal(app.$("#settings-calendar-system").value, "bikram", "the Settings card's picker agrees");
@@ -1296,7 +1309,7 @@ describe("tempo in a browser-like DOM", () => {
     await wait(30);
     assert.match(app.$("#calendar-holidays").textContent, /Constitution Day/);
     assert.match(app.$("#calendar-holidays").textContent, /Nepal/);
-    assert.match(app.$("#calendar-secondary").textContent, /Bikram Sambat: Ashwin 3, 2083 BS/);
+    assert.match(app.$("#calendar-secondary").textContent, /BS · Bikram Sambat: Ashwin 3, 2083 BS/);
 
     // Peace Day keeps its world-day dot on the 21st.
     assert.ok(app.$('#calendar-grid .calendar-day[data-date="2026-09-21"] .calendar-dot[data-cat="world"]'));
