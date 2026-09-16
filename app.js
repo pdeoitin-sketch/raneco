@@ -655,7 +655,7 @@ import {
       const system = calendarSystem(prefs.calendarSystem);
       const marked = HOLIDAY_SETS.filter((set) => prefs.holidays[set.id] !== false).map((set) => set.label.toLowerCase());
       elements.settingsCalendarStatus.textContent =
-        `Weeks begin ${start.label}. Second calendar: ${system.label}. Marking: ${marked.length ? marked.join(", ") : "nothing — a clean grid"}.`;
+        `Weeks begin ${start.label}. Calendar shown first: ${system.label}. Gregorian stays underneath. Marking: ${marked.length ? marked.join(", ") : "nothing — a clean grid"}.`;
     }
 
     const units = readWeatherUnits();
@@ -761,8 +761,8 @@ import {
       const system = calendarSystem(prefs.calendarSystem);
       notify(
         system.id === "gregorian"
-          ? "Second calendar off — a plain Gregorian grid."
-          : `${system.label} dates now ride along in the calendar.`
+          ? "Gregorian is primary — the plain calendar is back."
+          : `${system.label} is now the primary date; Gregorian stays underneath.`
       );
     }
   }

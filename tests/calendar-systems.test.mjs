@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   CALENDAR_SYSTEMS,
   bikramFromGregorian,
+  bikramMonthLabel,
   bikramMonthName,
   calendarSystem,
   calendarSystemAvailable,
@@ -49,6 +50,7 @@ test("the inverse conversion round-trips and the table has honest edges", () => 
   assert.equal(gregorianFromBikram({ year: 2083, month: 4, day: 32 }), null, "Shrawan never has 32 days");
   assert.equal(bikramMonthName(5), "Bhadra");
   assert.equal(bikramMonthName(12, { short: true }), "Cha");
+  assert.match(bikramMonthLabel(6), /Ashwin \/ Ashoj \/ Asoj \(असोज\)/);
 });
 
 test("a BS year is always 12 months long and totals around 365 days", () => {

@@ -57,6 +57,30 @@ test("Nepal's national days are counted in Bikram Sambat, and Israel's in Hebrew
   assert.ok(has({ year: 2026, month: 4, day: 22 }, "Independence Day (Yom Ha'atzmaut)"), "Iyar 5");
 });
 
+test("the Nepali festival table includes the complete headline seasons", () => {
+  const festivalNames = [
+    [2026, 1, 15, "Maghe Sankranti"],
+    [2026, 2, 15, "Maha Shivaratri"],
+    [2026, 3, 3, "Holi"],
+    [2026, 4, 17, "Mata Tirtha"],
+    [2026, 5, 1, "Buddha Jayanti"],
+    [2026, 8, 28, "Janai Purnima"],
+    [2026, 9, 14, "Teej"],
+    [2026, 10, 21, "Dashain"],
+    [2026, 11, 8, "Diwali"],
+    [2026, 11, 15, "Chhath"],
+    [2026, 12, 24, "Yomari"],
+  ];
+  for (const [year, month, day, name] of festivalNames) {
+    assert.ok(names({ year, month, day }).some((eventName) => eventName.includes(name)), `${name} is present`);
+  }
+
+  const dashain = eventsForDate({ year: 2026, month: 10, day: 21 }).find((event) => event.name.includes("Dashain"));
+  assert.equal(dashain.nepali, true);
+  assert.match(dashain.bs.monthName, /Kartik/);
+  assert.equal(dashain.bs.year, 2083);
+});
+
 test("religious feasts from the tabular Hijri and Hebrew calendars appear, honestly labelled", () => {
   assert.ok(has({ year: 2026, month: 2, day: 18 }, "Ramadan begins"));
   const ramadan = eventsForDate({ year: 2026, month: 2, day: 18 }).find((event) => event.name === "Ramadan begins");

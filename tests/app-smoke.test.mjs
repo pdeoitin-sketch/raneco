@@ -1279,8 +1279,12 @@ describe("tempo in a browser-like DOM", () => {
     systemSelect.dispatchEvent(new app.window.Event("change", { bubbles: true }));
     await wait(40);
 
-    assert.ok(app.$("#calendar-grid .calendar-day .calendar-alt"), "cells carry the second date");
+    assert.ok(app.$("#calendar-grid .calendar-day .calendar-alt"), "cells carry the Gregorian date underneath");
     assert.match(app.$("#calendar-summary").textContent, /Bikram Sambat/);
+    assert.match(app.$("#calendar-month").textContent, /Bhadra|Ashwin/);
+    const primaryCell = app.$('#calendar-grid .calendar-day[data-date="2026-09-19"]');
+    assert.equal(primaryCell.querySelector(".calendar-number").textContent.trim(), "3", "Bikram day is primary");
+    assert.equal(primaryCell.querySelector(".calendar-gregorian-date").textContent.trim(), "19", "Gregorian day moves underneath");
     const system = JSON.parse(app.localStorage.getItem("tempo-preferences"));
     assert.equal(system.calendarSystem, "bikram", "the choice is a preference, so it survives reloads");
     assert.equal(app.$("#settings-calendar-system").value, "bikram", "the Settings card's picker agrees");

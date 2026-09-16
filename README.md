@@ -28,12 +28,12 @@ up and the URL quietly follows.
 | **Stopwatch** | `#/stopwatch` | Centisecond stopwatch with laps, goals and splits |
 | **World clocks** | `#/clocks` | Up to 12 places — **hour large and bold, that city's own temperature beside it**, the shift from home and the sun line small underneath |
 | **Time standards** | `#/standards` | **UTC, GMT, IST, GST, JST, EST…** — the clocks that are named rather than placed, short form and full form, by region |
-| **Calendar** | `#/calendar` | Home-zone month view that **speaks nine more calendars** (Bikram Sambat, Chinese, Korean Dangi, Hebrew, Hijri, Persian, Indian, Thai Buddhist, Japanese), marks world holidays and 60+ national days in color, and keeps **your own notes** pinned to any date |
+| **Calendar** | `#/calendar` | Home-zone month view that **speaks nine more calendars** (Bikram Sambat, Chinese, Korean Dangi, Hebrew, Hijri, Persian, Indian, Thai Buddhist, Japanese), can put the chosen calendar first in every cell, marks world holidays plus Nepali festival dates in color, and keeps **your own notes** pinned to any date |
 | **Old clock** | `#/clock` | Full-face clock with **eight faces**, a **live sky behind the dial**, sweep/tick hand and an hourly chime |
 | **Time calculator** | `#/calculator` | Difference between two moments, unit conversion, saved results |
 | **Weather** | `#/weather` | Live conditions for a point, plus a panel saying *where it thinks you are and how sure it is* |
 | **Forecast** | `#/forecast` | Next 24 hours hour-by-hour, next 7 days with highs, lows and rain chance |
-| **Settings** | `#/settings` | Text size and themes, plus the grown-up set: calendar week start and second calendar, holiday sets, weather units, alarm volume/duration, notification behaviour, a GPS privacy switch, a full-data wipe, and **export/import of everything Tempo remembers** |
+| **Settings** | `#/settings` | Text size and themes, plus the grown-up set: calendar week start and primary calendar, Nepali festival sets, weather units, alarm volume/duration, notification behaviour, a GPS privacy switch, a full-data wipe, and **export/import of everything Tempo remembers** |
 | **About** | `#/about` | What Tempo is, where the numbers come from, honest limits, and tagged remarks kept in your browser |
 
 A **phrase sits under every heading** — time for the clock sections, sky for
@@ -52,7 +52,7 @@ into the back button.
 Everything persists in `localStorage`: home place, board, **wall-clock
 alarms**, timer settings, **alarm sound, volume and ring duration**, stopwatch
 laps, saved calculations, calendar selection, **calendar notes**, the
-**preferences** (week start, second calendar, holiday sets, GPS switch),
+**preferences** (week start, primary calendar, holiday sets, GPS switch),
 old-clock face, theme, text size, unit system and remarks. Settings →
 Export/Import pours that whole `tempo-*` namespace into one JSON file and
 restores it back.
@@ -76,7 +76,7 @@ restores it back.
 | **Calendar systems** | `src/calendar-systems.js` | Bikram Sambat from an embedded month-length table (BS 2000–2090), the Chinese, Korean (Dangi), Hebrew, Hijri, Persian, Indian, Thai Buddhist and Japanese calendars from the browser's own ICU — feature-detected, honestly omitted when unsupported |
 | **Calendar events** | `src/calendar-events.js` | Fixed world days, Easter by the Western computus, 60+ national days (Nepal's counted in BS, Israel's in the Hebrew calendar), lunar new years, tabular-Hijri feasts — all switchable by set |
 | **Calendar notes** | `src/calendar-notes.js` | Up to 20 color-coded notes per date, trimmed, capped and pruned when emptied |
-| **Preferences** | `src/preferences.js` | One `tempo-preferences` blob for week start / second calendar / holiday sets / GPS, plus the shared `tempo-weather-units`, `tempo-alarm-volume/-duration/-notify` keys the tools already read |
+| **Preferences** | `src/preferences.js` | One `tempo-preferences` blob for week start / primary calendar / holiday sets / GPS, plus the shared `tempo-weather-units`, `tempo-alarm-volume/-duration/-notify` keys the tools already read |
 | **Data backup** | `src/data-backup.js` | Export/import of the whole `tempo-*` namespace as one validated JSON document |
 | **Settings** | `src/settings.js` + `src/theme.js` | Text-size preferences plus Auto/Light/Dark and fixed weather-mood theme choices |
 | **Board temperatures** | `src/board-weather.js` | Every world clock's temperature in **one** batched Open-Meteo request, each card in its own country's unit |

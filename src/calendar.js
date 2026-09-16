@@ -6,9 +6,10 @@
  * you were looking at. Around that spine:
  *
  *   • The week can start Monday, Sunday or Saturday (Settings).
- *   • Each cell can carry a second date — Bikram Sambat, Chinese, Korean
- *     (Dangi), Hebrew, Hijri, Persian, Indian, Thai Buddhist or Japanese —
- *     from `calendar-systems.js`.
+ *   • Each cell can carry a date from Bikram Sambat, Chinese, Korean (Dangi),
+ *     Hebrew, Hijri, Persian, Indian, Thai Buddhist or Japanese. When one is
+ *     selected it becomes the large primary date and Gregorian moves below
+ *     it, so switching calendars changes what the reader sees first.
  *   • Holidays and observances from `calendar-events.js` mark cells with
  *     colored dots, grouped in a legend, and list themselves on the
  *     selected day.
@@ -192,6 +193,18 @@ function monthTitle(view) {
   return monthTitleFormatter.format(new Date(Date.UTC(view.year, view.month - 1, 1)));
 }
 
+function alternateMonthTitle(view, cells, systemId) {
+  const labels = [];
+  for (const cell of cells.filter((entry) => entry.inMonth)) {
+    const alt = describeInSystem(systemId, cell);
+    if (!alt) continue;
+    const label = systemId === "bikram" ? `${alt.monthName} ${alt.year} BS` : `${alt.monthName} ${alt.year}`;
+    if (!labels.includes(label)) labels.push(label);
+  }
+  const gregorian = monthTitle(view);
+  return labels.length ? `${labels.join(" → ")} · ${gregorian}` : gregorian;
+}
+
 function todayInZone(zone, at = new Date()) {
   const parts = partsFor(at, zone || "UTC");
   return { year: parts.year, month: parts.month, day: parts.day };
@@ -245,17 +258,32 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
     const place = getPlace() || {};
     const city = place.city || place.label || "your home place";
 
-    if (elements.month) elements.month.textContent = monthTitle(state.view);
+    if (elements.month) {
+      elements.month.textContent = second.active ? alternateMonthTitle(state.view, cells, second.id) : monthTitle(state.view);
+    }
+    if (elements.grid) {
+      const card = elements.grid.closest(".calendar-card");
+      if (card) {
+        card.dataset.calendarPrimary = second.active ? second.id : "gregorian";
+        card.dataset.calendarLabel = second.active ? second.system.label : "Gregorian";
+      }
+    }
     if (elements.summary) {
       const todayDetail = describeDate(today, today);
+      const todayAlt = second.active ? describeInSystem(second.id, today) : null;
       const weekNote = start === 1 ? "Weeks start on Monday" : `Weeks start on ${start === 0 ? "Sunday" : "Saturday"}`;
-      const secondNote = second.active ? ` Second dates: ${second.system.label}.` : "";
-      elements.summary.textContent = `Today in ${city}: ${todayDetail.title}. ${weekNote}.${secondNote}`;
+      const secondNote = second.active
+        ? ` Primary dates: ${second.system.label}${todayAlt ? ` (${todayAlt.monthLabel || todayAlt.monthName} ${todayAlt.day}, ${todayAlt.year})` : ""}. Gregorian dates stay underneath.`
+        : " Choose a calendar to put its dates first.";
+      elements.summary.textContent = `Today in ${city}: ${todayDetail.title}. ${weekNote}. ${secondNote}`;
     }
-    if (elements.todayPill) elements.todayPill.textContent = `TODAY · ${todayIso}`;
+    if (elements.todayPill) {
+      const todayAlt = second.active ? describeInSystem(second.id, today) : null;
+      elements.todayPill.textContent = todayAlt ? `TODAY · ${todayAlt.long}` : `TODAY · ${todayIso}`;
+    }
     if (elements.systemBadge) {
       elements.systemBadge.hidden = !second.active;
-      elements.systemBadge.textContent = second.active ? `+ ${second.system.label}` : "";
+      elements.systemBadge.textContent = second.active ? `PRIMARY · ${second.system.label}` : "";
     }
     if (elements.grid) {
       const labels = weekdayLabels(start);
@@ -288,9 +316,17 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
           if (events.length > 3) dots.push(`<span class="calendar-dot-extra">+${events.length - 3}</span>`);
           if (notes.length) dots.push('<span class="calendar-dot calendar-dot-note"></span>');
 
+          const primaryNumber = second.active && alt ? alt.cell : String(cell.day);
+          const dateUnderneath = second.active && alt
+            ? `<span class="calendar-alt calendar-gregorian-date" title="Gregorian date">${cell.day}</span>`
+            : alt
+              ? `<span class="calendar-alt" title="${escapeHTML(alt.monthLabel || alt.long)}">${escapeHTML(alt.cell)}</span>`
+              : "";
+          if (second.active && alt) classes.push("is-calendar-primary");
+
           return `<button type="button" class="${classes.join(" ")}" role="gridcell" data-date="${escapeHTML(cell.iso)}" aria-pressed="${cell.isSelected}" aria-label="${escapeHTML(aria.join(" — "))}${cell.isToday ? ", today" : ""}">
-            <span class="calendar-number">${cell.day}</span>
-            ${alt ? `<span class="calendar-alt">${escapeHTML(alt.cell)}</span>` : ""}
+            <span class="calendar-number" title="${escapeHTML(alt ? (alt.monthLabel || alt.long) : label)}">${escapeHTML(primaryNumber)}</span>
+            ${dateUnderneath}
             ${cell.isToday ? '<small class="calendar-day-tag">Today</small>' : ""}
             ${dots.length ? `<span class="calendar-dots">${dots.join("")}</span>` : ""}
           </button>`;
@@ -317,28 +353,33 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
       });
     parts.push(`<span class="calendar-legend-item"><span class="calendar-dot calendar-dot-note"></span>Your note</span>`);
     if (second.active) {
-      parts.push(`<span class="calendar-legend-item calendar-legend-alt">Small date: ${escapeHTML(second.system.label)}</span>`);
+      parts.push(`<span class="calendar-legend-item calendar-legend-alt">Primary date: ${escapeHTML(second.system.label)} · Gregorian underneath</span>`);
     }
     elements.legend.innerHTML = parts.join("");
   }
 
   function renderSelected(selected, today, prefs = preferences()) {
     const detail = describeDate(selected, today);
-    if (elements.selectedTitle) elements.selectedTitle.textContent = detail.title;
+    const second = systemInfo(prefs);
+    const alt = second.active ? describeInSystem(second.id, selected) : null;
+    if (elements.selectedTitle) elements.selectedTitle.textContent = alt ? alt.long : detail.title;
     if (elements.selectedMeta) {
-      elements.selectedMeta.textContent = detail.today ? "This is today in your home place." : `This date is ${detail.relative}.`;
+      elements.selectedMeta.textContent = alt
+        ? `Gregorian: ${detail.title}. ${detail.today ? "This is today in your home place." : `This date is ${detail.relative}.`}`
+        : detail.today
+          ? "This is today in your home place."
+          : `This date is ${detail.relative}.`;
     }
     if (elements.selectedIso) elements.selectedIso.textContent = detail.iso;
     if (elements.selectedWeek) elements.selectedWeek.textContent = `Week ${pad2(detail.isoWeek.week)}, ${detail.isoWeek.year}`;
     if (elements.selectedYearDay) elements.selectedYearDay.textContent = `Day ${detail.dayOfYear}`;
     if (elements.selectedRemaining) elements.selectedRemaining.textContent = `${detail.daysLeft} days left`;
 
-    const second = systemInfo(prefs);
     if (elements.secondary) {
-      const alt = second.active ? describeInSystem(second.id, selected) : null;
       elements.secondary.hidden = !alt;
       if (alt) {
-        elements.secondary.textContent = `${second.system.label}: ${alt.long}${alt.approximate ? " (tabular date — may differ locally by a day)" : ""}`;
+        const monthNames = alt.monthLabel && alt.system === "bikram" ? ` · ${alt.monthLabel}` : "";
+        elements.secondary.textContent = `${second.system.label}: ${alt.long}${monthNames}${alt.approximate ? " (tabular date — may differ locally by a day)" : ""}`;
       }
     }
 
@@ -356,7 +397,7 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
               (event) => `<li class="calendar-event" data-cat="${escapeHTML(event.category)}">
                 <span class="calendar-dot" data-cat="${escapeHTML(event.category)}"></span>
                 <span class="calendar-event-name">${escapeHTML(event.name)}</span>
-                <small>${escapeHTML(eventCategory(event.category).label)}${event.place ? ` · ${escapeHTML(event.place)}` : ""}${event.approximate ? " · approx." : ""}</small>
+                <small>${escapeHTML(eventCategory(event.category).label)}${event.place ? ` · ${escapeHTML(event.place)}` : ""}${event.bs ? ` · ${escapeHTML(event.bs.monthName)} ${event.bs.day}, ${event.bs.year} BS` : ""}${event.approximate ? " · approx." : ""}</small>
               </li>`
             )
             .join("")
@@ -501,7 +542,7 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
       ensureState(now);
       render(now);
     },
-    /** Re-read preferences (week start, second calendar, holiday sets) now. */
+    /** Re-read preferences (week start, primary calendar, holiday sets) now. */
     refreshPreferences(now = new Date()) {
       render(now);
     },
