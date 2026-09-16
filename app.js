@@ -40,6 +40,23 @@ import { createRemarks } from "./src/remarks.js";
 import { phraseFor } from "./src/phrases.js";
 import { createToaster, $, $$, escapeHTML, flatten, pad } from "./src/ui.js";
 import { TEXT_SIZE_OPTIONS, applyTextSize, readTextSize, textSizeOption, writeTextSize } from "./src/settings.js";
+import {
+  HOLIDAY_SETS,
+  WEEK_STARTS,
+  readAlarmDuration,
+  readAlarmVolumePercent,
+  readNotificationsEnabled,
+  readPreferences,
+  readWeatherUnits,
+  weekStartOption,
+  writeAlarmDuration,
+  writeAlarmVolumePercent,
+  writeNotificationsEnabled,
+  writePreferences,
+  writeWeatherUnits,
+} from "./src/preferences.js";
+import { CALENDAR_SYSTEMS, calendarSystem, calendarSystemAvailable } from "./src/calendar-systems.js";
+import { applyBackup, backupFileName, buildBackupJSON, parseBackup } from "./src/data-backup.js";
 import { APPEARANCES, THEME_CHOICES, applyAppearance, readMode, resolveAppearance, themeCaption, themeChoice, writeMode } from "./src/theme.js";
 import { REFRESH_MS, effectiveMood, fetchWeather, preferImperial } from "./src/weather.js";
 import { BOARD_REFRESH_MS, fetchBoardTemperatures, unitForRecord } from "./src/board-weather.js";
@@ -180,6 +197,7 @@ import {
     board: storedBoard(),
     themeMode: readMode(),
     textSize: readTextSize(),
+    preferences: readPreferences(),
     appearance: "light",
     weather: null,
     // The sky the Auto theme paints from. This is tied to the *home place*
@@ -269,6 +287,17 @@ import {
     calendarPrev: $("#calendar-prev"),
     calendarNext: $("#calendar-next"),
     calendarToday: $("#calendar-today"),
+    calendarSystem: $("#calendar-system"),
+    calendarSystemBadge: $("#calendar-system-badge"),
+    calendarLegend: $("#calendar-legend"),
+    calendarSecondary: $("#calendar-secondary"),
+    calendarEventsBlock: $("#calendar-events-block"),
+    calendarEvents: $("#calendar-holidays"),
+    calendarNoteCount: $("#calendar-note-count"),
+    calendarNoteInput: $("#calendar-note-input"),
+    calendarNoteColor: $("#calendar-note-color"),
+    calendarNoteAdd: $("#calendar-note-add"),
+    calendarNotesList: $("#calendar-notes-list"),
     calendarSelectedTitle: $("#calendar-selected-title"),
     calendarSelectedMeta: $("#calendar-selected-meta"),
     calendarSelectedIso: $("#calendar-selected-iso"),
@@ -281,6 +310,24 @@ import {
     settingsTextSize: $("#settings-text-size"),
     settingsTextStatus: $("#settings-text-status"),
     settingsReset: $("#settings-reset"),
+    settingsWeekStart: $("#settings-week-start"),
+    settingsCalendarSystem: $("#settings-calendar-system"),
+    settingsHolidayToggles: $("#settings-holiday-toggles"),
+    settingsCalendarStatus: $("#settings-calendar-status"),
+    settingsUnits: $("#settings-units"),
+    settingsUnitsStatus: $("#settings-units-status"),
+    settingsVolume: $("#settings-volume"),
+    settingsVolumeLabel: $("#settings-volume-label"),
+    settingsDuration: $("#settings-duration"),
+    settingsNotifications: $("#settings-notifications"),
+    settingsNotifyStatus: $("#settings-notify-status"),
+    settingsGeo: $("#settings-geo"),
+    settingsGeoStatus: $("#settings-geo-status"),
+    settingsClearData: $("#settings-clear-data"),
+    settingsExport: $("#settings-export"),
+    settingsImport: $("#settings-import"),
+    settingsImportFile: $("#settings-import-file"),
+    settingsDataStatus: $("#settings-data-status"),
 
     footerYear: $("#footer-year"),
   };
@@ -475,6 +522,69 @@ import {
         .join("");
       elements.settingsTextSize.dataset.ready = "true";
     }
+
+    if (elements.settingsWeekStart && !elements.settingsWeekStart.dataset.ready) {
+      elements.settingsWeekStart.innerHTML = WEEK_STARTS.map(
+        (start) => `<button type="button" class="seg-button" role="radio" aria-checked="false"
+          data-week-start="${escapeHTML(start.id)}" title="${escapeHTML(start.note)}">${escapeHTML(start.label)}</button>`
+      ).join("");
+      elements.settingsWeekStart.dataset.ready = "true";
+    }
+
+    /* Both calendar-system pickers (Settings card and the Calendar section
+     * toolbar) are fed from the same catalogue; systems this browser's ICU
+     * build cannot compute are listed but disabled, honestly. */
+    const systemOption = (system) => {
+      const available = calendarSystemAvailable(system.id);
+      return `<option value="${escapeHTML(system.id)}"${available ? "" : " disabled"}>${escapeHTML(system.label)}${
+        system.place ? ` — ${escapeHTML(system.place)}` : ""
+      }${available ? "" : " (not in this browser)"}</option>`;
+    };
+    const systemOptionsHtml = CALENDAR_SYSTEMS.map(systemOption).join("");
+    for (const select of [elements.settingsCalendarSystem, elements.calendarSystem]) {
+      if (select && !select.dataset.ready) {
+        select.innerHTML = systemOptionsHtml;
+        select.dataset.ready = "true";
+      }
+    }
+
+    if (elements.settingsHolidayToggles && !elements.settingsHolidayToggles.dataset.ready) {
+      elements.settingsHolidayToggles.innerHTML = HOLIDAY_SETS.map(
+        (set) => `<label class="settings-check">
+          <input type="checkbox" data-holiday-set="${escapeHTML(set.id)}" checked />
+          <span class="settings-check-main"><strong>${escapeHTML(set.label)}</strong><small>${escapeHTML(set.note)}</small></span>
+        </label>`
+      ).join("");
+      elements.settingsHolidayToggles.dataset.ready = "true";
+    }
+
+    const UNIT_CHOICES = [
+      { id: "auto", label: "Auto" },
+      { id: "metric", label: "°C · metric" },
+      { id: "imperial", label: "°F · imperial" },
+    ];
+    if (elements.settingsUnits && !elements.settingsUnits.dataset.ready) {
+      elements.settingsUnits.innerHTML = UNIT_CHOICES.map(
+        (choice) => `<button type="button" class="seg-button" role="radio" aria-checked="false"
+          data-units-choice="${escapeHTML(choice.id)}">${escapeHTML(choice.label)}</button>`
+      ).join("");
+      elements.settingsUnits.dataset.ready = "true";
+    }
+
+    const DURATION_CHOICES = [
+      { seconds: 5, label: "5 s" },
+      { seconds: 15, label: "15 s" },
+      { seconds: 30, label: "30 s" },
+      { seconds: 60, label: "1 min" },
+      { seconds: 0, label: "Until off" },
+    ];
+    if (elements.settingsDuration && !elements.settingsDuration.dataset.ready) {
+      elements.settingsDuration.innerHTML = DURATION_CHOICES.map(
+        (choice) => `<button type="button" class="seg-button" role="radio" aria-checked="false"
+          data-duration-choice="${choice.seconds}">${escapeHTML(choice.label)}</button>`
+      ).join("");
+      elements.settingsDuration.dataset.ready = "true";
+    }
   }
 
   function syncSettingsPanel(result = null) {
@@ -513,6 +623,98 @@ import {
       const option = textSizeOption(state.textSize);
       elements.settingsTextStatus.textContent = `${option.label} text · ${Math.round(option.scale * 100)}% scale. ${option.summary}`;
     }
+
+    syncPreferenceControls();
+  }
+
+  /**
+   * Reflect state.preferences (and the shared tempo-* alarm/unit keys) into
+   * the grown-up settings cards. Runs inside syncSettingsPanel, which is
+   * already the "settings panel mirrors state" pass.
+   */
+  function syncPreferenceControls() {
+    const prefs = state.preferences;
+
+    if (elements.settingsWeekStart) {
+      $$("[data-week-start]", elements.settingsWeekStart).forEach((button) => {
+        const active = button.dataset.weekStart === prefs.weekStart;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-checked", String(active));
+      });
+    }
+    for (const select of [elements.settingsCalendarSystem, elements.calendarSystem]) {
+      if (select && select.value !== prefs.calendarSystem) select.value = prefs.calendarSystem;
+    }
+    if (elements.settingsHolidayToggles) {
+      $$("[data-holiday-set]", elements.settingsHolidayToggles).forEach((input) => {
+        input.checked = prefs.holidays[input.dataset.holidaySet] !== false;
+      });
+    }
+    if (elements.settingsCalendarStatus) {
+      const start = weekStartOption(prefs.weekStart);
+      const system = calendarSystem(prefs.calendarSystem);
+      const marked = HOLIDAY_SETS.filter((set) => prefs.holidays[set.id] !== false).map((set) => set.label.toLowerCase());
+      elements.settingsCalendarStatus.textContent =
+        `Weeks begin ${start.label}. Second calendar: ${system.label}. Marking: ${marked.length ? marked.join(", ") : "nothing — a clean grid"}.`;
+    }
+
+    const units = readWeatherUnits();
+    if (elements.settingsUnits) {
+      $$("[data-units-choice]", elements.settingsUnits).forEach((button) => {
+        const active = button.dataset.unitsChoice === units;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-checked", String(active));
+      });
+    }
+    if (elements.settingsUnitsStatus) {
+      elements.settingsUnitsStatus.textContent =
+        units === "metric"
+          ? "Celsius and km/h everywhere, no matter the place."
+          : units === "imperial"
+            ? "Fahrenheit and mph everywhere, no matter the place."
+            : "Auto: each place uses its own measuring system.";
+    }
+
+    const volume = readAlarmVolumePercent();
+    if (elements.settingsVolume && document.activeElement !== elements.settingsVolume) {
+      elements.settingsVolume.value = String(volume);
+    }
+    if (elements.settingsVolumeLabel) elements.settingsVolumeLabel.textContent = `${volume}%`;
+
+    const duration = readAlarmDuration();
+    if (elements.settingsDuration) {
+      $$("[data-duration-choice]", elements.settingsDuration).forEach((button) => {
+        const active = Number(button.dataset.durationChoice) === duration;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-checked", String(active));
+      });
+    }
+
+    const notifications = readNotificationsEnabled();
+    if (elements.settingsNotifications) {
+      elements.settingsNotifications.setAttribute("aria-pressed", String(notifications));
+      elements.settingsNotifications.classList.toggle("active", notifications);
+    }
+    if (elements.settingsNotifyStatus) {
+      const supported = typeof Notification !== "undefined";
+      const permission = supported ? Notification.permission : "unsupported";
+      if (!supported) elements.settingsNotifyStatus.textContent = "This browser has no notification support — sound it is.";
+      else if (permission === "denied")
+        elements.settingsNotifyStatus.textContent = "Notifications are blocked by the browser — the sound still plays.";
+      else if (notifications) elements.settingsNotifyStatus.textContent = "A notification joins the sound when a ring goes off.";
+      else elements.settingsNotifyStatus.textContent = "Sound only, by default.";
+    }
+
+    if (elements.settingsGeo) {
+      elements.settingsGeo.setAttribute("aria-pressed", String(prefs.geo));
+      elements.settingsGeo.classList.toggle("active", prefs.geo);
+      elements.settingsGeo.innerHTML = `<span class="pill-icon" aria-hidden="true">⌖</span> Location buttons ${prefs.geo ? "on" : "off"}`;
+    }
+    if (elements.settingsGeoStatus) {
+      elements.settingsGeoStatus.textContent = prefs.geo
+        ? "Every “use my location” button asks your device for a position."
+        : "All “use my location” buttons are switched off — places are picked by name only.";
+    }
   }
 
   function setTextSize(size, { silent = false } = {}) {
@@ -531,6 +733,186 @@ import {
     applyTheme();
     syncSettingsPanel();
     notify("Settings reset — Auto theme and default text are back.");
+  }
+
+  /* ----------------------------------------------- preferences, many tools */
+
+  function patchPreferences(patch) {
+    state.preferences = writePreferences(patch);
+    syncSettingsPanel();
+    calendar.refreshPreferences();
+    return state.preferences;
+  }
+
+  function setWeekStartPreference(id) {
+    if (id === state.preferences.weekStart) return;
+    const prefs = patchPreferences({ weekStart: id });
+    notify(`Calendar weeks now start on ${weekStartOption(prefs.weekStart).label}.`);
+  }
+
+  function setCalendarSystemPreference(id, { silent = false } = {}) {
+    if (!calendarSystemAvailable(id)) {
+      notify("This browser cannot compute that calendar — it stays on the list for other devices.", "!");
+      return;
+    }
+    if (id === state.preferences.calendarSystem) return;
+    const prefs = patchPreferences({ calendarSystem: id });
+    if (!silent) {
+      const system = calendarSystem(prefs.calendarSystem);
+      notify(
+        system.id === "gregorian"
+          ? "Second calendar off — a plain Gregorian grid."
+          : `${system.label} dates now ride along in the calendar.`
+      );
+    }
+  }
+
+  function setHolidaySetPreference(id, enabled) {
+    const prefs = patchPreferences({ holidays: { [id]: enabled } });
+    const set = HOLIDAY_SETS.find((entry) => entry.id === id);
+    if (set) notify(`${set.label} ${prefs.holidays[id] !== false ? "marked on" : "hidden from"} the calendar.`);
+  }
+
+  function setUnitsPreference(choice) {
+    const units = writeWeatherUnits(choice);
+    syncSettingsPanel();
+    // The weather card re-reads its units on refresh; the forecast derives
+    // its units from the card, so one forced refresh carries the change.
+    weatherCard.refresh({ force: true });
+    refreshHomeWeather({ force: true });
+    forecast.refresh();
+    notify(
+      units === "auto"
+        ? "Weather units follow each place again."
+        : units === "metric"
+          ? "Celsius and km/h from here on."
+          : "Fahrenheit and mph from here on."
+    );
+  }
+
+  function setVolumePreference(percent, { quiet = false } = {}) {
+    const applied = writeAlarmVolumePercent(percent);
+    // The wall-clock alarms read this key at ring time; the timer keeps its
+    // own state in a 0–1 gain, so mirror the change into it too.
+    if (timer && typeof timer.setVolume === "function") timer.setVolume(applied / 100);
+    if (elements.settingsVolumeLabel) elements.settingsVolumeLabel.textContent = `${applied}%`;
+    if (!quiet) syncSettingsPanel();
+    return applied;
+  }
+
+  function setDurationPreference(seconds) {
+    const applied = writeAlarmDuration(seconds);
+    if (timer && typeof timer.setDuration === "function") timer.setDuration(applied);
+    syncSettingsPanel();
+    notify(applied === 0 ? "Rings keep going until you stop them." : `Rings last ${applied < 60 ? `${applied} seconds` : "1 minute"} by default.`);
+  }
+
+  async function toggleNotificationsPreference() {
+    const wantsOn = !readNotificationsEnabled();
+    let enabled;
+    if (timer && typeof timer.enableNotifications === "function") {
+      // The timer owns the permission dance and writes the same key.
+      enabled = await timer.enableNotifications(wantsOn);
+    } else {
+      enabled = writeNotificationsEnabled(wantsOn);
+    }
+    syncSettingsPanel();
+    return enabled;
+  }
+
+  function setGeoPreference(enabled) {
+    patchPreferences({ geo: enabled });
+    applyGeoGate();
+    notify(
+      enabled
+        ? "Location buttons are back — they ask your device each time."
+        : "Location buttons are off. Places are chosen by name now."
+    );
+  }
+
+  /** Disable every GPS button when the privacy toggle is off. */
+  function applyGeoGate() {
+    const enabled = state.preferences.geo !== false;
+    $$("[data-needs-geo]").forEach((button) => {
+      button.disabled = !enabled;
+      button.setAttribute("aria-disabled", String(!enabled));
+      if (!enabled) button.title = "Location features are switched off in Settings → Privacy & location.";
+      else button.removeAttribute("title");
+    });
+  }
+
+  function clearAllSavedData() {
+    const verb = typeof window !== "undefined" && typeof window.confirm === "function" ? window.confirm : null;
+    if (verb && !verb("Clear every preference, alarm, world clock, calendar note and remark Tempo saved on this device?")) {
+      return;
+    }
+    try {
+      const doomed = [];
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (typeof key === "string" && key.startsWith("tempo-")) doomed.push(key);
+      }
+      doomed.forEach((key) => localStorage.removeItem(key));
+      notify("Tempo has forgotten everything on this device. Reloading fresh…", "🗑", 2500);
+      window.setTimeout(() => window.location.reload(), 900);
+    } catch (_) {
+      notify("Storage is unavailable in this browser, so there is nothing to clear.", "!");
+    }
+  }
+
+  /* --------------------------------------------------------- export/import */
+
+  function exportBackup() {
+    let json;
+    try {
+      json = buildBackupJSON(localStorage);
+    } catch (_) {
+      notify("Storage is unavailable in this browser, so there is nothing to export.", "!");
+      return;
+    }
+    const name = backupFileName();
+    if (typeof URL !== "undefined" && typeof URL.createObjectURL === "function") {
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+      if (elements.settingsDataStatus) {
+        elements.settingsDataStatus.textContent = `Saved ${name} — every tempo-* key in one file.`;
+      }
+      notify("Backup exported. Keep it somewhere you trust.");
+    } else {
+      // A fallback for the rare engine without blob URLs: offer the text.
+      if (elements.settingsDataStatus) elements.settingsDataStatus.textContent = json;
+      notify("Your browser cannot download files — the backup is printed in the status line instead.", "!", 9000);
+    }
+  }
+
+  async function importBackupFile(file) {
+    if (!file) return;
+    let text = "";
+    try {
+      text = await file.text();
+    } catch (_) {
+      notify("That file could not be read.", "!");
+      return;
+    }
+    const parsed = parseBackup(text);
+    if (!parsed.ok) {
+      if (elements.settingsDataStatus) elements.settingsDataStatus.textContent = parsed.error;
+      notify(parsed.error, "!");
+      return;
+    }
+    const written = applyBackup(parsed.backup, localStorage);
+    if (elements.settingsDataStatus) {
+      elements.settingsDataStatus.textContent = `Restored ${written} keys from ${file.name}. Reloading with them…`;
+    }
+    notify(`Backup restored — ${written} settings came home. Reloading…`, "✓", 2500);
+    window.setTimeout(() => window.location.reload(), 900);
   }
 
   /* ------------------------------------------------------------- phrases */
@@ -646,7 +1028,15 @@ import {
     if (!force && state.homeWeather && state.homeWeather.ok && Date.now() - state.homeWeather.observedAt < REFRESH_MS) {
       return state.homeWeather;
     }
-    const units = preferImperial((place.countries || []).map((entry) => entry.code)) ? "imperial" : "metric";
+    // Units: the Settings card's choice wins; on Auto each place keeps the
+    // measuring system it actually uses (°F for the US, °C elsewhere).
+    const unitPreference = readWeatherUnits();
+    const units =
+      unitPreference !== "auto"
+        ? unitPreference
+        : preferImperial((place.countries || []).map((entry) => entry.code))
+          ? "imperial"
+          : "metric";
     const snapshot = await fetchWeather({ lat: coords.lat, lon: coords.lon, label: place.label, units, timezone: "auto" });
     if (revision !== homeWeatherRevision) return null; // the home place moved again while this was in flight
     applyHomeWeather(snapshot);
@@ -998,6 +1388,12 @@ import {
    * location card both report instead of quietly pretending to be certain.
    */
   async function useMyLocation({ setHome = true, addClock = false, alsoWeather = true } = {}) {
+    if (state.preferences.geo === false) {
+      // The privacy toggle is off; the buttons are disabled too, so this is
+      // the belt-and-braces path for programmatic callers.
+      notify("Location features are switched off in Settings → Privacy & location.", "!");
+      return null;
+    }
     const buttons = [elements.useLocationButton, elements.locationLocate, elements.weatherUseLocationTop].filter(
       Boolean
     );
@@ -1236,6 +1632,16 @@ import {
       prev: elements.calendarPrev,
       next: elements.calendarNext,
       today: elements.calendarToday,
+      legend: elements.calendarLegend,
+      systemBadge: elements.calendarSystemBadge,
+      secondary: elements.calendarSecondary,
+      eventsBlock: elements.calendarEventsBlock,
+      events: elements.calendarEvents,
+      noteCount: elements.calendarNoteCount,
+      noteInput: elements.calendarNoteInput,
+      noteColor: elements.calendarNoteColor,
+      noteAdd: elements.calendarNoteAdd,
+      notesList: elements.calendarNotesList,
       selectedTitle: elements.calendarSelectedTitle,
       selectedMeta: elements.calendarSelectedMeta,
       selectedIso: elements.calendarSelectedIso,
@@ -1245,6 +1651,7 @@ import {
     },
     getZone: () => homeZone(),
     getPlace: () => homePlace(),
+    getPreferences: () => state.preferences,
     notify,
   });
 
@@ -1409,6 +1816,61 @@ import {
     }
     if (elements.settingsReset) elements.settingsReset.addEventListener("click", resetSettings);
 
+    /* ------------------------------------------------ grown-up preferences */
+
+    if (elements.settingsWeekStart) {
+      elements.settingsWeekStart.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-week-start]");
+        if (!button) return;
+        setWeekStartPreference(button.dataset.weekStart);
+      });
+    }
+    for (const select of [elements.settingsCalendarSystem, elements.calendarSystem]) {
+      if (select) {
+        select.addEventListener("change", () => setCalendarSystemPreference(select.value));
+      }
+    }
+    if (elements.settingsHolidayToggles) {
+      elements.settingsHolidayToggles.addEventListener("change", (event) => {
+        const input = event.target.closest("[data-holiday-set]");
+        if (!input) return;
+        setHolidaySetPreference(input.dataset.holidaySet, input.checked);
+      });
+    }
+    if (elements.settingsUnits) {
+      elements.settingsUnits.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-units-choice]");
+        if (!button) return;
+        setUnitsPreference(button.dataset.unitsChoice);
+      });
+    }
+    if (elements.settingsVolume) {
+      elements.settingsVolume.addEventListener("input", () => setVolumePreference(Number(elements.settingsVolume.value)));
+    }
+    if (elements.settingsDuration) {
+      elements.settingsDuration.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-duration-choice]");
+        if (!button) return;
+        setDurationPreference(Number(button.dataset.durationChoice));
+      });
+    }
+    if (elements.settingsNotifications) {
+      elements.settingsNotifications.addEventListener("click", toggleNotificationsPreference);
+    }
+    if (elements.settingsGeo) {
+      elements.settingsGeo.addEventListener("click", () => setGeoPreference(!state.preferences.geo));
+    }
+    if (elements.settingsClearData) elements.settingsClearData.addEventListener("click", clearAllSavedData);
+    if (elements.settingsExport) elements.settingsExport.addEventListener("click", exportBackup);
+    if (elements.settingsImport && elements.settingsImportFile) {
+      elements.settingsImport.addEventListener("click", () => elements.settingsImportFile.click());
+      elements.settingsImportFile.addEventListener("change", () => {
+        const file = elements.settingsImportFile.files && elements.settingsImportFile.files[0];
+        importBackupFile(file);
+        elements.settingsImportFile.value = "";
+      });
+    }
+
     if (elements.mobileMenuButton) {
       elements.mobileMenuButton.addEventListener("click", () => {
         elements.mobileNav.classList.toggle("open");
@@ -1551,6 +2013,7 @@ import {
     remarks.init();
     forecast.init();
     bindEvents();
+    applyGeoGate();
 
     setTextSize(state.textSize, { silent: true });
     applyTheme();

@@ -11,6 +11,7 @@ import {
   parsePlainDate,
   parseYearMonth,
   plainDate,
+  weekdayLabels,
 } from "../src/calendar.js";
 
 test("plain calendar dates parse and format without using the device zone", () => {
@@ -54,4 +55,30 @@ test("month navigation crosses year boundaries", () => {
   assert.deepEqual(addMonths({ year: 2026, month: 1 }, -1), { year: 2025, month: 12 });
   assert.deepEqual(addMonths({ year: 2026, month: 12 }, 1), { year: 2027, month: 1 });
   assert.deepEqual(addMonths({ year: 2026, month: 9 }, 5), { year: 2027, month: 2 });
+});
+
+test("weekday labels rotate for Sunday- and Saturday-first weeks", () => {
+  assert.deepEqual(weekdayLabels(1), ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], "ISO default");
+  assert.deepEqual(weekdayLabels(0), ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+  assert.deepEqual(weekdayLabels(6), ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]);
+  assert.deepEqual(weekdayLabels(99), weekdayLabels(1), "nonsense falls back to Monday");
+  assert.deepEqual(weekdayLabels(), weekdayLabels(1));
+});
+
+test("the grid honours the chosen week start without moving the dates", () => {
+  // September 2026 starts on a Tuesday.
+  const monday = buildMonth({ year: 2026, month: 9, weekStart: 1 });
+  assert.equal(monday[0].iso, "2026-08-31", "Monday-first: the prior Monday leads");
+
+  const sunday = buildMonth({ year: 2026, month: 9, weekStart: 0 });
+  assert.equal(sunday[0].iso, "2026-08-30", "Sunday-first adds one more leading day");
+  assert.equal(sunday.filter((cell) => cell.inMonth).length, 30);
+  assert.equal(sunday[2].iso, "2026-09-01");
+
+  const saturday = buildMonth({ year: 2026, month: 9, weekStart: 6 });
+  assert.equal(saturday[0].iso, "2026-08-29", "Saturday-first adds two");
+  assert.equal(saturday[3].iso, "2026-09-01");
+
+  assert.equal(sunday.find((cell) => cell.iso === "2026-09-05").isWeekend, true, "weekends still follow the real day");
+  assert.equal(monday.length, 42, "six weeks whatever the start");
 });
