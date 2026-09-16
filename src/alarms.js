@@ -298,6 +298,17 @@ export function createAlarms({ elements = {}, getZone, notify, player } = {}) {
   const sounds = player || createAlarmPlayer();
   const alarms = loadAlarms();
   const ui = { editingId: null, ringing: null, queue: [] };
+  const scheduleDays = {
+    once: null,
+    weekdays: [1, 2, 3, 4, 5],
+    daily: [0, 1, 2, 3, 4, 5, 6],
+    weekends: [0, 6],
+  };
+  const starterTemplates = {
+    morning: { time: "07:00", repeat: scheduleDays.weekdays, label: "Good morning" },
+    lunch: { time: "12:30", repeat: scheduleDays.weekdays, label: "Lunch break" },
+    unwind: { time: "21:30", repeat: scheduleDays.daily, label: "Time to unwind" },
+  };
 
   function currentZone() {
     if (typeof getZone === "function") {
@@ -498,6 +509,8 @@ export function createAlarms({ elements = {}, getZone, notify, player } = {}) {
       chip.classList.toggle("active", active);
     }
     syncDateField();
+    syncSchedulePresets();
+    renderEditorPreview();
   }
 
   /** The date only means anything for a one-time alarm. */
@@ -506,6 +519,70 @@ export function createAlarms({ elements = {}, getZone, notify, player } = {}) {
     const repeating = repeatFromChips() !== null;
     elements.date.disabled = repeating;
     if (repeating) elements.date.value = "";
+  }
+
+  function scheduleForRepeat(repeat) {
+    const normalised = normaliseRepeat(repeat);
+    if (!normalised) return "once";
+    return Object.entries(scheduleDays).find(([, days]) => days && days.length === normalised.length && days.every((day, index) => day === normalised[index]))?.[0] || "";
+  }
+
+  function syncSchedulePresets() {
+    if (!elements.schedulePresets) return;
+    const activeId = scheduleForRepeat(repeatFromChips());
+    for (const button of elements.schedulePresets.querySelectorAll("[data-alarm-schedule]")) {
+      const active = button.dataset.alarmSchedule === activeId;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    }
+  }
+
+  function applySchedule(id) {
+    if (!(id in scheduleDays) || !elements.repeatRow) return;
+    const days = scheduleDays[id];
+    for (const chip of elements.repeatRow.querySelectorAll("[data-repeat-day]")) {
+      const active = Boolean(days && days.includes(Number(chip.dataset.repeatDay)));
+      chip.classList.toggle("active", active);
+      chip.setAttribute("aria-pressed", String(active));
+    }
+    syncDateField();
+    syncSchedulePresets();
+    renderEditorPreview();
+  }
+
+  function editorDraft() {
+    const time = elements.time ? String(elements.time.value || "").trim() : "";
+    if (!TIME_PATTERN.test(time)) return null;
+    const repeat = repeatFromChips();
+    return {
+      time,
+      repeat,
+      date: repeat ? null : elements.date && elements.date.value ? String(elements.date.value) : null,
+    };
+  }
+
+  function renderEditorPreview() {
+    if (!elements.preview) return;
+    const draft = editorDraft();
+    if (!draft) {
+      elements.preview.textContent = "Choose a time";
+      return;
+    }
+    const next = nextOccurrence(draft, Date.now(), currentZone());
+    elements.preview.textContent = next
+      ? `Next · ${formatOccurrence(next, currentZone())} · ${relativeWhen(next)}`
+      : "That moment has already passed";
+  }
+
+  function applyStarterTemplate(id) {
+    const template = starterTemplates[id];
+    if (!template) return;
+    if (elements.time) elements.time.value = template.time;
+    if (elements.label) elements.label.value = template.label;
+    if (elements.notes) elements.notes.value = "";
+    applySchedule(scheduleForRepeat(template.repeat));
+    if (elements.time && typeof elements.time.focus === "function") elements.time.focus();
+    if (notify) notify(`${template.label} is ready to personalise — save it when it feels right.`, "✦");
   }
 
   function resetEditor() {
@@ -607,7 +684,7 @@ export function createAlarms({ elements = {}, getZone, notify, player } = {}) {
   /* ------------------------------------------------------------ render */
 
   function render() {
-    if (elements.list) elements.list.innerHTML = alarms.map(alarmCard).join("");
+    if (elements.list) elements.list.innerHTML = alarms.map((alarm, index) => alarmCard(alarm, index)).join("");
     if (elements.empty) elements.empty.hidden = alarms.length > 0;
     if (elements.status) {
       const on = alarms.filter((alarm) => alarm.enabled).length;
@@ -619,17 +696,18 @@ export function createAlarms({ elements = {}, getZone, notify, player } = {}) {
     renderTimes();
   }
 
-  function alarmCard(alarm) {
+  function alarmCard(alarm, index = 0) {
     const zone = currentZone();
     const next = alarm.enabled ? nextOccurrence(alarm, Date.now(), zone) : null;
     const sound = findSound(alarm.sound);
     const ringing = ui.ringing && ui.ringing.id === alarm.id;
     const nextLine = !alarm.enabled
-      ? "off"
+      ? "Paused — tap the switch when you need it"
       : next
         ? `${escapeHTML(relativeWhen(next))} · ${escapeHTML(formatOccurrence(next, zone))}`
-        : "past — it will not ring";
-    return `<li class="alarm-item${alarm.enabled ? "" : " is-off"}${ringing ? " is-ringing" : ""}" data-alarm-id="${escapeHTML(alarm.id)}">
+        : "This one-time moment has passed";
+    return `<li class="alarm-item alarm-color-${index % 4}${alarm.enabled ? "" : " is-off"}${ringing ? " is-ringing" : ""}" data-alarm-id="${escapeHTML(alarm.id)}">
+      <span class="alarm-card-icon" aria-hidden="true">${ringing ? "♪" : "↗"}</span>
       <div class="alarm-when">
         <span class="alarm-time">${escapeHTML(alarm.time)}</span>
         <span class="alarm-repeat">${escapeHTML(describeRepeat(alarm))}</span>
@@ -637,12 +715,11 @@ export function createAlarms({ elements = {}, getZone, notify, player } = {}) {
       <div class="alarm-body">
         <strong class="alarm-label">${alarm.label ? escapeHTML(alarm.label) : "Alarm"}</strong>
         ${alarm.notes ? `<p class="alarm-notes">${escapeHTML(alarm.notes)}</p>` : ""}
-        <p class="alarm-sound">${escapeHTML(sound.name)}</p>
-        <p class="alarm-next" data-next-for="${escapeHTML(alarm.id)}">${nextLine}</p>
+        <div class="alarm-card-meta"><span class="alarm-sound"><span aria-hidden="true">♪</span> ${escapeHTML(sound.name)}</span><span class="alarm-next" data-next-for="${escapeHTML(alarm.id)}">${nextLine}</span></div>
       </div>
       <div class="alarm-actions">
         <button type="button" class="alarm-toggle" data-alarm-toggle="${escapeHTML(alarm.id)}" aria-pressed="${alarm.enabled}" title="${alarm.enabled ? "Turn off" : "Turn on"}">
-          ${alarm.enabled ? "On" : "Off"}
+          <span class="alarm-toggle-track" aria-hidden="true"><span></span></span><span class="alarm-toggle-label">${alarm.enabled ? "On" : "Off"}</span>
         </button>
         <button type="button" class="alarm-edit" data-alarm-edit="${escapeHTML(alarm.id)}">Edit</button>
         <button type="button" class="alarm-remove" data-alarm-remove="${escapeHTML(alarm.id)}" aria-label="Remove the ${escapeHTML(alarm.time)} alarm">✕</button>
@@ -658,7 +735,7 @@ export function createAlarms({ elements = {}, getZone, notify, player } = {}) {
       const line = elements.list.querySelector(`[data-next-for="${alarm.id}"]`);
       if (!line) continue;
       if (!alarm.enabled) {
-        line.textContent = "off";
+        line.textContent = "Paused — tap the switch when you need it";
         continue;
       }
       const next = nextOccurrence(alarm, Date.now(), zone);
@@ -672,6 +749,30 @@ export function createAlarms({ elements = {}, getZone, notify, player } = {}) {
     if (elements.save) elements.save.addEventListener("click", saveFromEditor);
     if (elements.cancel) elements.cancel.addEventListener("click", resetEditor);
     if (elements.dismiss) elements.dismiss.addEventListener("click", () => dismiss());
+    if (elements.time) elements.time.addEventListener("input", renderEditorPreview);
+    if (elements.date) elements.date.addEventListener("change", renderEditorPreview);
+    if (elements.sound) elements.sound.addEventListener("change", renderEditorPreview);
+    if (elements.testSound) {
+      elements.testSound.addEventListener("click", () => {
+        const id = elements.sound && ALARM_SOUNDS.some((entry) => entry.id === elements.sound.value)
+          ? elements.sound.value
+          : DEFAULT_SOUND_ID;
+        sounds.preview(id, { volume: volumeSetting() });
+        if (notify) notify(`Previewing ${findSound(id).name}.`, "♪");
+      });
+    }
+    if (elements.schedulePresets) {
+      elements.schedulePresets.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-alarm-schedule]");
+        if (button) applySchedule(button.dataset.alarmSchedule);
+      });
+    }
+    if (elements.empty) {
+      elements.empty.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-alarm-template]");
+        if (button) applyStarterTemplate(button.dataset.alarmTemplate);
+      });
+    }
     if (elements.repeatRow) {
       elements.repeatRow.addEventListener("click", (event) => {
         const chip = event.target.closest("[data-repeat-day]");
@@ -680,6 +781,8 @@ export function createAlarms({ elements = {}, getZone, notify, player } = {}) {
         chip.setAttribute("aria-pressed", String(active));
         chip.classList.toggle("active", active);
         syncDateField();
+        syncSchedulePresets();
+        renderEditorPreview();
       });
     }
     if (elements.list) {

@@ -266,7 +266,8 @@ export const JAPANESE_MONTHS = [
 export const CALENDAR_SYSTEMS = [
   {
     id: "gregorian",
-    label: "Gregorian only",
+    label: "No secondary calendar",
+    shortLabel: "GREG",
     nativeLabel: "Gregorian",
     place: "Worldwide",
     type: "Solar civil calendar",
@@ -279,6 +280,7 @@ export const CALENDAR_SYSTEMS = [
   {
     id: "bikram",
     label: "Bikram Sambat",
+    shortLabel: "BS",
     nativeLabel: "विक्रम संवत्",
     place: "Nepal",
     type: "Solar sidereal calendar",
@@ -291,6 +293,7 @@ export const CALENDAR_SYSTEMS = [
   {
     id: "chinese",
     label: "Chinese calendar",
+    shortLabel: "CHN",
     nativeLabel: "农历 / 漢曆",
     place: "China & East Asia",
     type: "Lunisolar calendar",
@@ -305,6 +308,7 @@ export const CALENDAR_SYSTEMS = [
   {
     id: "dangi",
     label: "Korean calendar (Dangi)",
+    shortLabel: "DANGI",
     nativeLabel: "단기 / 음력",
     place: "Korea",
     type: "Lunisolar calendar",
@@ -319,6 +323,7 @@ export const CALENDAR_SYSTEMS = [
   {
     id: "hebrew",
     label: "Hebrew calendar",
+    shortLabel: "HEB",
     nativeLabel: "הלוח העברי",
     place: "Israel & Jewish life",
     type: "Lunisolar calendar",
@@ -332,6 +337,7 @@ export const CALENDAR_SYSTEMS = [
   {
     id: "islamic",
     label: "Islamic calendar (Hijri)",
+    shortLabel: "AH",
     nativeLabel: "التقويم الهجري",
     place: "Muslim world",
     type: "Purely lunar calendar",
@@ -346,6 +352,7 @@ export const CALENDAR_SYSTEMS = [
   {
     id: "persian",
     label: "Persian calendar",
+    shortLabel: "AP",
     nativeLabel: "گاه‌شماری هجری خورشیدی",
     place: "Iran & Afghanistan",
     type: "Astronomical solar calendar",
@@ -359,6 +366,7 @@ export const CALENDAR_SYSTEMS = [
   {
     id: "indian",
     label: "Indian national calendar",
+    shortLabel: "ŚAKA",
     nativeLabel: "भारतीय राष्ट्रीय पंचांग (शक संवत्)",
     place: "India",
     type: "Solar civil calendar",
@@ -372,6 +380,7 @@ export const CALENDAR_SYSTEMS = [
   {
     id: "buddhist",
     label: "Thai Buddhist calendar",
+    shortLabel: "BE",
     nativeLabel: "ปฏิทินสุริยคติไทย (พุทธศักราช)",
     place: "Thailand",
     type: "Solar Buddhist Era calendar",
@@ -385,6 +394,7 @@ export const CALENDAR_SYSTEMS = [
   {
     id: "japanese",
     label: "Japanese calendar",
+    shortLabel: "JP",
     nativeLabel: "和暦 (元号)",
     place: "Japan",
     type: "Solar imperial era calendar",

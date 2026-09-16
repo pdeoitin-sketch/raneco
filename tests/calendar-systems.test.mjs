@@ -28,8 +28,10 @@ test("the catalogue answers the user's question: many calendars, one place", () 
     "japanese",
   ]);
   for (const system of CALENDAR_SYSTEMS) {
-    assert.ok(system.label && system.note && system.place, `${system.id} is fully described`);
+    assert.ok(system.label && system.shortLabel && system.note && system.place, `${system.id} is fully described and abbreviated`);
   }
+  assert.equal(calendarSystem("bikram").shortLabel, "BS");
+  assert.equal(calendarSystem("islamic").shortLabel, "AH");
   assert.equal(calendarSystem("nonsense").id, "gregorian");
 });
 

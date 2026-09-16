@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="A calm, capable dashboard for your local time, calendar, settings, alarms that ring at a wall-clock time, world clocks, live weather and forecast, a timer, a stopwatch, and time arithmetic — one page, in your browser."
+      content="A calm, capable dashboard for local time, interactive alarms and timers, a universal calendar with named secondary dates, world clocks, weather, forecast, and focused settings — in your browser."
     />
     <title>Tempo — Time, made useful</title>
     <meta name="color-scheme" content="light dark" />
@@ -130,10 +130,6 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18.5h5M4 14h9M4 9.5h7"></path><path d="M14.5 5.5a4 4 0 0 1 3.9 3.1 3 3 0 0 1-.4 5.9"></path></svg>
             <span>Forecast</span>
           </a>
-          <a class="nav-link" href="#/settings" data-route="settings" data-nav="settings">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.25"></circle><path d="M12 3.75v2.2M12 18.05v2.2M4.42 7.12l1.9 1.1M17.68 15.78l1.9 1.1M4.42 16.88l1.9-1.1M17.68 8.22l1.9-1.1"></path></svg>
-            <span>Settings</span>
-          </a>
           <a class="nav-link" href="#/about" data-route="about" data-nav="about">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"></circle><path d="M12 10.6v5.4M12 7.8h.01"></path></svg>
             <span>About</span>
@@ -141,6 +137,10 @@
         </nav>
 
         <div class="sidebar-bottom">
+          <a class="nav-link settings-nav-link" href="#/settings" data-route="settings" data-nav="settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.25"></circle><path d="M12 3.75v2.2M12 18.05v2.2M4.42 7.12l1.9 1.1M17.68 15.78l1.9 1.1M4.42 16.88l1.9-1.1M17.68 8.22l1.9-1.1"></path></svg>
+            <span>Settings</span><span class="settings-nav-arrow" aria-hidden="true">→</span>
+          </a>
           <div class="theme-block">
             <p class="eyebrow">LOOK</p>
             <div class="theme-switch" id="theme-switch" role="radiogroup" aria-label="Colour theme">
@@ -272,10 +272,8 @@
               <h2 id="alarms-title">Alarms</h2>
               <p class="section-phrase" id="alarms-phrase"></p>
               <p class="section-intro">
-                The timer counts <em>down</em>; these ring <em>at a time</em>. A date if it is once, weekdays if it
-                repeats, a label and notes for the half-asleep version of you — and any of the sixteen sounds.
-                They run on your clock, walk calendar days (a Friday alarm jumps the weekend), survive DST, and
-                still ring if a throttled tab wakes up to ninety seconds late.
+                Build a wake-up, reminder or weekly rhythm in a few taps. Choose a time, tap the days, preview its
+                sound and see exactly when it will ring next — all on your home-place clock.
               </p>
             </div>
             <span class="tool-status neutral" id="alarms-status">NO ALARMS YET</span>
@@ -292,15 +290,22 @@
 
           <div class="tool-page">
             <article class="tool-card alarm-editor-card" aria-labelledby="alarms-editor-title">
-              <div class="calculator-card-heading">
+              <div class="calculator-card-heading alarm-editor-heading">
                 <div>
-                  <p class="card-label" id="alarms-editor-eyebrow">NEW</p>
+                  <p class="card-label" id="alarms-editor-eyebrow">CREATE A RHYTHM</p>
                   <h3 id="alarms-editor-title">New alarm</h3>
                 </div>
+                <span class="alarm-preview" id="alarms-preview" aria-live="polite">Next · tomorrow at 07:00</span>
               </div>
 
               <div class="alarm-form">
-                <div class="alarm-form-row">
+                <div class="alarm-schedule-presets" id="alarms-schedule-presets" role="group" aria-label="Quick repeat schedule">
+                  <button type="button" class="alarm-schedule-chip active" data-alarm-schedule="once" aria-pressed="true"><span aria-hidden="true">✦</span> Once</button>
+                  <button type="button" class="alarm-schedule-chip" data-alarm-schedule="weekdays" aria-pressed="false"><span aria-hidden="true">☀</span> Weekdays</button>
+                  <button type="button" class="alarm-schedule-chip" data-alarm-schedule="daily" aria-pressed="false"><span aria-hidden="true">↻</span> Every day</button>
+                  <button type="button" class="alarm-schedule-chip" data-alarm-schedule="weekends" aria-pressed="false"><span aria-hidden="true">☕</span> Weekends</button>
+                </div>
+                <div class="alarm-form-row alarm-time-row">
                   <label class="alarm-field alarm-field-time"><span>TIME</span>
                     <input id="alarms-time" type="time" value="07:00" required aria-label="Alarm time" />
                   </label>
@@ -330,9 +335,12 @@
                   <textarea id="alarms-notes" rows="2" maxlength="500" placeholder="Kettle first, then the news." aria-label="Notes attached to this alarm"></textarea>
                 </label>
 
-                <label class="alarm-field"><span>SOUND</span>
-                  <select id="alarms-sound" aria-label="Alarm sound"></select>
-                </label>
+                <div class="alarm-field"><span>SOUND</span>
+                  <div class="alarm-sound-picker">
+                    <select id="alarms-sound" aria-label="Alarm sound"></select>
+                    <button class="secondary-button alarm-sound-preview" type="button" id="alarms-test-sound" aria-label="Preview selected alarm sound"><span aria-hidden="true">▶</span> Preview</button>
+                  </div>
+                </div>
 
                 <div class="alarm-form-actions">
                   <button class="primary-button" type="button" id="alarms-save">Add alarm</button>
@@ -352,7 +360,16 @@
                   <h3 id="alarms-list-title">Your alarms</h3>
                 </div>
               </div>
-              <p class="empty-state" id="alarms-empty">No alarms yet — the one you set above will live here.</p>
+              <div class="alarm-empty-state" id="alarms-empty">
+                <span class="alarm-empty-orbit" aria-hidden="true">✦</span>
+                <strong>Your day has room for a rhythm.</strong>
+                <p>Start from a useful routine, then make it yours.</p>
+                <div class="alarm-starter-grid" aria-label="Alarm starter templates">
+                  <button type="button" data-alarm-template="morning"><span aria-hidden="true">☀</span><strong>Morning</strong><small>07:00 · weekdays</small></button>
+                  <button type="button" data-alarm-template="lunch"><span aria-hidden="true">◐</span><strong>Lunch break</strong><small>12:30 · weekdays</small></button>
+                  <button type="button" data-alarm-template="unwind"><span aria-hidden="true">☾</span><strong>Unwind</strong><small>21:30 · every day</small></button>
+                </div>
+              </div>
               <ol class="alarm-list" id="alarms-list" aria-live="polite"></ol>
             </article>
           </div>
@@ -365,9 +382,8 @@
               <h2 id="timer-title">Timer</h2>
               <p class="section-phrase" id="timer-phrase"></p>
               <p class="section-intro">
-                Set a length, start it, and get on with the thing you were avoiding. When it ends the alarm
-                <em>keeps going</em> until you stop it — sixteen sounds, your own music, or a link. Need it to
-                ring <em>at a time</em> instead? That is the Alarms section just above.
+                Choose a moment, watch it move, and adjust without breaking your flow. The finish is impossible
+                to miss, with a sound you can preview and a clear stop control when time is up.
               </p>
             </div>
             <span class="tool-status" id="timer-status">READY</span>
@@ -384,15 +400,19 @@
 
           <div class="tool-page">
             <article class="tool-card timer-card" aria-labelledby="timer-card-title">
-              <div class="calculator-card-heading">
+              <div class="calculator-card-heading timer-card-heading">
                 <div>
-                  <p class="card-label">REMAINING</p>
-                  <h3 id="timer-card-title">Time left</h3>
+                  <p class="card-label">MAKE SPACE FOR ONE THING</p>
+                  <h3 id="timer-card-title">Your countdown</h3>
                 </div>
+                <span class="timer-end-time" id="timer-end-time">Ready when you are</span>
               </div>
               <div class="timer-layout">
-                <div class="timer-ring" id="timer-ring" aria-label="Timer remaining">
-                  <div class="timer-ring-inner"><span id="timer-display">05:00</span><small>MIN : SEC</small></div>
+                <div class="timer-visual">
+                  <div class="timer-ring" id="timer-ring" aria-label="Timer remaining">
+                    <div class="timer-ring-inner"><span id="timer-display">05:00</span><small>MIN : SEC</small></div>
+                  </div>
+                  <p class="timer-progress-copy" id="timer-progress-copy">Pick a rhythm or set your own.</p>
                 </div>
                 <div class="timer-controls">
                   <div class="time-inputs" aria-label="Set timer duration">
@@ -400,12 +420,18 @@
                     <span class="input-colon">:</span>
                     <label><span>SEC</span><input id="timer-seconds" type="number" inputmode="numeric" min="0" max="59" value="0" aria-label="Seconds" /></label>
                   </div>
-                  <div class="preset-row">
-                    <button type="button" class="preset-button" data-seconds="60">1 min</button>
-                    <button type="button" class="preset-button" data-seconds="300">5 min</button>
-                    <button type="button" class="preset-button" data-seconds="900">15 min</button>
-                    <button type="button" class="preset-button" data-seconds="1500">25 min</button>
-                    <button type="button" class="preset-button" data-seconds="3600">1 hr</button>
+                  <div class="preset-row timer-preset-grid" aria-label="Timer presets">
+                    <button type="button" class="preset-button timer-preset" data-seconds="60"><span>⚡</span><strong>1 min</strong><small>Reset</small></button>
+                    <button type="button" class="preset-button timer-preset" data-seconds="300"><span>☕</span><strong>5 min</strong><small>Breather</small></button>
+                    <button type="button" class="preset-button timer-preset" data-seconds="900"><span>◎</span><strong>15 min</strong><small>Sprint</small></button>
+                    <button type="button" class="preset-button timer-preset" data-seconds="1500"><span>✦</span><strong>25 min</strong><small>Focus</small></button>
+                    <button type="button" class="preset-button timer-preset" data-seconds="3600"><span>◇</span><strong>1 hr</strong><small>Deep work</small></button>
+                  </div>
+                  <div class="timer-adjust-row" role="group" aria-label="Adjust timer">
+                    <span>QUICK ADJUST</span>
+                    <button type="button" data-timer-adjust="-60">−1m</button>
+                    <button type="button" data-timer-adjust="60">+1m</button>
+                    <button type="button" data-timer-adjust="300">+5m</button>
                   </div>
                   <div class="primary-actions">
                     <button class="primary-button timer-start" id="timer-start" type="button"><span class="play-icon">▶</span> Start timer</button>
@@ -461,7 +487,9 @@
                 <div class="sound-list" id="alarm-sounds" role="radiogroup" aria-label="Alarm sound"></div>
               </details>
 
-              <div class="custom-sound">
+              <details class="custom-sound">
+                <summary><span aria-hidden="true">♫</span><span><strong>Use your own music</strong><small>YouTube, Spotify, a link or a file</small></span><span aria-hidden="true">＋</span></summary>
+                <div class="custom-sound-body">
                 <p class="eyebrow">YOUR OWN MUSIC</p>
                 <p class="note-copy small">
                   Paste a YouTube, YouTube Music or Spotify link and it plays in an embedded player when the
@@ -486,7 +514,8 @@
                   A file stays on your device — nothing is uploaded — but the browser forgets it when you close
                   the tab, so pick it again next visit.
                 </p>
-              </div>
+                </div>
+              </details>
             </article>
           </div>
         </section>
@@ -617,9 +646,9 @@
               <h2 id="calendar-title">Calendar</h2>
               <p class="section-phrase" id="calendar-phrase"></p>
               <p class="section-intro">
-                A month view tied to your home place — choose a calendar to show first in every cell, with
-                Gregorian dates underneath, world holidays and national days marked in color, and room for your own notes on
-                any date. ISO week numbers and day-of-year details still follow the same clock as your alarms.
+                January stays January: the universal Gregorian calendar is always the clear, full-size month.
+                Add a cultural calendar as a small named date in each cell, then mark world holidays, national days,
+                and your own notes without losing the calendar everyone shares.
                 <span class="section-count" id="calendar-today-pill">TODAY</span>
               </p>
             </div>
@@ -641,9 +670,13 @@
                 <span class="formula-icon soft" aria-hidden="true">31</span>
               </div>
               <div class="calendar-toolbar">
+                <div class="universal-calendar-label" aria-label="Main calendar">
+                  <span class="universal-calendar-icon" aria-hidden="true">G</span>
+                  <span><strong>Gregorian</strong><small>Universal main calendar</small></span>
+                </div>
                 <label class="calendar-system-field" for="calendar-system">
-                  <span>Calendar to show first</span>
-                  <select id="calendar-system" aria-label="Primary calendar shown in each date cell"></select>
+                  <span>Small secondary calendar</span>
+                  <select id="calendar-system" aria-label="Secondary calendar shown in each date cell"></select>
                 </label>
                 <span class="calendar-system-badge" id="calendar-system-badge" hidden></span>
               </div>
@@ -692,7 +725,7 @@
               </div>
 
               <p class="note-copy small muted">
-                Each calendar displays a full 1-month duration from Day 1 to month end with Gregorian dates underneath.
+                Gregorian months and days stay main; your selected calendar appears as a small named translation in each cell.
                 Nepali festival dates use published Bikram Sambat tables (Dashain, Tihar, Chhath, Teej, Holi, Losar, Jatras).
                 Islamic dates follow tabular Hijri, Hebrew feasts begin at sundown, and national independence &amp; democracy days are marked worldwide.
               </p>
@@ -965,12 +998,14 @@
               <h2 id="settings-title">Settings</h2>
               <p class="section-phrase" id="settings-phrase"></p>
               <p class="section-intro">
-                The preferences home, grown up: text size and themes, plus the calendar's week start and second
-                calendar, weather units, alarm defaults, notification behaviour, privacy controls, and an
-                export/import backup of everything Tempo remembers.
+                A focused preferences page, opened only when you ask for it. Tune the display, secondary calendar,
+                weather units, alarm behaviour and privacy here, then return to your dashboard exactly where you left it.
               </p>
             </div>
-            <div class="page-actions">
+            <div class="page-actions settings-page-actions">
+              <a class="outline-button" id="settings-back" href="#/now" data-route="now">
+                <span class="button-plus" aria-hidden="true">←</span> Back to dashboard
+              </a>
               <button class="outline-button" id="settings-reset" type="button">
                 <span class="button-plus" aria-hidden="true">↺</span> Reset display settings
               </button>
@@ -1013,18 +1048,18 @@
               <div class="calculator-card-heading">
                 <div>
                   <p class="card-label">CALENDAR</p>
-                  <h3 id="settings-calendar-title">Week start &amp; calendars</h3>
+                  <h3 id="settings-calendar-title">Universal &amp; secondary dates</h3>
                 </div>
                 <span class="formula-icon soft" aria-hidden="true">🗓</span>
               </div>
               <p class="note-copy">
-                Where the week begins, which calendar's date appears first in every cell, and which holiday sets
-                the month marks up.
+                Gregorian remains the universal main calendar. Choose one small, clearly named secondary date,
+                decide where the week begins, and select the holiday sets you want marked.
               </p>
               <p class="eyebrow settings-field-label">WEEKS BEGIN ON</p>
               <div class="segmented wrap" id="settings-week-start" role="radiogroup" aria-label="Week starts on"></div>
               <label class="settings-select-field" for="settings-calendar-system">
-                <span class="eyebrow settings-field-label">CALENDAR SHOWN FIRST</span>
+                <span class="eyebrow settings-field-label">SMALL SECONDARY CALENDAR</span>
                 <select id="settings-calendar-system"></select>
               </label>
               <p class="eyebrow settings-field-label">MARK THESE DAYS</p>
@@ -1147,12 +1182,12 @@
           <div class="about-grid">
             <article class="note-card about-card">
               <p class="eyebrow">WHAT TEMPO IS</p>
-              <h3>One page, thirteen sections</h3>
+              <h3>One dashboard, focused when it matters</h3>
               <p class="note-copy">
-                Tempo is a single-scroll dashboard for your time and your sky: the clock you live on, alarms that
-                ring at a wall-clock time, a timer, a stopwatch, the world's clocks, time standards, a calendar,
-                an old clock with a live sky behind it, time arithmetic, weather, a seven-day forecast and settings. There is no account, no backend and
-                no key to manage — it is a static page that runs entirely in your browser.
+                Tempo keeps your time and sky tools in one fluent scroll: the clock you live on, alarms, timer,
+                stopwatch, world clocks, time standards, calendar, old clock, arithmetic, weather and forecast.
+                Settings opens separately from the side, only when you ask. There is no account, backend or key to
+                manage — it all runs in your browser.
               </p>
             </article>
 
