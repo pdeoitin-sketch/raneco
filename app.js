@@ -281,6 +281,7 @@ import {
     themeCaption: $("#theme-caption"),
 
     calendarMonth: $("#calendar-month"),
+    calendarMonthSpan: $("#calendar-month-span"),
     calendarGrid: $("#calendar-grid"),
     calendarSummary: $("#calendar-summary"),
     calendarTodayPill: $("#calendar-today-pill"),
@@ -290,6 +291,7 @@ import {
     calendarSystem: $("#calendar-system"),
     calendarSystemBadge: $("#calendar-system-badge"),
     calendarLegend: $("#calendar-legend"),
+    calendarSpecsCard: $("#calendar-specs-card"),
     calendarSecondary: $("#calendar-secondary"),
     calendarEventsBlock: $("#calendar-events-block"),
     calendarEvents: $("#calendar-holidays"),
@@ -1626,6 +1628,7 @@ import {
   const calendar = createCalendar({
     elements: {
       month: elements.calendarMonth,
+      monthSpan: elements.calendarMonthSpan,
       grid: elements.calendarGrid,
       summary: elements.calendarSummary,
       todayPill: elements.calendarTodayPill,
@@ -1634,6 +1637,7 @@ import {
       today: elements.calendarToday,
       legend: elements.calendarLegend,
       systemBadge: elements.calendarSystemBadge,
+      specsCard: elements.calendarSpecsCard,
       secondary: elements.calendarSecondary,
       eventsBlock: elements.calendarEventsBlock,
       events: elements.calendarEvents,

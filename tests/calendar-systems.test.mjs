@@ -102,3 +102,47 @@ test("availability detection and the zodiac mapping behave", () => {
   assert.equal(zodiacAnimalFor(2024), "Dragon");
   assert.equal(zodiacAnimalFor(1984), "Rat");
 });
+
+test("all calendar systems provide full specifications and month catalogues", () => {
+  for (const sys of CALENDAR_SYSTEMS) {
+    assert.ok(sys.id, "has id");
+    assert.ok(sys.label, "has label");
+    assert.ok(sys.type, "has type");
+    assert.ok(sys.epoch, "has epoch");
+    assert.ok(sys.rule, "has rule");
+    assert.ok(Array.isArray(sys.months) && sys.months.length >= 12, `${sys.id} has at least 12 months`);
+    for (const m of sys.months) {
+      assert.ok(m.name, `month in ${sys.id} has name`);
+    }
+  }
+});
+
+test("findSystemMonthBounds and stepSystemMonth calculate clean 1-month durations", async () => {
+  const { findSystemMonthBounds, stepSystemMonth } = await import("../src/calendar-systems.js");
+  const today = { year: 2026, month: 9, day: 16 };
+
+  // Bikram Sambat today is Bhadra 31, 2083 BS
+  const bsBounds = findSystemMonthBounds("bikram", today);
+  assert.deepEqual(bsBounds.day1Greg, { year: 2026, month: 8, day: 17 });
+  assert.equal(bsBounds.totalDays, 31);
+  assert.deepEqual(bsBounds.endGreg, { year: 2026, month: 9, day: 16 });
+
+  // Step 1 month forward to Ashwin 2083 BS
+  const ashwinDay1 = stepSystemMonth("bikram", bsBounds.day1Greg, 1);
+  assert.deepEqual(ashwinDay1, { year: 2026, month: 9, day: 17 });
+  const ashwinBounds = findSystemMonthBounds("bikram", ashwinDay1);
+  assert.equal(ashwinBounds.totalDays, 31);
+  assert.deepEqual(ashwinBounds.endGreg, { year: 2026, month: 10, day: 17 });
+
+  // Islamic calendar
+  const islamicBounds = findSystemMonthBounds("islamic", today);
+  assert.ok(islamicBounds.totalDays === 29 || islamicBounds.totalDays === 30);
+  const nextIslamic = stepSystemMonth("islamic", islamicBounds.day1Greg, 1);
+  assert.ok(nextIslamic.year >= 2026);
+
+  // Hebrew calendar
+  const hebrewBounds = findSystemMonthBounds("hebrew", today);
+  assert.ok(hebrewBounds.totalDays === 29 || hebrewBounds.totalDays === 30);
+  const nextHebrew = stepSystemMonth("hebrew", hebrewBounds.day1Greg, 1);
+  assert.ok(nextHebrew.year >= 2026);
+});

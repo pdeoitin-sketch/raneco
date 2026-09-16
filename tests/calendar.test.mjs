@@ -82,3 +82,50 @@ test("the grid honours the chosen week start without moving the dates", () => {
   assert.equal(sunday.find((cell) => cell.iso === "2026-09-05").isWeekend, true, "weekends still follow the real day");
   assert.equal(monday.length, 42, "six weeks whatever the start");
 });
+
+test("a month grid can wear a non-Gregorian calendar with a full 1-month duration", () => {
+  // Bhadra 2083 BS runs from 2026-08-17 to 2026-09-16 (31 days).
+  const bhadra = buildMonth({
+    systemId: "bikram",
+    day1Greg: { year: 2026, month: 8, day: 17 },
+    totalDays: 31,
+    weekStart: 1,
+    today: { year: 2026, month: 9, day: 16 },
+  });
+  assert.equal(bhadra.length, 42);
+  const inMonthCells = bhadra.filter((c) => c.inMonth);
+  assert.equal(inMonthCells.length, 31, "Bhadra 2083 has exactly 31 days");
+  assert.equal(inMonthCells[0].primaryDay, 1, "Day 1 of Bhadra is primary 1");
+  assert.equal(inMonthCells[0].gregorianDay, 17, "Gregorian underneath is 17 (Aug 17)");
+  assert.equal(inMonthCells[30].primaryDay, 31, "Day 31 of Bhadra is primary 31");
+  assert.equal(inMonthCells[30].gregorianDay, 16, "Gregorian underneath is 16 (Sep 16)");
+  assert.equal(inMonthCells[30].isToday, true, "Today (2026-09-16) is Bhadra 31");
+
+  // Ashwin 2083 BS runs from 2026-09-17 to 2026-10-16 (30 days).
+  const ashwin = buildMonth({
+    systemId: "bikram",
+    day1Greg: { year: 2026, month: 9, day: 17 },
+    totalDays: 30,
+    weekStart: 1,
+  });
+  const ashwinInMonth = ashwin.filter((c) => c.inMonth);
+  assert.equal(ashwinInMonth.length, 30, "Ashwin 2083 has exactly 30 days");
+  assert.equal(ashwinInMonth[0].primaryDay, 1);
+  assert.equal(ashwinInMonth[0].gregorianDay, 17);
+  assert.equal(ashwinInMonth[29].primaryDay, 30);
+  assert.equal(ashwinInMonth[29].gregorianDay, 16);
+});
+
+test("every non-Gregorian calendar produces a valid 1-month grid", () => {
+  const systems = ["islamic", "hebrew", "persian", "indian", "chinese", "dangi", "buddhist", "japanese"];
+  for (const sys of systems) {
+    const grid = buildMonth({
+      systemId: sys,
+      day1Greg: { year: 2026, month: 9, day: 12 },
+      totalDays: 30,
+      weekStart: 1,
+    });
+    assert.equal(grid.length, 42);
+    assert.equal(grid.filter((c) => c.inMonth).length, 30);
+  }
+});

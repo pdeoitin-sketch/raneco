@@ -1,28 +1,35 @@
 /**
- * A home-zone calendar that speaks more than one calendar.
+ * A home-zone calendar that speaks more than one calendar with true
+ * month-wise duration for each calendar system.
  *
- * The grid itself stays Gregorian and honest: it follows the dashboard's
- * home place, highlights that place's today, and remembers the month and day
- * you were looking at. Around that spine:
+ * The spine follows your home place, highlights that place's today,
+ * and remembers the month and day you were looking at.
  *
- *   • The week can start Monday, Sunday or Saturday (Settings).
- *   • Each cell can carry a date from Bikram Sambat, Chinese, Korean (Dangi),
- *     Hebrew, Hijri, Persian, Indian, Thai Buddhist or Japanese. When one is
- *     selected it becomes the large primary date and Gregorian moves below
- *     it, so switching calendars changes what the reader sees first.
- *   • Holidays and observances from `calendar-events.js` mark cells with
- *     colored dots, grouped in a legend, and list themselves on the
- *     selected day.
- *   • And any date can hold the reader's own notes, kept on this device
- *     (`calendar-notes.js`).
- *
- * All calculations are done as plain UTC dates so the browser's own time
- * zone cannot move a calendar cell.
+ * Features:
+ *   • True 1-Month Duration Grid: Every calendar system (Bikram Sambat,
+ *     Islamic, Hebrew, Persian, Indian Śaka, Chinese, Korean Dangi,
+ *     Thai Buddhist, Japanese, or Gregorian) displays its own complete
+ *     month from Day 1 to the end of that specific month, rather than a
+ *     half-and-half Gregorian split.
+ *   • Prominent primary day numbers in the selected calendar, with Gregorian
+ *     dates displayed underneath.
+ *   • Week starts on Monday, Sunday, or Saturday (Settings).
+ *   • Holidays, national days, democracy & freedom days, cultural festivals,
+ *     and religious observances marked with category dots.
+ *   • Full specifications, month catalogues, regularities, and celebration
+ *     dates for all 10 calendar systems.
+ *   • Device-local notes pinned to any date.
  */
 
 import { escapeHTML } from "./ui.js";
 import { getFormatter, partsFor } from "./time-math.js";
-import { describeInSystem, calendarSystem } from "./calendar-systems.js";
+import {
+  CALENDAR_SYSTEMS,
+  calendarSystem,
+  describeInSystem,
+  findSystemMonthBounds,
+  stepSystemMonth,
+} from "./calendar-systems.js";
 import { eventCategory, eventsForDate } from "./calendar-events.js";
 import { addNote, notesForDate, removeNote } from "./calendar-notes.js";
 
@@ -36,6 +43,7 @@ const SUN_FIRST_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const monthTitleFormatter = getFormatter("en-US", { timeZone: "UTC", month: "long", year: "numeric" });
 const fullDateFormatter = getFormatter("en-US", { timeZone: "UTC", weekday: "long", month: "long", day: "numeric", year: "numeric" });
 const shortDateFormatter = getFormatter("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
+const spanDateFormatter = getFormatter("en-US", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
 
 export function pad2(value) {
   return String(value).padStart(2, "0");
@@ -111,17 +119,50 @@ export function weekdayLabels(weekStart = 1) {
   return Array.from({ length: 7 }, (_, index) => SUN_FIRST_WEEKDAYS[(start + index) % 7]);
 }
 
-export function buildMonth({ year, month, today, selected, weekStart = 1 } = {}) {
+/**
+ * Builds 42 grid cells (6 rows × 7 columns) for a month view.
+ * Supports both standard Gregorian months and non-Gregorian systems
+ * with true 1-month duration.
+ */
+export function buildMonth({
+  year,
+  month,
+  today,
+  selected,
+  weekStart = 1,
+  systemId = "gregorian",
+  day1Greg,
+  totalDays,
+} = {}) {
   const start = Number.isInteger(weekStart) && weekStart >= 0 && weekStart <= 6 ? weekStart : 1;
   const labels = weekdayLabels(start);
-  const first = new Date(Date.UTC(year, month - 1, 1));
-  const leading = (first.getUTCDay() - start + 7) % 7;
-  const gridStart = Date.UTC(year, month - 1, 1 - leading);
   const todayIso = today ? plainDate(today) : "";
   const selectedIso = selected || todayIso;
 
+  const isNonGregorian = systemId && systemId !== "gregorian" && day1Greg && totalDays;
+
+  let gridStartStamp = 0;
+  let inMonthStart = 0;
+  let inMonthCount = 0;
+
+  if (isNonGregorian) {
+    const firstDay = new Date(Date.UTC(day1Greg.year, day1Greg.month - 1, day1Greg.day));
+    const leading = (firstDay.getUTCDay() - start + 7) % 7;
+    gridStartStamp = firstDay.getTime() - leading * DAY;
+    inMonthStart = leading;
+    inMonthCount = totalDays;
+  } else {
+    const gregYear = year || (day1Greg ? day1Greg.year : 2026);
+    const gregMonth = month || (day1Greg ? day1Greg.month : 1);
+    const firstDay = new Date(Date.UTC(gregYear, gregMonth - 1, 1));
+    const leading = (firstDay.getUTCDay() - start + 7) % 7;
+    gridStartStamp = Date.UTC(gregYear, gregMonth - 1, 1 - leading);
+    inMonthStart = leading;
+    inMonthCount = daysInMonth(gregYear, gregMonth);
+  }
+
   return Array.from({ length: 42 }, (_, index) => {
-    const stamp = new Date(gridStart + index * DAY);
+    const stamp = new Date(gridStartStamp + index * DAY);
     const cell = {
       year: stamp.getUTCFullYear(),
       month: stamp.getUTCMonth() + 1,
@@ -129,14 +170,24 @@ export function buildMonth({ year, month, today, selected, weekStart = 1 } = {})
     };
     const iso = plainDate(cell);
     const nativeDay = stamp.getUTCDay();
+    const inMonth = isNonGregorian
+      ? index >= inMonthStart && index < inMonthStart + inMonthCount
+      : cell.month === (month || (day1Greg ? day1Greg.month : cell.month));
+
+    const alt = systemId && systemId !== "gregorian" ? describeInSystem(systemId, cell) : null;
+    const primaryDay = isNonGregorian && alt ? alt.day : cell.day;
+
     return {
       ...cell,
       iso,
       weekday: labels[index % 7],
-      inMonth: cell.month === month,
+      inMonth,
       isToday: iso === todayIso,
       isSelected: iso === selectedIso,
       isWeekend: nativeDay === 0 || nativeDay === 6,
+      primaryDay,
+      gregorianDay: cell.day,
+      alt,
     };
   });
 }
@@ -175,6 +226,8 @@ export function readCalendarState(storage) {
     return {
       view: view || null,
       selected: selected ? plainDate(selected) : "",
+      viewAnchorIso: parsed.viewAnchorIso || (selected ? plainDate(selected) : ""),
+      viewSystem: parsed.viewSystem || "",
     };
   } catch (_) {
     return {};
@@ -183,7 +236,15 @@ export function readCalendarState(storage) {
 
 function writeCalendarState(state) {
   try {
-    localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify({ view: monthKey(state.view), selected: state.selected }));
+    localStorage.setItem(
+      CALENDAR_STORAGE_KEY,
+      JSON.stringify({
+        view: state.view ? monthKey(state.view) : "",
+        selected: state.selected,
+        viewAnchorIso: state.viewAnchorIso || "",
+        viewSystem: state.viewSystem || "",
+      })
+    );
   } catch (_) {
     // The calendar still works for this visit when storage is blocked.
   }
@@ -193,16 +254,10 @@ function monthTitle(view) {
   return monthTitleFormatter.format(new Date(Date.UTC(view.year, view.month - 1, 1)));
 }
 
-function alternateMonthTitle(view, cells, systemId) {
-  const labels = [];
-  for (const cell of cells.filter((entry) => entry.inMonth)) {
-    const alt = describeInSystem(systemId, cell);
-    if (!alt) continue;
-    const label = systemId === "bikram" ? `${alt.monthName} ${alt.year} BS` : `${alt.monthName} ${alt.year}`;
-    if (!labels.includes(label)) labels.push(label);
-  }
-  const gregorian = monthTitle(view);
-  return labels.length ? `${labels.join(" → ")} · ${gregorian}` : gregorian;
+function formatDateSpan(d1, d2) {
+  const t1 = new Date(Date.UTC(d1.year, d1.month - 1, d1.day));
+  const t2 = new Date(Date.UTC(d2.year, d2.month - 1, d2.day));
+  return `${spanDateFormatter.format(t1)} – ${spanDateFormatter.format(t2)}`;
 }
 
 function todayInZone(zone, at = new Date()) {
@@ -213,10 +268,17 @@ function todayInZone(zone, at = new Date()) {
 const FALLBACK_PREFERENCES = { weekStart: "monday", calendarSystem: "gregorian", holidays: {} };
 const WEEK_START_DAYS = { monday: 1, sunday: 0, saturday: 6 };
 
-export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace = () => ({ city: "your home place" }), getPreferences, notify } = {}) {
+export function createCalendar({
+  elements = {},
+  getZone = () => "UTC",
+  getPlace = () => ({ city: "your home place" }),
+  getPreferences,
+  notify,
+} = {}) {
   const state = readCalendarState();
   let bound = false;
   let lastToday = "";
+  let inspectedSystemId = null;
 
   function preferences() {
     try {
@@ -233,8 +295,9 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
 
   function ensureState(now = new Date()) {
     const today = todayInZone(getZone(), now);
-    if (!state.view) state.view = { year: today.year, month: today.month };
     if (!state.selected) state.selected = plainDate(today);
+    if (!state.viewAnchorIso) state.viewAnchorIso = state.selected;
+    if (!state.view) state.view = { year: today.year, month: today.month };
     return today;
   }
 
@@ -254,12 +317,62 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
 
     const selected = parsePlainDate(state.selected) || today;
     const selectedIso = plainDate(selected);
-    const cells = buildMonth({ ...state.view, today, selected: selectedIso, weekStart: start });
+
+    const anchorGreg = parsePlainDate(state.viewAnchorIso) || selected;
+    const monthBounds = findSystemMonthBounds(second.id, anchorGreg);
+
+    state.view = { year: monthBounds.day1Greg.year, month: monthBounds.day1Greg.month };
+    writeCalendarState(state);
+
+    const cells = buildMonth({
+      systemId: second.id,
+      day1Greg: monthBounds.day1Greg,
+      totalDays: monthBounds.totalDays,
+      year: monthBounds.day1Greg.year,
+      month: monthBounds.day1Greg.month,
+      today,
+      selected: selectedIso,
+      weekStart: start,
+    });
+
     const place = getPlace() || {};
     const city = place.city || place.label || "your home place";
 
+    // Format single month title and date range span
+    let displayTitle = "";
+    let displaySpan = "";
+
+    if (second.active && monthBounds.desc) {
+      displayTitle = monthBounds.desc.long.replace(/ \d+,\s*/, " ").replace(/^\d+\s+/, "").replace(/\s*—.*$/, "");
+      if (second.id === "bikram") {
+        displayTitle = `${monthBounds.desc.monthName} ${monthBounds.desc.year} BS`;
+      } else if (second.id === "persian") {
+        displayTitle = `${monthBounds.desc.monthName} ${monthBounds.desc.year} AP`;
+      } else if (second.id === "islamic") {
+        displayTitle = `${monthBounds.desc.monthName} ${monthBounds.desc.year} AH`;
+      } else if (second.id === "hebrew") {
+        displayTitle = `${monthBounds.desc.monthName} ${monthBounds.desc.year} AM`;
+      } else if (second.id === "indian") {
+        displayTitle = `${monthBounds.desc.monthName} ${monthBounds.desc.year} Śaka`;
+      } else if (second.id === "buddhist") {
+        displayTitle = `${monthBounds.desc.monthName} ${monthBounds.desc.year} BE`;
+      } else if (second.id === "japanese") {
+        displayTitle = `${monthBounds.desc.monthName} ${monthBounds.desc.year} ${monthBounds.desc.era || "Reiwa"}`;
+      } else if (second.id === "chinese" || second.id === "dangi") {
+        const zodiacNote = monthBounds.desc.zodiac ? ` (${monthBounds.desc.zodiac} year)` : "";
+        displayTitle = `${monthBounds.desc.monthName} ${monthBounds.desc.year}${zodiacNote}`;
+      }
+      displaySpan = formatDateSpan(monthBounds.day1Greg, monthBounds.endGreg);
+    } else {
+      displayTitle = monthTitle(monthBounds.day1Greg);
+      displaySpan = formatDateSpan(monthBounds.day1Greg, monthBounds.endGreg);
+    }
+
     if (elements.month) {
-      elements.month.textContent = second.active ? alternateMonthTitle(state.view, cells, second.id) : monthTitle(state.view);
+      elements.month.textContent = displayTitle;
+    }
+    if (elements.monthSpan) {
+      elements.monthSpan.textContent = displaySpan;
     }
     if (elements.grid) {
       const card = elements.grid.closest(".calendar-card");
@@ -273,9 +386,9 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
       const todayAlt = second.active ? describeInSystem(second.id, today) : null;
       const weekNote = start === 1 ? "Weeks start on Monday" : `Weeks start on ${start === 0 ? "Sunday" : "Saturday"}`;
       const secondNote = second.active
-        ? ` Primary dates: ${second.system.label}${todayAlt ? ` (${todayAlt.monthLabel || todayAlt.monthName} ${todayAlt.day}, ${todayAlt.year})` : ""}. Gregorian dates stay underneath.`
-        : " Choose a calendar to put its dates first.";
-      elements.summary.textContent = `Today in ${city}: ${todayDetail.title}. ${weekNote}. ${secondNote}`;
+        ? ` Primary calendar: ${second.system.label} (showing full 1-month duration of ${displayTitle}, ${displaySpan}) with Gregorian dates underneath. Today is ${todayAlt ? todayAlt.long : todayDetail.short}.`
+        : " Showing 1-month duration with international observances & national days.";
+      elements.summary.textContent = `Today in ${city}: ${todayDetail.title}. ${weekNote}.${secondNote}`;
     }
     if (elements.todayPill) {
       const todayAlt = second.active ? describeInSystem(second.id, today) : null;
@@ -283,7 +396,7 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
     }
     if (elements.systemBadge) {
       elements.systemBadge.hidden = !second.active;
-      elements.systemBadge.textContent = second.active ? `PRIMARY · ${second.system.label}` : "";
+      elements.systemBadge.textContent = second.active ? `PRIMARY · ${second.system.label} (1 MONTH)` : "";
     }
     if (elements.grid) {
       const labels = weekdayLabels(start);
@@ -300,7 +413,7 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
           const events = eventsForDate(cell, prefs.holidays);
           for (const event of events) markedCategories.add(event.category);
           const notes = notesForDate(cell.iso);
-          const alt = second.active ? describeInSystem(second.id, cell) : null;
+          const alt = second.active ? cell.alt : null;
           if (events.length || notes.length) classes.push("is-marked");
 
           const label = describeDate(cell, today).title;
@@ -316,16 +429,14 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
           if (events.length > 3) dots.push(`<span class="calendar-dot-extra">+${events.length - 3}</span>`);
           if (notes.length) dots.push('<span class="calendar-dot calendar-dot-note"></span>');
 
-          const primaryNumber = second.active && alt ? alt.cell : String(cell.day);
-          const dateUnderneath = second.active && alt
-            ? `<span class="calendar-alt calendar-gregorian-date" title="Gregorian date">${cell.day}</span>`
-            : alt
-              ? `<span class="calendar-alt" title="${escapeHTML(alt.monthLabel || alt.long)}">${escapeHTML(alt.cell)}</span>`
-              : "";
-          if (second.active && alt) classes.push("is-calendar-primary");
+          const primaryNumber = second.active ? (alt ? alt.day : cell.primaryDay) : cell.day;
+          const dateUnderneath = second.active
+            ? `<span class="calendar-alt calendar-gregorian-date" title="Gregorian date: ${escapeHTML(label)}">${cell.gregorianDay}</span>`
+            : "";
+          if (second.active) classes.push("is-calendar-primary");
 
           return `<button type="button" class="${classes.join(" ")}" role="gridcell" data-date="${escapeHTML(cell.iso)}" aria-pressed="${cell.isSelected}" aria-label="${escapeHTML(aria.join(" — "))}${cell.isToday ? ", today" : ""}">
-            <span class="calendar-number" title="${escapeHTML(alt ? (alt.monthLabel || alt.long) : label)}">${escapeHTML(primaryNumber)}</span>
+            <span class="calendar-number" title="${escapeHTML(alt ? alt.long : label)}">${escapeHTML(String(primaryNumber))}</span>
             ${dateUnderneath}
             ${cell.isToday ? '<small class="calendar-day-tag">Today</small>' : ""}
             ${dots.length ? `<span class="calendar-dots">${dots.join("")}</span>` : ""}
@@ -339,6 +450,7 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
     }
 
     renderSelected(selected, today, prefs);
+    renderSpecificationsGuide(second.id);
   }
 
   function renderLegend(prefs, markedCategories) {
@@ -353,7 +465,7 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
       });
     parts.push(`<span class="calendar-legend-item"><span class="calendar-dot calendar-dot-note"></span>Your note</span>`);
     if (second.active) {
-      parts.push(`<span class="calendar-legend-item calendar-legend-alt">Primary date: ${escapeHTML(second.system.label)} · Gregorian underneath</span>`);
+      parts.push(`<span class="calendar-legend-item calendar-legend-alt">Primary: ${escapeHTML(second.system.label)} (1-month duration) · Gregorian underneath</span>`);
     }
     elements.legend.innerHTML = parts.join("");
   }
@@ -427,11 +539,79 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
     }
   }
 
+  function renderSpecificationsGuide(systemId) {
+    if (!elements.specsCard) return;
+    const currentId = inspectedSystemId || systemId || "bikram";
+    const sys = calendarSystem(currentId);
+
+    const tabsHtml = CALENDAR_SYSTEMS.map(
+      (entry) => `<button type="button" class="seg-button calendar-spec-tab${entry.id === currentId ? " active" : ""}" data-spec-system="${escapeHTML(entry.id)}">
+        ${escapeHTML(entry.label)}
+      </button>`
+    ).join("");
+
+    const monthsHtml = (sys.months || [])
+      .map(
+        (m, idx) => `<tr>
+          <td><span class="calendar-spec-ord">${m.ordinal || idx + 1}</span></td>
+          <td><strong>${escapeHTML(m.name)}</strong>${m.native ? ` <small class="calendar-spec-native">(${escapeHTML(m.native)})</small>` : ""}</td>
+          <td><code>${escapeHTML(String(m.days || "—"))}</code></td>
+          <td><span class="calendar-spec-note">${escapeHTML(m.season || m.note || "—")}</span></td>
+        </tr>`
+      )
+      .join("");
+
+    elements.specsCard.innerHTML = `
+      <div class="calculator-card-heading">
+        <div>
+          <p class="card-label">SPECIFICATIONS &amp; CELEBRATION DATES</p>
+          <h3 id="calendar-specs-heading">${escapeHTML(sys.label)} ${sys.nativeLabel ? `(${escapeHTML(sys.nativeLabel)})` : ""}</h3>
+        </div>
+        <span class="formula-icon soft" aria-hidden="true">📖</span>
+      </div>
+      <div class="segmented wrap calendar-spec-tabs" role="tablist" aria-label="Select calendar specification">
+        ${tabsHtml}
+      </div>
+      <div class="calendar-spec-details">
+        <dl class="calendar-spec-meta">
+          <div><dt>Calendar Type</dt><dd>${escapeHTML(sys.type || "Solar")}</dd></div>
+          <div><dt>Origin / Epoch</dt><dd>${escapeHTML(sys.epoch || "—")}</dd></div>
+          <div><dt>Region &amp; Culture</dt><dd>${escapeHTML(sys.place || "—")}</dd></div>
+          <div><dt>Regularity &amp; Rules</dt><dd>${escapeHTML(sys.rule || sys.note || "—")}</dd></div>
+        </dl>
+        <p class="eyebrow calendar-spec-subhead">SPECIFIC MONTHS &amp; DURATIONS (${(sys.months || []).length} MONTHS)</p>
+        <div class="calendar-spec-table-wrap">
+          <table class="calendar-spec-table">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Month Name &amp; Native</th>
+                <th scope="col">Days</th>
+                <th scope="col">Season &amp; Observance Highlights</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${monthsHtml}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    const specButtons = elements.specsCard.querySelectorAll("[data-spec-system]");
+    specButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        inspectedSystemId = btn.dataset.specSystem;
+        renderSpecificationsGuide(second.id);
+      });
+    });
+  }
+
   function selectDate(iso, { silent = false } = {}) {
     const date = parsePlainDate(iso);
     if (!date) return false;
     state.selected = plainDate(date);
-    state.view = { year: date.year, month: date.month };
+    state.viewAnchorIso = state.selected;
     writeCalendarState(state);
     render();
     if (!silent && typeof notify === "function") notify(`${describeDate(date, ensureState()).short} selected in Calendar.`);
@@ -440,21 +620,22 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
 
   function changeMonth(amount) {
     ensureState();
-    const selected = parsePlainDate(state.selected) || { day: 1 };
-    state.view = addMonths(state.view, amount);
-    state.selected = plainDate({
-      year: state.view.year,
-      month: state.view.month,
-      day: Math.min(selected.day, daysInMonth(state.view.year, state.view.month)),
-    });
+    const prefs = preferences();
+    const second = systemInfo(prefs);
+    const anchorGreg = parsePlainDate(state.viewAnchorIso) || parsePlainDate(state.selected) || todayInZone(getZone());
+    const currentBounds = findSystemMonthBounds(second.id, anchorGreg);
+    const nextDay1 = stepSystemMonth(second.id, currentBounds.day1Greg, amount);
+
+    state.viewAnchorIso = plainDate(nextDay1);
+    state.selected = plainDate(nextDay1);
     writeCalendarState(state);
     render();
   }
 
   function jumpToToday() {
     const today = ensureState();
-    state.view = { year: today.year, month: today.month };
     state.selected = plainDate(today);
+    state.viewAnchorIso = plainDate(today);
     writeCalendarState(state);
     render();
     if (typeof notify === "function") notify("Calendar returned to today.");
@@ -542,8 +723,9 @@ export function createCalendar({ elements = {}, getZone = () => "UTC", getPlace 
       ensureState(now);
       render(now);
     },
-    /** Re-read preferences (week start, primary calendar, holiday sets) now. */
     refreshPreferences(now = new Date()) {
+      ensureState(now);
+      state.viewAnchorIso = state.selected;
       render(now);
     },
     selectDate,
