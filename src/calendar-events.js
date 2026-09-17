@@ -505,10 +505,38 @@ function setEnabled(sets, category) {
   return sets[category] !== false;
 }
 
+/**
+ * When a specific calendar system is the active one (anything but Gregorian),
+ * its national/cultural/religious events are scoped to that calendar's own
+ * home place — Nepal for Bikram Sambat, China for the Chinese calendar, and
+ * so on. International-day observances (the "world" set) stay visible under
+ * every calendar, since they are dated by convention rather than owned by
+ * one culture. Gregorian keeps the full, unscoped worldwide table — it is
+ * the "everything" civil calendar most dashboards already show.
+ */
+export const SYSTEM_HOME_PLACES = {
+  bikram: ["Nepal"],
+  chinese: ["China"],
+  dangi: ["Korea", "South Korea", "North Korea"],
+  hebrew: ["Israel"],
+  islamic: [],
+  persian: ["Iran", "Afghanistan"],
+  indian: ["India"],
+  buddhist: ["Thailand"],
+  japanese: ["Japan"],
+};
+
+function placeMatches(place, allowedPlaces) {
+  if (!allowedPlaces || allowedPlaces.length === 0) return false;
+  if (!place) return false;
+  return allowedPlaces.some((allowed) => place.includes(allowed));
+}
+
 function addNepaliDate(event, bs) {
   return {
     ...event,
     nepali: true,
+    system: "bikram",
     bs: bs
       ? {
           year: bs.year,
@@ -521,9 +549,41 @@ function addNepaliDate(event, bs) {
 }
 
 /**
- * Every event landing on a plain Gregorian date, filtered by the enabled sets.
+ * Which calendar system "owns" an event: the one whose own dates and
+ * culture it belongs to. Events computed straight off a calendar system
+ * (Chinese New Year, Ramadan, Rosh Hashanah, Nepali festivals…) already
+ * carry that system's id. Fixed Gregorian-dated national and cultural days
+ * are attributed by their place. Anything left over (Christmas, Easter,
+ * generic international days) has no single owning calendar — it only
+ * shows on the unscoped Gregorian view.
  */
-export function eventsForDate(date, sets) {
+function ownerSystem(event) {
+  if (event.system) return event.system;
+  if (event.place) {
+    for (const [systemId, places] of Object.entries(SYSTEM_HOME_PLACES)) {
+      if (placeMatches(event.place, places)) return systemId;
+    }
+  }
+  return null;
+}
+
+/**
+ * When a specific calendar is active, keep only that calendar's own
+ * national/cultural/religious dates plus the always-shared international
+ * days. The unscoped Gregorian view keeps every event, exactly as before.
+ */
+function scopeToSystem(events, systemId) {
+  if (!systemId || systemId === "gregorian") return events;
+  return events.filter((event) => event.category === "world" || ownerSystem(event) === systemId);
+}
+
+/**
+ * Every event landing on a plain Gregorian date, filtered by the enabled
+ * sets and — when a calendar system other than Gregorian is active — scoped
+ * to that calendar's own specification (its own national days, festivals,
+ * and religious observances only).
+ */
+export function eventsForDate(date, sets, systemId) {
   const events = [];
   for (const [month, day, name, category, place] of FIXED_EVENTS) {
     if (date.month !== month || date.day !== day) continue;
@@ -576,8 +636,28 @@ export function eventsForDate(date, sets) {
     }
   }
 
+  // Nepal's national days are published both as a fixed Gregorian date and
+  // as their true Bikram Sambat date; when both rules land on the same day
+  // they describe the same holiday. Keep the Bikram Sambat-tagged copy —
+  // it carries the BS month/day the specification card and detail view show.
+  const deduped = [];
+  const seen = new Map();
+  for (const event of events) {
+    const key = `${event.category}:${event.name}`;
+    const existing = seen.get(key);
+    if (!existing) {
+      seen.set(key, event);
+      deduped.push(event);
+    } else if (event.bs && !existing.bs) {
+      const index = deduped.indexOf(existing);
+      deduped[index] = event;
+      seen.set(key, event);
+    }
+  }
+
   const order = new Map(EVENT_CATEGORIES.map((category, index) => [category.id, index]));
-  return events.sort((a, b) => order.get(a.category) - order.get(b.category) || a.name.localeCompare(b.name));
+  const sorted = deduped.sort((a, b) => order.get(a.category) - order.get(b.category) || a.name.localeCompare(b.name));
+  return scopeToSystem(sorted, systemId);
 }
 
 export const HOLIDAY_SET_IDS = ALL_SETS;

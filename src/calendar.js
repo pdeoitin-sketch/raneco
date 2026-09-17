@@ -1,19 +1,28 @@
 /**
- * A home-zone calendar that speaks more than one calendar with true
- * month-wise duration for each calendar system.
+ * A home-zone calendar that can wear any one of ten real calendar systems
+ * at a time — Gregorian, Bikram Sambat, Chinese, Korean Dangi, Hebrew,
+ * Islamic, Persian, Indian Śaka, Thai Buddhist, or Japanese.
  *
- * The spine follows your home place, highlights that place's today,
- * and remembers the month and day you were looking at.
+ * Whichever calendar you pick becomes the real month you are looking at:
+ * its own month name, its own month length, its own "Previous / Next
+ * month" stepping, and its own festivals, national days and religious
+ * observances — not a small translation squeezed under a Gregorian grid.
+ * A quiet Gregorian date still rides along under every cell so you always
+ * know which everyday date a festival falls on, but Gregorian never owns
+ * the page unless you have actually chosen it.
  *
  * Features:
- *   • Stable universal month grid: January stays January and Gregorian day
- *     numbers remain the prominent civil-calendar spine.
- *   • Bikram Sambat, Islamic, Hebrew, Persian, Indian Śaka, Chinese, Korean
- *     Dangi, Thai Buddhist and Japanese dates can be shown as a compact,
- *     clearly abbreviated secondary line in every cell.
+ *   • Full month-wise duration for every calendar: Baisakh 1–31, Ramadan
+ *     1–30, Tishri 1–30, Farvardin 1–31 — real month lengths, not a
+ *     Gregorian grid wearing a costume.
+ *   • Switching calendars is a real, one-tap display change: the month
+ *     title, the big day numbers, the "Today" pill, the legend and the
+ *     specification card all follow the calendar you chose.
+ *   • Holidays, national days, democracy & freedom days, cultural festivals
+ *     and religious observances are scoped to the active calendar's own
+ *     culture (Nepal for Bikram Sambat, China for the Chinese calendar…),
+ *     plus the international days that are shared by every calendar.
  *   • Week starts on Monday, Sunday, or Saturday (Settings).
- *   • Holidays, national days, democracy & freedom days, cultural festivals,
- *     and religious observances marked with category dots.
  *   • Full specifications, month catalogues, regularities, and celebration
  *     dates for all 10 calendar systems.
  *   • Device-local notes pinned to any date.
@@ -25,6 +34,8 @@ import {
   CALENDAR_SYSTEMS,
   calendarSystem,
   describeInSystem,
+  findSystemMonthBounds,
+  stepSystemMonth,
 } from "./calendar-systems.js";
 import { eventCategory, eventsForDate } from "./calendar-events.js";
 import { addNote, notesForDate, removeNote } from "./calendar-notes.js";
@@ -40,6 +51,7 @@ const monthTitleFormatter = getFormatter("en-US", { timeZone: "UTC", month: "lon
 const fullDateFormatter = getFormatter("en-US", { timeZone: "UTC", weekday: "long", month: "long", day: "numeric", year: "numeric" });
 const shortDateFormatter = getFormatter("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
 const spanDateFormatter = getFormatter("en-US", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
+const monthDayFormatter = getFormatter("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
 
 export function pad2(value) {
   return String(value).padStart(2, "0");
@@ -219,10 +231,11 @@ export function readCalendarState(storage) {
     const parsed = JSON.parse(store.getItem(CALENDAR_STORAGE_KEY) || "{}");
     const view = parseYearMonth(parsed.view);
     const selected = parsePlainDate(parsed.selected);
+    const anchor = parsePlainDate(parsed.viewAnchorIso);
     return {
       view: view || null,
       selected: selected ? plainDate(selected) : "",
-      viewAnchorIso: parsed.viewAnchorIso || (selected ? plainDate(selected) : ""),
+      viewAnchorIso: anchor ? plainDate(anchor) : (selected ? plainDate(selected) : ""),
       viewSystem: parsed.viewSystem || "",
     };
   } catch (_) {
@@ -246,10 +259,6 @@ function writeCalendarState(state) {
   }
 }
 
-function monthTitle(view) {
-  return monthTitleFormatter.format(new Date(Date.UTC(view.year, view.month - 1, 1)));
-}
-
 function formatDateSpan(d1, d2) {
   const t1 = new Date(Date.UTC(d1.year, d1.month - 1, d1.day));
   const t2 = new Date(Date.UTC(d2.year, d2.month - 1, d2.day));
@@ -263,6 +272,24 @@ function todayInZone(zone, at = new Date()) {
 
 const FALLBACK_PREFERENCES = { weekStart: "monday", calendarSystem: "gregorian", holidays: {} };
 const WEEK_START_DAYS = { monday: 1, sunday: 0, saturday: 6 };
+
+/**
+ * The active calendar's own title for the month currently on screen: its
+ * month name plus its own year, in that calendar's own numbering — not the
+ * Gregorian month the underlying dates happen to fall across.
+ */
+function systemMonthTitle(system, bounds) {
+  if (system.id === "gregorian") {
+    return monthTitleFormatter.format(new Date(Date.UTC(bounds.day1Greg.year, bounds.day1Greg.month - 1, 1)));
+  }
+  const desc = bounds.desc;
+  if (!desc) return monthTitleFormatter.format(new Date(Date.UTC(bounds.day1Greg.year, bounds.day1Greg.month - 1, 1)));
+  const monthName = desc.monthName || system.months?.[((desc.month || 1) - 1 + system.months.length) % system.months.length]?.name || "";
+  const year = desc.year ?? desc.relatedYear ?? bounds.day1Greg.year;
+  const era = system.id === "islamic" ? "AH" : system.id === "hebrew" ? "AM" : system.id === "persian" ? "AP" : system.id === "indian" ? "Śaka" : system.id === "buddhist" ? "BE" : system.id === "japanese" ? (desc.era || "Reiwa") : system.id === "bikram" ? "BS" : "";
+  const zodiacNote = system.zodiac && desc.zodiac ? ` · ${desc.zodiac} year` : "";
+  return `${monthName} ${year}${era ? ` ${era}` : ""}${zodiacNote}`;
+}
 
 export function createCalendar({
   elements = {},
@@ -297,9 +324,21 @@ export function createCalendar({
     return today;
   }
 
-  function systemInfo(prefs = preferences()) {
-    const system = calendarSystem(prefs.calendarSystem);
-    return { id: system.id, system, active: system.id !== "gregorian" };
+  function activeSystem(prefs = preferences()) {
+    return calendarSystem(prefs.calendarSystem);
+  }
+
+  /**
+   * Resolves the month bounds (Gregorian day 1, day count, that calendar's
+   * own month/year description) for whatever the anchor date currently is,
+   * in the active calendar system. If the preference's calendar changed
+   * since the anchor was set, this re-derives the anchor from `selected`
+   * (or today) so switching calendars always lands on a sensible month.
+   */
+  function currentBounds(system, today) {
+    const anchorIso = state.viewAnchorIso || state.selected || plainDate(today);
+    const anchor = parsePlainDate(anchorIso) || today;
+    return findSystemMonthBounds(system.id, anchor);
   }
 
   function render(now = new Date()) {
@@ -309,68 +348,68 @@ export function createCalendar({
 
     const prefs = preferences();
     const start = weekStartDay(prefs);
-    const second = systemInfo(prefs);
+    const system = activeSystem(prefs);
+    const isGregorian = system.id === "gregorian";
 
     const selected = parsePlainDate(state.selected) || today;
     const selectedIso = plainDate(selected);
 
-    // Gregorian is the stable, universal civil spine. Choosing another
-    // calendar never changes which month Previous / Next means: January stays
-    // January, February stays February, and the chosen system is a compact
-    // translation inside each day cell.
-    const view = state.view || { year: today.year, month: today.month };
-    const monthStart = { year: view.year, month: view.month, day: 1 };
-    const monthEnd = { year: view.year, month: view.month, day: daysInMonth(view.year, view.month) };
+    // Whichever calendar is active becomes the real month on screen: its
+    // own day-1, its own day count, and (for non-Gregorian systems) its own
+    // month name and year. Previous / Next step that calendar's months.
+    const bounds = currentBounds(system, today);
+    const monthStart = bounds.day1Greg;
+    const monthEnd = bounds.endGreg;
+    state.view = { year: monthStart.year, month: monthStart.month };
     state.viewAnchorIso = plainDate(monthStart);
+    state.viewSystem = system.id;
     writeCalendarState(state);
 
     const cells = buildMonth({
-      systemId: second.id,
-      year: view.year,
-      month: view.month,
+      systemId: system.id,
+      year: monthStart.year,
+      month: monthStart.month,
       today,
       selected: selectedIso,
       weekStart: start,
+      day1Greg: monthStart,
+      totalDays: bounds.totalDays,
     });
 
     const place = getPlace() || {};
     const city = place.city || place.label || "your home place";
-    const displayTitle = monthTitle(view);
+    const displayTitle = systemMonthTitle(system, bounds);
     const displaySpan = formatDateSpan(monthStart, monthEnd);
 
     if (elements.month) {
       elements.month.textContent = displayTitle;
     }
     if (elements.monthSpan) {
-      elements.monthSpan.textContent = displaySpan;
+      elements.monthSpan.textContent = isGregorian ? displaySpan : `${displaySpan} · Gregorian`;
     }
     if (elements.grid) {
       const card = elements.grid.closest(".calendar-card");
       if (card) {
-        card.dataset.calendarSecondary = second.active ? second.id : "none";
-        card.dataset.calendarLabel = second.active ? second.system.label : "No secondary calendar";
+        card.dataset.calendarPrimary = system.id;
+        card.dataset.calendarLabel = system.label;
       }
     }
     if (elements.summary) {
       const todayDetail = describeDate(today, today);
-      const todayAlt = second.active ? describeInSystem(second.id, today) : null;
+      const todayAlt = !isGregorian ? describeInSystem(system.id, today) : null;
       const weekNote = start === 1 ? "Weeks start on Monday" : `Weeks start on ${start === 0 ? "Sunday" : "Saturday"}`;
-      const secondNote = second.active
-        ? ` ${second.system.label} is the small secondary date (${second.system.shortLabel}) beside each universal Gregorian day. Today is ${todayAlt ? todayAlt.long : todayDetail.short}.`
-        : " Gregorian is the universal calendar, with international observances and national days marked in color.";
-      elements.summary.textContent = `Today in ${city}: ${todayDetail.title}. ${weekNote}.${secondNote}`;
+      const systemNote = isGregorian
+        ? " Gregorian is the calendar shown, with international observances and national days marked in color."
+        : ` ${system.label} is the calendar shown, with its own national days, festivals and observances marked in color. Gregorian's ${todayDetail.short} runs quietly under each date.`;
+      elements.summary.textContent = `Today in ${city}: ${todayAlt ? todayAlt.long : todayDetail.title}. ${weekNote}.${systemNote}`;
     }
     if (elements.todayPill) {
-      const todayAlt = second.active ? describeInSystem(second.id, today) : null;
-      elements.todayPill.textContent = todayAlt
-        ? `TODAY · ${todayIso} · ${second.system.shortLabel} ${todayAlt.day}`
-        : `TODAY · ${todayIso}`;
+      const todayAlt = !isGregorian ? describeInSystem(system.id, today) : null;
+      elements.todayPill.textContent = todayAlt ? `TODAY · ${todayAlt.long}` : `TODAY · ${todayIso}`;
     }
     if (elements.systemBadge) {
-      elements.systemBadge.hidden = !second.active;
-      elements.systemBadge.textContent = second.active
-        ? `SECONDARY · ${second.system.shortLabel} · ${second.system.label}`
-        : "";
+      elements.systemBadge.hidden = isGregorian;
+      elements.systemBadge.textContent = isGregorian ? "" : `${system.shortLabel} · ${system.label}`;
     }
     if (elements.grid) {
       const labels = weekdayLabels(start);
@@ -384,15 +423,16 @@ export function createCalendar({
           if (cell.isSelected) classes.push("is-selected");
           if (cell.isWeekend) classes.push("is-weekend");
 
-          const events = eventsForDate(cell, prefs.holidays);
+          const events = eventsForDate(cell, prefs.holidays, system.id);
           for (const event of events) markedCategories.add(event.category);
           const notes = notesForDate(cell.iso);
-          const alt = second.active ? cell.alt : null;
+          const alt = !isGregorian ? cell.alt : null;
           if (events.length || notes.length) classes.push("is-marked");
+          if (!isGregorian) classes.push("has-primary-calendar");
 
           const label = describeDate(cell, today).title;
-          const aria = [label];
-          if (alt) aria.push(`${alt.label}: ${alt.long}`);
+          const aria = [alt ? alt.long : label];
+          if (alt) aria.push(`Gregorian: ${label}`);
           if (events.length) aria.push(events.map((event) => event.name).join(", "));
           if (notes.length) aria.push(`${notes.length} note${notes.length === 1 ? "" : "s"}`);
 
@@ -403,32 +443,34 @@ export function createCalendar({
           if (events.length > 3) dots.push(`<span class="calendar-dot-extra">+${events.length - 3}</span>`);
           if (notes.length) dots.push('<span class="calendar-dot calendar-dot-note"></span>');
 
-          const secondaryDate = alt
-            ? `<span class="calendar-alt calendar-secondary-date" title="${escapeHTML(`${second.system.label}: ${alt.long}`)}"><abbr title="${escapeHTML(second.system.label)}">${escapeHTML(second.system.shortLabel)}</abbr> ${escapeHTML(alt.cell || String(alt.day))}</span>`
+          // The active calendar owns the large number in each cell. A quiet
+          // Gregorian date rides underneath for orientation — never the
+          // other way around.
+          const primaryNumber = alt ? (alt.day ?? cell.gregorianDay) : cell.day;
+          const gregorianLine = !isGregorian
+            ? `<span class="calendar-alt calendar-gregorian-date" title="${escapeHTML(`Gregorian: ${label}`)}">${escapeHTML(monthDayFormatter.format(new Date(Date.UTC(cell.year, cell.month - 1, cell.day))))}</span>`
             : "";
-          if (second.active) classes.push("has-secondary-calendar");
 
           return `<button type="button" class="${classes.join(" ")}" role="gridcell" data-date="${escapeHTML(cell.iso)}" aria-pressed="${cell.isSelected}" aria-label="${escapeHTML(aria.join(" — "))}${cell.isToday ? ", today" : ""}">
-            <span class="calendar-number" title="${escapeHTML(label)}">${escapeHTML(String(cell.day))}</span>
-            ${secondaryDate}
+            <span class="calendar-number" title="${escapeHTML(alt ? alt.long : label)}">${escapeHTML(String(primaryNumber))}</span>
+            ${gregorianLine}
             ${cell.isToday ? '<small class="calendar-day-tag">Today</small>' : ""}
             ${dots.length ? `<span class="calendar-dots">${dots.join("")}</span>` : ""}
           </button>`;
         })
         .join("");
       elements.grid.innerHTML = weekdays + days;
-      renderLegend(prefs, markedCategories);
+      renderLegend(prefs, markedCategories, system);
     } else {
-      renderLegend(prefs, new Set());
+      renderLegend(prefs, new Set(), system);
     }
 
     renderSelected(selected, today, prefs);
-    renderSpecificationsGuide(second.id);
+    renderSpecificationsGuide(system.id);
   }
 
-  function renderLegend(prefs, markedCategories) {
+  function renderLegend(prefs, markedCategories, system) {
     if (!elements.legend) return;
-    const second = systemInfo(prefs);
     const order = new Map([["world", 0], ["national", 1], ["cultural", 2], ["religious", 3]]);
     const parts = [...markedCategories]
       .sort((a, b) => (order.get(a) ?? 9) - (order.get(b) ?? 9))
@@ -437,17 +479,18 @@ export function createCalendar({
         return `<span class="calendar-legend-item"><span class="calendar-dot" data-cat="${escapeHTML(category.id)}"></span>${escapeHTML(category.label)}</span>`;
       });
     parts.push(`<span class="calendar-legend-item"><span class="calendar-dot calendar-dot-note"></span>Your note</span>`);
-    if (second.active) {
-      parts.push(`<span class="calendar-legend-item calendar-legend-alt"><strong>Universal:</strong> Gregorian · <strong>Secondary:</strong> ${escapeHTML(second.system.shortLabel)} · ${escapeHTML(second.system.label)}</span>`);
+    if (system && system.id !== "gregorian") {
+      parts.push(`<span class="calendar-legend-item calendar-legend-alt"><strong>Calendar:</strong> ${escapeHTML(system.shortLabel)} · ${escapeHTML(system.label)} · <strong>Also shown:</strong> Gregorian</span>`);
     }
     elements.legend.innerHTML = parts.join("");
   }
 
   function renderSelected(selected, today, prefs = preferences()) {
     const detail = describeDate(selected, today);
-    const second = systemInfo(prefs);
-    const alt = second.active ? describeInSystem(second.id, selected) : null;
-    if (elements.selectedTitle) elements.selectedTitle.textContent = detail.title;
+    const system = activeSystem(prefs);
+    const isGregorian = system.id === "gregorian";
+    const alt = !isGregorian ? describeInSystem(system.id, selected) : null;
+    if (elements.selectedTitle) elements.selectedTitle.textContent = alt ? alt.long : detail.title;
     if (elements.selectedMeta) {
       elements.selectedMeta.textContent = detail.today
         ? "This is today in your home place."
@@ -462,16 +505,16 @@ export function createCalendar({
       elements.secondary.hidden = !alt;
       if (alt) {
         const monthNames = alt.monthLabel && alt.system === "bikram" ? ` · ${alt.monthLabel}` : "";
-        elements.secondary.textContent = `${second.system.shortLabel} · ${second.system.label}: ${alt.long}${monthNames}${alt.approximate ? " (tabular date — may differ locally by a day)" : ""}`;
+        elements.secondary.textContent = `Gregorian: ${detail.title}${monthNames}${alt.approximate ? " (tabular date — may differ locally by a day)" : ""}`;
       }
     }
 
-    renderSelectedEvents(selected, prefs);
+    renderSelectedEvents(selected, prefs, system);
     renderNotes(selected);
   }
 
-  function renderSelectedEvents(selected, prefs) {
-    const events = eventsForDate(selected, prefs.holidays);
+  function renderSelectedEvents(selected, prefs, system) {
+    const events = eventsForDate(selected, prefs.holidays, system.id);
     if (elements.eventsBlock) elements.eventsBlock.hidden = false;
     if (elements.events) {
       elements.events.innerHTML = events.length
@@ -573,7 +616,7 @@ export function createCalendar({
     specButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
         inspectedSystemId = btn.dataset.specSystem;
-        renderSpecificationsGuide(second.id);
+        renderSpecificationsGuide(activeSystem().id);
       });
     });
   }
@@ -590,12 +633,15 @@ export function createCalendar({
   }
 
   function changeMonth(amount) {
-    ensureState();
-    // Navigation always follows the universal Gregorian month. The secondary
-    // calendar is a translation, so choosing it can never turn “next month”
-    // into a partial January/February view or unexpectedly change the spine.
-    state.view = addMonths(state.view, amount);
-    const nextDay1 = { ...state.view, day: 1 };
+    const today = ensureState();
+    const system = activeSystem();
+    // Navigation follows whichever calendar is active: stepping "next
+    // month" in Bikram Sambat moves by a real Bikram Sambat month, in
+    // Islamic by a real Hijri month, and so on — never a hidden Gregorian
+    // month underneath a translated label.
+    const bounds = currentBounds(system, today);
+    const nextDay1 = stepSystemMonth(system.id, bounds.day1Greg, amount);
+    state.view = { year: nextDay1.year, month: nextDay1.month };
     state.viewAnchorIso = plainDate(nextDay1);
     state.selected = plainDate(nextDay1);
     writeCalendarState(state);
@@ -696,6 +742,9 @@ export function createCalendar({
     },
     refreshPreferences(now = new Date()) {
       ensureState(now);
+      // A calendar switch re-anchors the view from the selected date, so
+      // "Ashwin 2083" appears the instant you pick Bikram Sambat rather
+      // than a stale Gregorian month carried over from before.
       state.viewAnchorIso = state.selected;
       render(now);
     },

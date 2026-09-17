@@ -3365,26 +3365,12 @@ body[data-ui="dark"] .alarm-schedule-chip.active { color: #d5cdff; }
 .custom-sound[open] > summary > span:last-child { transform: rotate(45deg); }
 .custom-sound-body { padding: 3px 13px 14px; border-top: 1px solid var(--line); }
 
-/* Gregorian stays large; the selected cultural date is compact and named. */
-.universal-calendar-label { display: inline-flex; align-items: center; gap: 9px; }
-.universal-calendar-icon {
-  width: 37px;
-  height: 37px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  color: var(--on-violet);
-  background: linear-gradient(145deg, var(--violet), var(--violet-dark));
-  box-shadow: 0 7px 16px color-mix(in srgb, var(--violet) 22%, transparent);
-  font-family: var(--font-display);
-  font-weight: 700;
-}
-.universal-calendar-label > span:last-child { display: grid; gap: 1px; }
-.universal-calendar-label strong { font-size: 13.5px; }
-.universal-calendar-label small { color: var(--ink-3); font-size: 10.5px; }
+/* The chosen calendar owns the big number; a quiet Gregorian date is a
+ * compact chip underneath it for orientation. */
 .calendar-toolbar { align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface-raised); }
-.calendar-system-field { margin-left: auto; }
-.calendar-secondary-date {
+.calendar-system-field-main { width: 100%; max-width: 360px; }
+.calendar-system-field-main select { max-width: none; width: 100%; }
+.calendar-gregorian-date {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -3394,14 +3380,12 @@ body[data-ui="dark"] .alarm-schedule-chip.active { color: #d5cdff; }
   border-radius: 6px;
   color: var(--ink-3);
   background: var(--canvas-soft);
+  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0;
 }
-.calendar-secondary-date abbr { color: var(--violet-dark); font-family: var(--font-sans); font-size: 8px; font-weight: 800; letter-spacing: .45px; text-decoration: none; }
-body[data-ui="dark"] .calendar-secondary-date abbr { color: #cfc5ff; }
-.calendar-day.is-selected .calendar-secondary-date { color: color-mix(in srgb, var(--on-violet) 82%, transparent); background: color-mix(in srgb, var(--on-violet) 14%, transparent); }
-.calendar-day.is-selected .calendar-secondary-date abbr { color: var(--on-violet); }
+.calendar-day.is-selected .calendar-gregorian-date { color: color-mix(in srgb, var(--on-violet) 82%, transparent); background: color-mix(in srgb, var(--on-violet) 14%, transparent); }
 .calendar-day { min-height: 82px; }
 .calendar-number { font-size: 22px; }
 .calendar-system-badge { max-width: 245px; overflow: hidden; text-overflow: ellipsis; }
@@ -3473,8 +3457,7 @@ body[data-current-page="settings"] .settings-layout > :nth-child(8) { grid-colum
   .timer-adjust-row { flex-wrap: wrap; }
   .timer-adjust-row > span { flex-basis: 100%; }
   .calendar-day { min-height: 62px; padding: 6px; }
-  .calendar-secondary-date { padding: 1px 3px; font-size: 8.5px; }
-  .calendar-secondary-date abbr { font-size: 7px; }
+  .calendar-gregorian-date { padding: 1px 3px; font-size: 8.5px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .timer-ring::after,
