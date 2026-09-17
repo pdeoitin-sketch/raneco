@@ -1274,7 +1274,7 @@ describe("tempo in a browser-like DOM", () => {
     assert.ok(app.$("#calendar-grid .calendar-day.is-today.is-selected"), "Today jumps back and selects today");
   });
 
-  test("calendar carries a second calendar, holiday marks and your own notes", async () => {
+  test("switching calendars makes the chosen system the real month, with its own festivals", async () => {
     // Seed the view at September 2026 so the fixed-date assertions hold on
     // whatever day the suite happens to run.
     app = await boot({
@@ -1283,7 +1283,8 @@ describe("tempo in a browser-like DOM", () => {
     });
     await app.go("calendar");
 
-    // Bikram Sambat: the toolbar picker and the Settings card share a catalogue.
+    // One calendar picker drives the whole page; the toolbar and Settings
+    // card share the same catalogue.
     const systemSelect = app.$("#calendar-system");
     assert.ok(systemSelect.querySelector('option[value="bikram"]'), "Bikram Sambat is on offer");
     assert.ok(systemSelect.querySelector('option[value="chinese"]'), "Chinese is on offer");
@@ -1292,12 +1293,14 @@ describe("tempo in a browser-like DOM", () => {
     systemSelect.dispatchEvent(new app.window.Event("change", { bubbles: true }));
     await wait(40);
 
-    assert.ok(app.$("#calendar-grid .calendar-day .calendar-alt"), "cells carry the named secondary date");
-    assert.match(app.$("#calendar-summary").textContent, /Bikram Sambat/);
-    assert.equal(app.$("#calendar-month").textContent, "September 2026", "the universal Gregorian month stays main");
+    // Bikram Sambat is now the real month: its own month name and year,
+    // not a translated label under a Gregorian grid.
+    assert.match(app.$("#calendar-month").textContent, /Ashwin 2083/, "the chosen calendar's own month and year lead the page");
+    assert.match(app.$("#calendar-summary").textContent, /Ashwin/);
+    assert.ok(app.$("#calendar-grid .calendar-day .calendar-gregorian-date"), "a quiet Gregorian date rides under each cell");
     const primaryCell = app.$('#calendar-grid .calendar-day[data-date="2026-09-19"]');
-    assert.equal(primaryCell.querySelector(".calendar-number").textContent.trim(), "19", "Gregorian day stays primary");
-    assert.match(primaryCell.querySelector(".calendar-secondary-date").textContent, /BS\s+3/, "the small calendar is named and translated");
+    assert.equal(primaryCell.querySelector(".calendar-number").textContent.trim(), "3", "Ashwin 3 is the big, primary number");
+    assert.match(primaryCell.querySelector(".calendar-gregorian-date").textContent, /19/, "Gregorian Sep 19 is the quiet date underneath");
     const system = JSON.parse(app.localStorage.getItem("tempo-preferences"));
     assert.equal(system.calendarSystem, "bikram", "the choice is a preference, so it survives reloads");
     assert.equal(app.$("#settings-calendar-system").value, "bikram", "the Settings card's picker agrees");
@@ -1309,10 +1312,7 @@ describe("tempo in a browser-like DOM", () => {
     await wait(30);
     assert.match(app.$("#calendar-holidays").textContent, /Constitution Day/);
     assert.match(app.$("#calendar-holidays").textContent, /Nepal/);
-    assert.match(app.$("#calendar-secondary").textContent, /BS · Bikram Sambat: Ashwin 3, 2083 BS/);
-
-    // Peace Day keeps its world-day dot on the 21st.
-    assert.ok(app.$('#calendar-grid .calendar-day[data-date="2026-09-21"] .calendar-dot[data-cat="world"]'));
+    assert.match(app.$("#calendar-secondary").textContent, /Gregorian: .*19/);
 
     // Pinning a note to the selected date works, persists, unpins.
     const noteInput = app.$("#calendar-note-input");
@@ -1340,10 +1340,41 @@ describe("tempo in a browser-like DOM", () => {
     nationalToggle.click();
     await wait(40);
     assert.match(app.$("#calendar-holidays").textContent, /No holidays marked/, "national set hidden for the 19th");
+
+    // Switching back to Gregorian restores the everyday month and its own,
+    // unscoped worldwide events (international days, every country's own
+    // national day) rather than only Nepal's.
+    systemSelect.value = "gregorian";
+    systemSelect.dispatchEvent(new app.window.Event("change", { bubbles: true }));
+    await wait(40);
+    assert.equal(app.$("#calendar-month").textContent, "September 2026", "Gregorian's own month returns when chosen");
     assert.ok(
       app.$('#calendar-grid .calendar-day[data-date="2026-09-21"] .calendar-dot[data-cat="world"]'),
-      "world days survive"
+      "world days show under Gregorian"
     );
+  });
+
+  test("a calendar's own festivals and national days are scoped to that calendar", async () => {
+    app = await boot({
+      homeZone: "Asia/Kathmandu",
+      storage: { "tempo-calendar": JSON.stringify({ view: "2026-01", selected: "2026-01-26" }) },
+    });
+    await app.go("calendar");
+
+    // Under Gregorian, Jan 26 shows both India's and other countries' days.
+    assert.match(app.$("#calendar-holidays").textContent, /Republic Day/);
+
+    // Switching to the Indian national calendar keeps Indian dates but
+    // drops unrelated national days that merely share the Gregorian date.
+    const systemSelect = app.$("#calendar-system");
+    systemSelect.value = "indian";
+    systemSelect.dispatchEvent(new app.window.Event("change", { bubbles: true }));
+    await wait(40);
+    const day26 = app.$('#calendar-grid .calendar-day[data-date="2026-01-26"]');
+    day26.click();
+    await wait(30);
+    assert.match(app.$("#calendar-holidays").textContent, /Republic Day/);
+    assert.match(app.$("#calendar-holidays").textContent, /India/);
   });
 
   test("time standards is a section of its own, short form and full form", async () => {

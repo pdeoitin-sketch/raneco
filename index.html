@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="A calm, capable dashboard for local time, interactive alarms and timers, a universal calendar with named secondary dates, world clocks, weather, forecast, and focused settings — in your browser."
+      content="A calm, capable dashboard for local time, interactive alarms and timers, a calendar that switches between Gregorian, Bikram Sambat, Chinese, Islamic and other real calendars, world clocks, weather, forecast, and focused settings — in your browser."
     />
     <title>Tempo — Time, made useful</title>
     <meta name="color-scheme" content="light dark" />
@@ -646,9 +646,9 @@
               <h2 id="calendar-title">Calendar</h2>
               <p class="section-phrase" id="calendar-phrase"></p>
               <p class="section-intro">
-                January stays January: the universal Gregorian calendar is always the clear, full-size month.
-                Add a cultural calendar as a small named date in each cell, then mark world holidays, national days,
-                and your own notes without losing the calendar everyone shares.
+                Pick a calendar and it becomes the real month you're looking at — its own month name, its own
+                length, its own festivals and national days. Switch calendars any time; a quiet Gregorian date
+                still rides along under each cell so you always know today's everyday date too.
                 <span class="section-count" id="calendar-today-pill">TODAY</span>
               </p>
             </div>
@@ -670,13 +670,9 @@
                 <span class="formula-icon soft" aria-hidden="true">31</span>
               </div>
               <div class="calendar-toolbar">
-                <div class="universal-calendar-label" aria-label="Main calendar">
-                  <span class="universal-calendar-icon" aria-hidden="true">G</span>
-                  <span><strong>Gregorian</strong><small>Universal main calendar</small></span>
-                </div>
-                <label class="calendar-system-field" for="calendar-system">
-                  <span>Small secondary calendar</span>
-                  <select id="calendar-system" aria-label="Secondary calendar shown in each date cell"></select>
+                <label class="calendar-system-field calendar-system-field-main" for="calendar-system">
+                  <span>Calendar</span>
+                  <select id="calendar-system" aria-label="Calendar shown as the main month"></select>
                 </label>
                 <span class="calendar-system-badge" id="calendar-system-badge" hidden></span>
               </div>
@@ -725,9 +721,10 @@
               </div>
 
               <p class="note-copy small muted">
-                Gregorian months and days stay main; your selected calendar appears as a small named translation in each cell.
-                Nepali festival dates use published Bikram Sambat tables (Dashain, Tihar, Chhath, Teej, Holi, Losar, Jatras).
-                Islamic dates follow tabular Hijri, Hebrew feasts begin at sundown, and national independence &amp; democracy days are marked worldwide.
+                Your chosen calendar owns the big date and its own festivals; a small Gregorian date rides quietly
+                underneath each cell for orientation. Nepali festival dates use published Bikram Sambat tables
+                (Dashain, Tihar, Chhath, Teej, Holi, Losar, Jatras). Islamic dates follow tabular Hijri, Hebrew
+                feasts begin at sundown, and international days are shown under every calendar.
               </p>
             </article>
           </div>
@@ -998,7 +995,7 @@
               <h2 id="settings-title">Settings</h2>
               <p class="section-phrase" id="settings-phrase"></p>
               <p class="section-intro">
-                A focused preferences page, opened only when you ask for it. Tune the display, secondary calendar,
+                A focused preferences page, opened only when you ask for it. Tune the display, your calendar,
                 weather units, alarm behaviour and privacy here, then return to your dashboard exactly where you left it.
               </p>
             </div>
@@ -1048,18 +1045,19 @@
               <div class="calculator-card-heading">
                 <div>
                   <p class="card-label">CALENDAR</p>
-                  <h3 id="settings-calendar-title">Universal &amp; secondary dates</h3>
+                  <h3 id="settings-calendar-title">Your calendar</h3>
                 </div>
                 <span class="formula-icon soft" aria-hidden="true">🗓</span>
               </div>
               <p class="note-copy">
-                Gregorian remains the universal main calendar. Choose one small, clearly named secondary date,
-                decide where the week begins, and select the holiday sets you want marked.
+                Choose which calendar the Calendar section shows as the real month — Gregorian, Bikram Sambat,
+                Chinese, Islamic and more each with their own dates, festivals and national days. Decide where
+                the week begins, and select the holiday sets you want marked.
               </p>
               <p class="eyebrow settings-field-label">WEEKS BEGIN ON</p>
               <div class="segmented wrap" id="settings-week-start" role="radiogroup" aria-label="Week starts on"></div>
               <label class="settings-select-field" for="settings-calendar-system">
-                <span class="eyebrow settings-field-label">SMALL SECONDARY CALENDAR</span>
+                <span class="eyebrow settings-field-label">CALENDAR</span>
                 <select id="settings-calendar-system"></select>
               </label>
               <p class="eyebrow settings-field-label">MARK THESE DAYS</p>

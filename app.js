@@ -657,7 +657,7 @@ import {
       const system = calendarSystem(prefs.calendarSystem);
       const marked = HOLIDAY_SETS.filter((set) => prefs.holidays[set.id] !== false).map((set) => set.label.toLowerCase());
       elements.settingsCalendarStatus.textContent =
-        `Weeks begin ${start.label}. Universal calendar: Gregorian. Secondary: ${system.id === "gregorian" ? "none" : `${system.shortLabel} · ${system.label}`}. Marking: ${marked.length ? marked.join(", ") : "nothing — a clean grid"}.`;
+        `Weeks begin ${start.label}. Calendar: ${system.label}${system.id === "gregorian" ? "" : ` (${system.shortLabel})`} — its own months, festivals and national days. Marking: ${marked.length ? marked.join(", ") : "nothing — a clean grid"}.`;
     }
 
     const units = readWeatherUnits();
@@ -763,8 +763,8 @@ import {
       const system = calendarSystem(prefs.calendarSystem);
       notify(
         system.id === "gregorian"
-          ? "Gregorian stays universal — secondary dates are now hidden."
-          : `${system.shortLabel} · ${system.label} now appears as the small secondary date; Gregorian stays main.`
+          ? "Gregorian is now the calendar shown — its own months, festivals and national days."
+          : `${system.shortLabel} · ${system.label} is now the calendar shown — its own months, festivals and national days.`
       );
     }
   }

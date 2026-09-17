@@ -266,7 +266,7 @@ export const JAPANESE_MONTHS = [
 export const CALENDAR_SYSTEMS = [
   {
     id: "gregorian",
-    label: "No secondary calendar",
+    label: "Gregorian",
     shortLabel: "GREG",
     nativeLabel: "Gregorian",
     place: "Worldwide",
