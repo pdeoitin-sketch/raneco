@@ -1,3 +1,29 @@
 node_modules/
 dist/
 .DS_Store
+
+# Environment files and secrets must never be committed. Tempo is a static
+# site and needs none of these; the ignores are here so that a tool or a
+# habit that creates one cannot leak it by accident.
+.env
+.env.*
+*.env
+.secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa*
+id_ed25519*
+
+# Local databases and dumps have no business in this repo either.
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql
+
+# Logs.
+*.log
+npm-debug.log*
