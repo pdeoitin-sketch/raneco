@@ -580,6 +580,12 @@ export function soundsByMood() {
 /* ----------------------------------------------------------- media links */
 
 const YOUTUBE_ID = /^[\w-]{11}$/;
+/** Spotify ids are base62 and 22 characters long; allow a little slack. */
+const SPOTIFY_ID = /^[A-Za-z0-9]{1,32}$/;
+/** YouTube playlist ids: letters, digits, dash and underscore only. */
+const YOUTUBE_LIST = /^[A-Za-z0-9_-]{1,64}$/;
+/** A pasted link longer than this is not a link — refuse it before parsing. */
+const MAX_LINK_LENGTH = 2048;
 
 /**
  * Work out what a pasted link actually is.
@@ -589,12 +595,20 @@ const YOUTUBE_ID = /^[\w-]{11}$/;
  * What it *can* do is hand the link to the platform's own embed player, which
  * needs no key and no account, and that is what this returns.
  *
+ * Everything that leaves this function for an `<iframe src>` or an
+ * `<audio src>` has been checked against a known-good shape first — the
+ * platform ids are matched against strict character sets, and no other
+ * protocol than http(s), blob: and data: ever reaches a media element.
+ *
  * @returns {{kind: string, id?: string, embedUrl?: string, openUrl?: string, url?: string, label: string}
  *           | {kind: "none", error: string}}
  */
 export function parseMediaLink(input) {
   const raw = String(input || "").trim();
   if (!raw) return { kind: "none", error: "Paste a link, or choose a file." };
+  if (raw.length > MAX_LINK_LENGTH) {
+    return { kind: "none", error: "That link is too long to be playable." };
+  }
 
   // Bare YouTube id, pasted out of a URL bar.
   if (YOUTUBE_ID.test(raw)) return youtubeSource(raw);
@@ -624,7 +638,7 @@ export function parseMediaLink(input) {
       return source;
     }
     const list = url.searchParams.get("list");
-    if (list) {
+    if (list && YOUTUBE_LIST.test(list)) {
       return {
         kind: "youtube",
         id: list,
@@ -674,6 +688,10 @@ function youtubeSource(id, start) {
 }
 
 function spotifySource(type, id) {
+  // The id came either from a spotify: URI (already validated) or from a URL
+  // path segment (validated here): nothing outside base62 ever reaches an
+  // <iframe src>.
+  if (!SPOTIFY_ID.test(id)) return { kind: "none", error: "That Spotify link does not look playable." };
   return {
     kind: "spotify",
     id,
@@ -799,6 +817,9 @@ export function createAlarmPlayer({ createContext, doc } = {}) {
     frame.className = "alarm-stream-frame";
     frame.setAttribute("title", `${source.label} alarm`);
     frame.setAttribute("allow", "autoplay; encrypted-media");
+    // The player needs no referrer to work; not sending one keeps the visit
+    // to this page from leaking to the embed platform's analytics.
+    frame.setAttribute("referrerpolicy", "no-referrer");
     frame.setAttribute("frameborder", "0");
     frame.src = source.embedUrl;
     const host = documentRef.getElementById("alarm-stream") || documentRef.body;

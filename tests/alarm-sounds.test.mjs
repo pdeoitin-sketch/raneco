@@ -136,6 +136,62 @@ test("direct audio, blobs and nonsense are each handled on their own terms", () 
   }
 });
 
+test("hostile or malformed links never reach an embed or a media element", () => {
+  // A playlist id is matched against a strict character set before it may
+  // become an iframe src — markup in the query string goes nowhere.
+  const injected = parseMediaLink(
+    "https://www.youtube.com/playlist?list=%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E"
+  );
+  assert.notEqual(injected.kind, "youtube", "a markup playlist id is not embedded");
+  assert.equal(injected.embedUrl, undefined);
+
+  // Overlong list parameters are refused too, not just malformed ones.
+  assert.notEqual(
+    parseMediaLink(`https://www.youtube.com/playlist?list=${"A".repeat(200)}`).kind,
+    "youtube",
+    "a 200-character playlist id is not embedded"
+  );
+
+  // Spotify ids from a URL path are validated the same way: no path games.
+  for (const link of [
+    "https://open.spotify.com/track/..%2F..%2Fevil",
+    "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT%3Cscript%3E",
+    `https://open.spotify.com/track/${"x".repeat(64)}`,
+  ]) {
+    const parsed = parseMediaLink(link);
+    assert.ok(
+      parsed.kind !== "spotify" || !parsed.embedUrl,
+      `${link} does not become a Spotify embed`
+    );
+  }
+
+  // A link over the length cap is refused before anything parses it.
+  const tooLong = parseMediaLink(`https://example.com/${"a".repeat(3000)}.mp3`);
+  assert.equal(tooLong.kind, "none");
+  assert.ok(tooLong.error);
+
+  // Valid links must keep working through all of the above.
+  assert.equal(parseMediaLink("https://www.youtube.com/playlist?list=PL1234567890").kind, "youtube");
+  assert.equal(parseMediaLink("https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT").kind, "spotify");
+});
+
+test("the stream embed leaks no referrer to the player platform", async () => {
+  const { JSDOM } = await import("jsdom");
+  const dom = new JSDOM(`<!doctype html><html><body><div id="alarm-stream"></div></body></html>`);
+  const player = createAlarmPlayer({ createContext: () => null, doc: dom.window.document });
+
+  const result = player.play(parseMediaLink("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), {
+    durationMs: 30000,
+  });
+  assert.equal(result.ok, true);
+  const frame = dom.window.document.querySelector("iframe");
+  assert.ok(frame, "the embed mounted");
+  assert.equal(frame.getAttribute("referrerpolicy"), "no-referrer");
+  assert.match(frame.src, /^https:\/\/www\.youtube-nocookie\.com\/embed\//);
+  player.stop();
+  assert.equal(dom.window.document.querySelector("iframe"), null, "stopping removes the embed");
+});
+
 /* ----------------------------------------------------------------- player */
 
 /**

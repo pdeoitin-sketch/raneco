@@ -36,17 +36,23 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      # Every action is pinned to a full commit SHA (not a moving tag) so a
+      # compromised tag upstream cannot inject code into this pipeline.
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      # A dependency with a known high-severity advisory must not ship.
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
 
       - name: Test
         run: npm test
@@ -60,16 +66,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      # A dependency with a known high-severity advisory must not ship.
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
 
       # The dashboard is a static bundle, so the tests are the only gate: the
       # jsdom suite boots app.js and would notice a broken picker, clock label,
@@ -81,7 +91,7 @@ jobs:
       # ("/raneco" for a project site, "" for a user/org site or custom domain).
       - name: Configure GitHub Pages
         id: pages
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
 
       # Vite must know the base path so `dist/index.html` references
       # `/raneco/assets/...` instead of `/assets/...`, which 404s on Pages.
@@ -91,7 +101,7 @@ jobs:
           VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: dist
 
@@ -106,4 +116,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

@@ -1379,6 +1379,15 @@ import {
 
   /* -------------------------------------------------------------- location */
 
+  // A short cooldown between location attempts. The buttons disable
+  // themselves while a fix is in flight, but without this they would
+  // re-arm the instant one attempt ends — and a reader drumming the button
+  // (or a script clicking it) would hammer the geocoding and weather APIs
+  // once per round trip. Five seconds between attempts is imperceptible to
+  // a person and a brick wall for a loop.
+  let lastLocateAttemptAt = 0;
+  const LOCATE_COOLDOWN_MS = 5000;
+
   /**
    * "Use my location", everywhere it appears.
    *
@@ -1396,6 +1405,12 @@ import {
       notify("Location features are switched off in Settings → Privacy & location.", "!");
       return null;
     }
+    const now = Date.now();
+    if (now - lastLocateAttemptAt < LOCATE_COOLDOWN_MS) {
+      notify("Already looking for you — give it a few seconds.", "!", 3000);
+      return null;
+    }
+    lastLocateAttemptAt = now;
     const buttons = [elements.useLocationButton, elements.locationLocate, elements.weatherUseLocationTop].filter(
       Boolean
     );
